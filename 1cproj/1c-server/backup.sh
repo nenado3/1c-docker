@@ -6,9 +6,14 @@ usage() {
 Резервная копия информационной базы в каталог BACKUP_DIR (.env, по умолчанию ./backups)
 
   ./backup.sh [база] [пользователь] [пароль]    выгрузка в .dt (по умолчанию)
+  ./backup.sh --cf [база] [пользователь] [пароль]    выгрузка конфигурации в .cf
   ./backup.sh --pg [база]                       дамп PostgreSQL (pg_dump -Fc)
 
-Для .dt в образе сервера нужен полный клиент (компонент client_full из setup-full-*.run);
+.dt и .cf всегда кладутся в backup-каталог: серверный — в BACKUP_DIR (1c-server/backups),
+клиентский export-db.sh — в EXPORT_DIR/backup (1c-client/export/backup). Файлы с исходными
+именами видны на веб-панели (вкладка «Выгрузки») со всеми вложенными папками.
+
+Для .dt/.cf в образе сервера нужен полный клиент (компонент client_full из setup-full-*.run);
 конфигуратор работает на виртуальном дисплее xvfb, графическая сессия не нужна.
 Перед выгрузкой завершите сеансы пользователей в базе.
 USAGE
@@ -28,6 +33,9 @@ case "$1" in
         fi
         rm -f "$OUT"; die "pg_dump не удался (имя базы верное? контейнер postgres запущен?)" ;;
 esac
+
+KIND=dt
+if [ "$1" = "--cf" ]; then KIND=cf; shift; fi
 
 IB="${1:-$IB_NAME}"
 IB_USER="$2"
@@ -53,17 +61,21 @@ if [ -n "$IB_USER" ] && [ -z "$IB_PASS" ]; then
 fi
 
 STAMP=$(date +%Y%m%d_%H%M%S)
-FILE="${IB}_${STAMP}.dt"
+FILE="${IB}_${STAMP}.${KIND}"
 LOGF="backup_${STAMP}.log"
 
-echo "Выгрузка базы '$IB' в ${BACKUP_DIR}/$FILE ..."
+# /DumpIB — выгрузка базы в .dt, /DumpCF — выгрузка конфигурации в .cf; файл кладётся
+# в смонтированный backup-каталог контейнера (/home/usr1cv8/backups = BACKUP_DIR на хосте)
+if [ "$KIND" = "cf" ]; then OP=/DumpCF; else OP=/DumpIB; fi
+
+echo "Выгрузка базы '$IB' (${KIND}) в ${BACKUP_DIR}/$FILE ..."
 RC=0
 $DOCKER compose exec -T onec-server bash -c '
-IB="$1"; U="$2"; P="$3"; OUT="$4"; LOG="$5"
+IB="$1"; U="$2"; P="$3"; OUT="$4"; LOG="$5"; OP="$6"
 AUTH=(); [ -n "$U" ] && AUTH=(/N "$U" /P "$P")
 /usr/local/bin/1c-xvfb /opt/1cv8/current/1cv8 DESIGNER /S "onec-server:1541\\${IB}" "${AUTH[@]}" \
-    /DisableStartupDialogs /DisableStartupMessages /DumpIB "$OUT" /Out "$LOG"
-' _ "$IB" "$IB_USER" "$IB_PASS" "/home/usr1cv8/backups/$FILE" "/home/usr1cv8/backups/$LOGF" || RC=$?
+    /DisableStartupDialogs /DisableStartupMessages "$OP" "$OUT" /Out "$LOG"
+' _ "$IB" "$IB_USER" "$IB_PASS" "/home/usr1cv8/backups/$FILE" "/home/usr1cv8/backups/$LOGF" "$OP" || RC=$?
 
 echo "--- журнал конфигуратора ---"
 cat "${BACKUP_DIR}/$LOGF" 2>/dev/null || echo "(журнал пуст)"

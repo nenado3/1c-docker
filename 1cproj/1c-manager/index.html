@@ -127,10 +127,11 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
   <section id="t-files">
     <div class="row"><button class="b sec" id="refreshF">Обновить</button></div>
-    <h2>Выгрузки сервера <span class="mut mono" id="dirBackups"></span></h2>
-    <table><thead><tr><th>Файл</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fBackups"></tbody></table>
-    <h2>Выгрузки клиента (.dt) <span class="mut mono" id="dirExport"></span></h2>
-    <table><thead><tr><th>Файл</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fExport"></tbody></table>
+    <h2>Выгрузки сервера (backup) <span class="mut mono" id="dirBackups"></span></h2>
+    <table><thead><tr><th>Файл / папка</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fBackups"></tbody></table>
+    <h2>Выгрузки клиента (export) <span class="mut mono" id="dirExport"></span></h2>
+    <table><thead><tr><th>Файл / папка</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fExport"></tbody></table>
+    <p class="mut">Папки backup и export показываются целиком, со всеми вложенными каталогами; файлы выгрузок (.dt/.cf) можно скачать по ссылке. Файл, загруженный для импорта, остаётся в backup с исходным именем без изменений.</p>
   </section>
 
   <section id="t-client">
@@ -303,9 +304,17 @@ async function loadPg() {
 }
 
 function fileRows(list, kind) {
-  if (!list.files.length) return '<tr><td colspan="4" class="mut">Пусто</td></tr>';
-  return list.files.map(f => '<tr><td class="mono">' + esc(f.name) + '</td><td>' + fmtSize(f.size) + '</td><td>' + fmtDate(f.mtime) + '</td><td>' +
-    (kind ? '<a class="b" style="text-decoration:none;display:inline-block" href="/download?token=' + encodeURIComponent(TOKEN) + '&dir=' + kind + '&name=' + encodeURIComponent(f.name) + '">Скачать</a>' : '') + '</td></tr>').join('');
+  // дерево папки backup/export: вложенные показываем отступом, файлы — со скачиванием
+  const tree = list.tree || [];
+  if (!tree.length) return '<tr><td colspan="4" class="mut">Пусто</td></tr>';
+  return tree.map(e => {
+    const depth = e.path.split('/').length - 1;
+    const pad = 'padding-left:' + (10 + depth * 22) + 'px';
+    if (e.type === 'dir')
+      return '<tr><td class="mono" style="' + pad + '">📁 ' + esc(e.name) + '/</td><td class="mut">—</td><td class="mut">—</td><td></td></tr>';
+    return '<tr><td class="mono" style="' + pad + '">' + esc(e.name) + '</td><td>' + fmtSize(e.size) + '</td><td>' + fmtDate(e.mtime) + '</td><td>' +
+      '<a class="b" style="text-decoration:none;display:inline-block" href="/download?token=' + encodeURIComponent(TOKEN) + '&dir=' + kind + '&name=' + encodeURIComponent(e.path) + '">Скачать</a></td></tr>';
+  }).join('');
 }
 async function loadFiles() {
   const r = await api('/api/files');
