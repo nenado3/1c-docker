@@ -61,24 +61,28 @@ USERS=$($DOCKER compose exec -T postgres runuser -u postgres -- "$PGBIN/psql" -d
     "SELECT count(*) FROM v8users" 2>/dev/null | tr -d '[:space:]')
 case "$USERS" in ''|*[!0-9]*) USERS=0;; esac
 
-# Передаём файл непосредственно в контейнер onec-server через docker cp.
-# Не полагаемся на bind-mount BACKUP_DIR: веб-панель и compose могут быть
-# запущены с разными рабочими каталогами, из-за чего один и тот же BACKUP_DIR
-# на хосте может указывать на разные каталоги. Временный каталог /tmp внутри
-# контейнера не зависит от настройки BACKUP_DIR.
+# Передаём файл в контейнер onec-server через docker cp.
+# Основной путь — смонтированный backup-каталог /home/usr1cv8/backups (файл с исходным именем
+# остаётся виден в BACKUP_DIR на хосте и в веб-панели); /tmp используется как запасной вариант,
+# если bind-mount BACKUP_DIR в контейнере нет (веб-панель и compose могут иметь разные cwd).
 [ -r "$HOST_FILE" ] || die "файл на хосте недоступен для чтения: $HOST_FILE"
 FILE_SIZE=$(stat -c '%s' "$HOST_FILE")
 [ "$FILE_SIZE" -gt 0 ] || die "файл на хосте пустой: $HOST_FILE"
 
-REMOTE_DIR="/tmp/onec-import"
-REMOTE="$REMOTE_DIR/$FILE"
+REMOTE_DIR="/home/usr1cv8/backups"
 CONTAINER="onec-server"
 
-# Проверяем контейнер и готовим каталог до копирования.
+# Проверяем контейнер до работы с каталогами.
 $DOCKER inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -qx true \
     || die "контейнер $CONTAINER не запущен; сначала запустите сервер 1С"
+
+if ! $DOCKER exec "$CONTAINER" test -d "$REMOTE_DIR" 2>/dev/null; then
+    # если смонтированного backup-каталога в контейнере нет — используем /tmp
+    REMOTE_DIR="/tmp/onec-import"
+fi
+REMOTE="$REMOTE_DIR/$FILE"
 $DOCKER exec "$CONTAINER" mkdir -p "$REMOTE_DIR" \
-    || die "не удалось создать временный каталог $REMOTE_DIR в контейнере"
+    || die "не удалось создать каталог $REMOTE_DIR в контейнере"
 
 # Сначала удаляем одноимённый остаток предыдущего прерванного импорта.
 $DOCKER exec "$CONTAINER" rm -f "$REMOTE" 2>/dev/null || true
@@ -187,8 +191,11 @@ if [[ "$KIND" == "dt" ]]; then
         designer_restore || die "восстановление .dt не удалось"
     fi
     echo "Готово: база '$IB' восстановлена из '$FILE'."
-    $DOCKER exec onec-server rm -f "$REMOTE" "$LOG" >/dev/null 2>&1 || true
-    exit 0
+# файл в backup-каталоге оставляем с исходным именем (он нужен в BACKUP_DIR и на веб-панели);
+# удаляем только временный вариант из /tmp и журнал
+case "$REMOTE" in /tmp/*) $DOCKER exec onec-server rm -f "$REMOTE" ;; esac
+$DOCKER exec onec-server rm -f "$LOG" >/dev/null 2>&1 || true
+exit 0
 fi
 
 # ---------------- .cf ----------------
@@ -210,4 +217,6 @@ if [ "$DONE" != "1" ]; then
     designer_restore || die "загрузка конфигурации не удалась"
 fi
 echo "Готово: конфигурация из '$FILE' загружена."
-$DOCKER exec onec-server rm -f "$REMOTE" "$LOG" >/dev/null 2>&1 || true
+# файл в backup-каталоге оставляем с исходным именем; удаляем только временный вариант и журнал
+case "$REMOTE" in /tmp/*) $DOCKER exec onec-server rm -f "$REMOTE" ;; esac
+$DOCKER exec onec-server rm -f "$LOG" >/dev/null 2>&1 || true

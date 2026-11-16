@@ -105,6 +105,30 @@ def data_dir(kind):
     return os.path.normpath(os.path.join(base, os.path.expanduser(val)))
 
 
+def walk_files(d, rel=""):
+    """Обход каталога со вложенными папками (для веб-обзора backup/export)."""
+    out = []
+    try:
+        entries = sorted(os.scandir(d), key=lambda e: (not e.is_dir(follow_symlinks=False), e.name.lower()))
+    except OSError:
+        return out
+    dirs, files = [], []
+    for e in entries:
+        if e.name.startswith(".") or e.is_symlink():
+            continue
+        r = (rel + "/" + e.name) if rel else e.name
+        if e.is_dir(follow_symlinks=False):
+            dirs.append({"name": e.name, "path": r, "type": "dir"})
+            dirs.extend(walk_files(e.path, r))
+        elif e.is_file():
+            try:
+                files.append({"name": e.name, "path": r, "type": "file",
+                              "size": e.stat().st_size, "mtime": e.stat().st_mtime})
+            except OSError:
+                pass
+    return dirs + files
+
+
 def list_files(kind):
     d, out = data_dir(kind), []
     if os.path.isdir(d):
@@ -113,7 +137,7 @@ def list_files(kind):
             if os.path.isfile(p) and not n.startswith("."):
                 out.append({"name": n, "size": os.path.getsize(p), "mtime": os.path.getmtime(p)})
     out.sort(key=lambda x: x["mtime"], reverse=True)
-    return {"dir": d, "files": out}
+    return {"dir": d, "files": out, "tree": walk_files(d)}
 
 
 # ---------------- фоновые задачи ----------------
@@ -239,6 +263,11 @@ def do_action(body):
         user, pwd = str(body.get("user", "")).strip(), str(body.get("pwd", ""))
         args = [ib] + ([user, pwd] if user else [])
         return script_job("Выгрузка .dt базы %s" % ib, "server", "backup.sh", *args)
+    if a == "backup_cf":
+        ib = need(body, "ib", NAME_RE)
+        user, pwd = str(body.get("user", "")).strip(), str(body.get("pwd", ""))
+        args = ["--cf", ib] + ([user, pwd] if user else [])
+        return script_job("Выгрузка .cf конфигурации базы %s" % ib, "server", "backup.sh", *args)
     if a == "import_file":
         ib = need(body, "ib", NAME_RE)
         filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$", re.I), 190)
@@ -379,9 +408,14 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, html, "text/html; charset=utf-8")
             if u.path == "/download":
                 kind, name = q.get("dir", [""])[0], q.get("name", [""])[0]
-                if kind not in ("backups", "export") or name != os.path.basename(name) or name.startswith("."):
+                # name может быть с вложенными папками (backup/export просматриваются на веб целиком);
+                # защита от выхода за пределы каталога — normpath + проверка префикса
+                if kind not in ("backups", "export") or not name or name.startswith(".") or "\x00" in name:
                     return self._send(400, {"error": "недопустимый запрос"})
-                p = os.path.join(data_dir(kind), name)
+                base = os.path.abspath(data_dir(kind))
+                p = os.path.normpath(os.path.join(base, name))
+                if not (p == base or p.startswith(base + os.sep)):
+                    return self._send(400, {"error": "недопустимый путь"})
                 if not os.path.isfile(p):
                     return self._send(404, {"error": "файл не найден"})
                 # отдаём чанками: .dt бывает в несколько ГБ, целиком в память его читать нельзя
@@ -389,7 +423,7 @@ class H(BaseHTTPRequestHandler):
                 self.send_header("Content-Type", "application/octet-stream")
                 self.send_header("Content-Length", str(os.path.getsize(p)))
                 self.send_header("Content-Disposition",
-                                 "attachment; filename*=UTF-8''%s" % quote(name))
+                                 "attachment; filename*=UTF-8''%s" % quote(os.path.basename(p)))
                 self.send_header("Cache-Control", "no-store")
                 self.end_headers()
                 with open(p, "rb") as f:
@@ -419,14 +453,14 @@ class H(BaseHTTPRequestHandler):
                         any(ord(c) < 32 for c in filename) or os.path.splitext(filename)[1].lower() not in (".dt", ".cf")):
                     return self._send(400, {"error": "разрешены только файлы .dt и .cf (имя до 180 символов)"})
                 ext = filename.rsplit(".", 1)[1].lower()
-                stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", os.path.splitext(filename)[0]).strip("._-")[:90] or "upload"
-                safe_name = "%s_%s.%s" % (stem, secrets.token_hex(5), ext)
+                # файл сохраняем в backup с исходным именем без изменений (перезаписывает одноимённый)
+                safe_name = filename
                 dest_dir = data_dir("backups")
                 os.makedirs(dest_dir, exist_ok=True)
                 dest = os.path.join(dest_dir, safe_name)
                 remaining = n
                 try:
-                    with open(dest, "xb") as f:
+                    with open(dest, "wb") as f:
                         while remaining:
                             chunk = self.rfile.read(min(1024 * 1024, remaining))
                             if not chunk:
