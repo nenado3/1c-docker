@@ -1,0 +1,47 @@
+#!/bin/bash
+. "$(dirname "$0")/common.sh"
+
+mkdir -p licenses && chmod 1777 licenses
+
+echo "== Запуск postgres и сервера 1С"
+$DOCKER compose up -d || die "не удалось запустить контейнеры"
+
+RAC() { $DOCKER compose exec -T onec-server "${ONEC_BIN}/rac" "$@"; }
+
+echo "== Ожидание кластера 1С (до 3 минут)"
+CLUSTER_ID=""
+for i in $(seq 1 90); do
+    CLUSTER_ID=$(RAC cluster list 2>/dev/null | awk '/^cluster/ {print $3; exit}')
+    [ -n "$CLUSTER_ID" ] && break
+    sleep 2
+done
+
+if [ -z "$CLUSTER_ID" ]; then
+    echo "Кластер не найден. Вывод rac и логи сервера:"
+    RAC cluster list || true
+    $DOCKER compose logs --tail=30 onec-server
+    die "сервер 1С не отвечает"
+fi
+echo "Кластер: $CLUSTER_ID"
+
+echo "== Проверка информационной базы '$IB_NAME'"
+if RAC infobase summary list --cluster="$CLUSTER_ID" | grep -qE "^name +: +${IB_NAME}$"; then
+    echo "База '$IB_NAME' уже есть, пропускаю создание"
+else
+    echo "Создаю базу '$IB_NAME'"
+    RAC infobase create \
+        --cluster="$CLUSTER_ID" \
+        --name="$IB_NAME" \
+        --dbms=PostgreSQL \
+        --db-server=postgres \
+        --db-name="$DB_NAME" \
+        --db-user="$DB_USER" \
+        --db-pwd="$DB_PASS" \
+        --locale=ru \
+        --create-database \
+        || die "не удалось создать базу (смотрите ошибку СУБД выше)"
+fi
+
+echo
+echo "Сервер готов. Сеть для клиента: onec-net"
+echo "В клиенте: кластер onec-server:1541, база $IB_NAME"
