@@ -48,7 +48,6 @@ if [ -z "$DISPLAY_NUMBER" ] || ! kill -0 "$XVFB_PID" 2>/dev/null; then
 fi
 
 export DISPLAY=":$DISPLAY_NUMBER"
-export XAUTHORITY="${XAUTHORITY:-}"
 "$@"
 RC=$?
 exit "$RC"
