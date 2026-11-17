@@ -96,7 +96,9 @@ def write_env_value(path, key, value):
 
 def data_dir(kind):
     if kind == "backups":
-        base, key, default = cfg["server_dir"], "BACKUP_DIR", "./backups"
+        # Для DT/CF используем строго каталог проекта 1c-server/backups,
+        # не допускаем расхождения с ожидаемыми backups/dt и backups/cf.
+        return os.path.join(cfg["server_dir"], "backups")
     elif kind == "export":
         base, key, default = cfg["client_dir"], "EXPORT_DIR", "./export"
     else:
