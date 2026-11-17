@@ -168,7 +168,7 @@ run_with_progress() {
 diagnose_restore() {
     echo "--- диагностика импорта: ${secs}s ---"
     local p
-    p=$($DOCKER exec onec-server sh -c "ps -eo pid=,args= | grep '[1]cv8 DESIGNER' | grep '[R]estoreIB' | head -n 1 | awk '{print \\$1}'" 2>/dev/null || true)
+    p=$($DOCKER exec onec-server sh -c "pgrep -f '/opt/1cv8/current/1cv8 DESIGNER.*RestoreIB' | head -n 1" 2>/dev/null || true)
     if [[ "$p" =~ ^[0-9]+$ ]]; then
         $DOCKER exec onec-server sh -c "
             echo 'PID: $p'
