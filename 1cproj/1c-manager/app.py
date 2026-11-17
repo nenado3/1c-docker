@@ -280,7 +280,14 @@ def do_action(body):
             raise ValueError("недопустимое имя пользователя PostgreSQL")
         if len(db_pwd) > 200:
             raise ValueError("слишком длинный пароль PostgreSQL")
-        args = [ib, filename, kind, user, pwd, db_user, db_pwd]
+        # Передаём import.sh тот же абсолютный путь, куда API загрузки реально сохранил файл.
+        # Это исключает расхождение BACKUP_DIR/cwd между веб-панелью и shell-скриптом.
+        uploaded_file = os.path.join(data_dir("backups"), kind, filename)
+        if not os.path.isfile(uploaded_file):
+            raise ValueError("Загрузка не найдена на диске: %s. Проверьте ответ загрузки и каталог BACKUP_DIR." % uploaded_file)
+        if os.path.getsize(uploaded_file) <= 0:
+            raise ValueError("Загруженный файл пустой: %s" % uploaded_file)
+        args = [ib, filename, kind, user, pwd, db_user, db_pwd, uploaded_file]
         return script_job("Импорт .%s в базу %s" % (kind, ib), "server", "import.sh", *args)
     if a == "backup_pg":
         return script_job("Дамп PostgreSQL %s" % need(body, "db", NAME_RE), "server", "backup.sh", "--pg", need(body, "db", NAME_RE))
