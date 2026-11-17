@@ -450,7 +450,7 @@ document.addEventListener('click', async e => {
   }
   if (t.dataset.pickdir) { $(t.dataset.pickdir).click(); return; }
   if (t.dataset.act === 'build-server') { $('dlgBuild').showModal(); loadBuild(); return; }
-  if (t.dataset.act === 'server-up') { dtLaunchMode = 'startup'; $('dtDbName').value = $('dtName').value.trim() || 'mybase'; $('dtDbUser').value = ''; $('dtDbPwd').value = ''; $('dtDialogHint').textContent = 'Сначала запустятся PostgreSQL и сервер 1С, затем будет создана отдельная новая база PostgreSQL и восстановлен выбранный .dt. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Запустить сервер и восстановить .dt'; $('dlgDt').showModal(); return; }
+  if (t.dataset.act === 'server-up') { dtLaunchMode = 'startup'; $('dtDbName').value = ''; $('dtDbUser').value = ''; $('dtDbPwd').value = ''; $('dtDialogHint').textContent = 'Сначала запустятся PostgreSQL и сервер 1С, затем будет создана отдельная новая база PostgreSQL и восстановлен выбранный .dt. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Запустить сервер и восстановить .dt'; $('dlgDt').showModal(); return; }
   if (t.dataset.op) {
     if (t.dataset.op === 'logs') { logsFor = t.dataset.c; loadLogs(); return; }
     return runAction({action: 'container_op', name: t.dataset.c, op: t.dataset.op});
@@ -540,7 +540,7 @@ function uploadFileWithProgress(file) {
 
 $('dtOk').onclick = async () => {
   const file = $('dtFile').files[0], ib = $('dtName').value.trim();
-  const dbName = $('dtDbName').value.trim(), dbUser = $('dtDbUser').value.trim(), dbPwd = $('dtDbPwd').value;
+  const dbName = $('dtDbName').value.trim() || ib, dbUser = $('dtDbUser').value.trim(), dbPwd = $('dtDbPwd').value;
   if (!/^[A-Za-z0-9_.-]{1,64}$/.test(ib)) { $('uploadStatus').textContent = 'Имя базы 1С: латинские буквы, цифры, точка, дефис или подчёркивание (до 64 символов).'; return; }
   if (!/^[A-Za-z0-9_.-]{1,63}$/.test(dbName)) { $('uploadStatus').textContent = 'Имя базы PostgreSQL должно содержать 1–63 допустимых символа.'; return; }
   if (dbUser && !/^[A-Za-z0-9_.-]{1,64}$/.test(dbUser)) { $('uploadStatus').textContent = 'Недопустимое имя пользователя PostgreSQL.'; return; }
