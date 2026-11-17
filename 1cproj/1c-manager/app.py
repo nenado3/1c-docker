@@ -263,11 +263,20 @@ def do_action(body):
     if a == "start_server_with_dt":
         ib = need(body, "ib", NAME_RE)
         filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.dt$", re.I), 190)
+        db_name = str(body.get("db_name") or ib).strip()
+        db_user = str(body.get("db_user") or "").strip()
+        db_pwd = str(body.get("db_pwd") or "")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,63}", db_name):
+            raise ValueError("имя базы PostgreSQL должно содержать 1–63 допустимых символа")
+        if db_user and not NAME_RE.match(db_user):
+            raise ValueError("недопустимое имя пользователя PostgreSQL")
+        if len(db_pwd) > 200:
+            raise ValueError("слишком длинный пароль PostgreSQL")
         uploaded_file = os.path.join(data_dir("backups"), "dt", filename)
         if not os.path.isfile(uploaded_file) or os.path.getsize(uploaded_file) <= 0:
             raise ValueError("Загруженный .dt не найден или пуст: %s" % uploaded_file)
         return script_job("Запуск сервера и создание базы %s из .dt" % ib, "server",
-                          "start-with-dt.sh", ib, filename, uploaded_file)
+                          "start-with-dt.sh", ib, filename, uploaded_file, db_name, db_user, db_pwd)
     if a == "backup_dt":
         ib = need(body, "ib", NAME_RE)
         user, pwd = str(body.get("user", "")).strip(), str(body.get("pwd", ""))
