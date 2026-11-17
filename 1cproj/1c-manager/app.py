@@ -463,7 +463,7 @@ class H(BaseHTTPRequestHandler):
                 dest_dir = os.path.join(data_dir("backups"), ext)
                 os.makedirs(dest_dir, exist_ok=True)
                 dest = os.path.join(dest_dir, safe_name)
-                part = dest + "." + secrets.token_hex(8) + ".part"
+                part = os.path.join(dest_dir, ".upload-" + secrets.token_hex(8) + ".part")
                 remaining = n
                 try:
                     with open(part, "xb") as f:
@@ -495,7 +495,7 @@ class H(BaseHTTPRequestHandler):
                 d = os.path.join(project("server"), "server" if target == "server" else "postgres", "dist")
                 os.makedirs(d, exist_ok=True)
                 dest = os.path.join(d, filename)
-                part = dest + ".part"
+                part = os.path.join(d, ".dist-upload-" + secrets.token_hex(8) + ".part")
                 remaining = n
                 try:
                     with open(part, "wb") as f:
