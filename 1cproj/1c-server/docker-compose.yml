@@ -10,7 +10,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in 1c-server/.env}"
     volumes:
       - pg-data:/var/lib/postgresql/data
     # Без healthcheck 1С успевала создать базу раньше, чем PostgreSQL начинал принимать подключения
