@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Запуск инфраструктуры и создание новой информационной базы из .dt.
 set -Eeuo pipefail
-SCRIPT_DIR="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd -P)"
 cd "$SCRIPT_DIR"
 . "$SCRIPT_DIR/common.sh"
 BACKUP_ROOT="$(realpath -m -- "$BACKUP_DIR")"
