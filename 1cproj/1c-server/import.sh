@@ -135,7 +135,6 @@ done
 echo "Файл доступен обоим контейнерам: $REMOTE ($(numfmt --to=iec "$FILE_SIZE"))"
 echo "onec-server и postgres читают один и тот же файл из общей папки /import."
 
-STAMP=$(date +%Y%m%d_%H%M%S)
 LOG="/import/import_${STAMP}.log"
 ACTION=()
 CAUTH=()
@@ -156,6 +155,9 @@ run_with_progress() {
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
         printf 'Операция 1С выполняется... %02d:%02d\n' "$((secs/60))" "$((secs%60))"
+        if [ "$secs" -gt 0 ] && [ $((secs % 30)) -eq 0 ]; then
+            diagnose_restore
+        fi
         sleep 10
         secs=$((secs+10))
     done
