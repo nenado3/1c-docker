@@ -1,2 +1,20 @@
 __pycache__/
 *.pyc
+
+# Local environment files and credentials (keep .env.example tracked)
+**/.env
+
+# Runtime data, backups, exports and 1C license files
+**/backups/
+**/export/
+**/licenses/
+**/*.lic
+**/*.dt
+**/*.cf
+**/*.dump
+**/*.log
+**/*.part
+
+# Local 1C installer packages are supplied by the operator
+**/dist/*.deb
+**/dist/*.run
