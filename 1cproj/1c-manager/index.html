@@ -157,8 +157,17 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
 <dialog id="dlgImport">
   <h3 style="margin-top:0">Загрузить файл в Docker и импортировать в базу</h3>
-  <label>Информационная база 1С</label>
-  <select id="importBase" aria-label="Информационная база"><option value="">Сначала загрузите список баз</option></select>
+  <label><input id="importNewBase" type="checkbox"> Создать новую информационную базу и отдельную БД PostgreSQL (только для .dt)</label>
+  <div id="importNewBaseFields" hidden>
+    <label>Имя новой информационной базы 1С</label>
+    <input id="importNewIb" placeholder="например mybase2">
+    <label>Имя новой базы PostgreSQL <span class="mut">(пусто — как имя ИБ)</span></label>
+    <input id="importNewDbName" placeholder="например mybase2">
+  </div>
+  <div id="importExistingBaseFields">
+    <label>Существующая информационная база 1С</label>
+    <select id="importBase" aria-label="Информационная база"><option value="">Сначала загрузите список баз</option></select>
+  </div>
   <label>Файл .dt или .cf</label>
   <input id="importFile" type="file" accept=".dt,.cf,application/octet-stream">
   <label>Пользователь 1С <span class="mut">(если требуется)</span></label>
@@ -583,20 +592,36 @@ $('dtOk').onclick = async () => {
   finally { $('dtOk').disabled = false; }
 };
 
+$('importNewBase').onchange = () => {
+  const creating = $('importNewBase').checked;
+  $('importNewBaseFields').hidden = !creating;
+  $('importExistingBaseFields').hidden = creating;
+  $('importFile').setAttribute('accept', creating ? '.dt,application/octet-stream' : '.dt,.cf,application/octet-stream');
+};
+
 $('uploadImport').onclick = async () => {
-  const file = $('importFile').files[0], ib = $('importBase').value;
+  const file = $('importFile').files[0];
+  const newBase = $('importNewBase').checked;
+  const ib = newBase ? $('importNewIb').value.trim() : $('importBase').value;
+  const dbName = $('importNewDbName').value.trim();
   if (!file) { $('importStatus').textContent = 'Выберите файл .dt или .cf.'; return; }
-  if (!ib) { $('importStatus').textContent = 'Выберите информационную базу.'; return; }
-  if (!/\.(dt|cf)$/i.test(file.name)) { $('importStatus').textContent = 'Поддерживаются только .dt и .cf.'; return; }
-  if (file.size > 8 * 1024 * 1024 * 1024) { $('importStatus').textContent = 'Файл больше 8 ГБ.'; return; }
+  if (!ib) { $('importStatus').textContent = newBase ? 'Укажите имя новой информационной базы.' : 'Выберите существующую информационную базу.'; return; }
+  if (!/^[A-Za-z0-9_.-]{1,64}$/.test(ib)) { $('importStatus').textContent = 'Имя ИБ: 1–64 символа, латиница, цифры, точка, дефис или подчёркивание.'; return; }
+  if (newBase && !/\.dt$/i.test(file.name)) { $('importStatus').textContent = 'Создать новую базу можно только из файла .dt.'; return; }
+  if (!/\.(dt|cf)$/i.test(file.name)) { $('importStatus').textContent = 'Поддерживаются только .dt или .cf.'; return; }
+  if (newBase && dbName && !/^[A-Za-z0-9_.-]{1,63}$/.test(dbName)) { $('importStatus').textContent = 'Имя PostgreSQL: 1–63 допустимых символа.'; return; }
+  const dbUser = $('importDbUser').value.trim(), dbPwd = $('importDbPwd').value;
+  if (newBase && (!!dbUser !== !!dbPwd)) { $('importStatus').textContent = 'Для отдельного пользователя PostgreSQL укажите и логин, и пароль; иначе оставьте оба поля пустыми для использования .env.'; return; }
+  if (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024) { $('importStatus').textContent = 'Размер файла должен быть от 1 байта до 8 ГБ.'; return; }
   $('uploadImport').disabled = true;
   $('importStatus').textContent = 'Загружаю ' + file.name + ' (' + fmtSize(file.size) + ')…';
   try {
     const result = await uploadFileWithProgress(file, 'import');
     $('importStatus').textContent = 'Файл загружен (100%): ' + (result.path || result.filename) + '. Запускаю импорт в базу ' + ib + '…';
-    await runAction({action:'import_file', ib, filename:result.filename,
+    await runAction({action:'import_file', ib, filename:result.filename, new_base:newBase,
+                     db_name:newBase ? dbName : '',
                      user:$('importUser').value, pwd:$('importPwd').value,
-                     db_user:$('importDbUser').value, db_pwd:$('importDbPwd').value});
+                     db_user:dbUser, db_pwd:dbPwd});
     $('importFile').value = '';
     $('dlgImport').close();
   } catch (e) { $('importStatus').textContent = 'Ошибка: ' + e.message; }
