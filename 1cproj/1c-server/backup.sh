@@ -83,8 +83,8 @@ echo "--- журнал конфигуратора ---"
 cat "${BACKUP_KIND_DIR}/$LOGF" 2>/dev/null || echo "(журнал пуст)"
 echo "----------------------------"
 
-$DOCKER compose exec -T onec-server chmod a+rw "/home/usr1cv8/backups/$FILE" "/home/usr1cv8/backups/$LOGF" 2>/dev/null || true
-if [ $RC -eq 0 ] && [ -s "${BACKUP_DIR}/$FILE" ]; then
+$DOCKER compose exec -T onec-server chmod a+rw "/home/usr1cv8/backups/$KIND/$FILE" "/home/usr1cv8/backups/$KIND/$LOGF" 2>/dev/null || true
+if [ $RC -eq 0 ] && [ -s "${BACKUP_KIND_DIR}/$FILE" ]; then
     ls -lh "${BACKUP_KIND_DIR}/$FILE"
     echo "Готово: $(cd "$BACKUP_KIND_DIR" && pwd)/$FILE"
 else
