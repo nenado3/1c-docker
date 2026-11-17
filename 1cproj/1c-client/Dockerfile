@@ -41,10 +41,10 @@ RUN if [ -f /opt/1cv8/current/libstdc++.so.6 ]; then \
         mv /opt/1cv8/current/libstdc++.so.6 /opt/1cv8/current/libstdc++.so.6.bak; \
     fi
 
-# Проверяем, что системная libstdc++ содержит символы, требуемые WebKit/GTK
+# Ubuntu 22.04 (базовый образ клиента) предоставляет GLIBCXX_3.4.29; проверяем ABI-минимум WebKit 4.0.
 RUN SYS_LIB="$(ldconfig -p | grep -m1 "libstdc++.so.6 " | sed -E "s/.*=>[[:space:]]*//")" \
     && test -n "$SYS_LIB" \
-    && grep -aFq "GLIBCXX_3.4.30" "$SYS_LIB"
+    && grep -aFq "GLIBCXX_3.4.29" "$SYS_LIB"
 
 # Настройки сетевого ключа HASP (NetHASP): редактируйте nethasp.ini рядом с Dockerfile и пересоберите образ
 # (или правьте его на хосте и пересоздавайте контейнер — файл смонтирован из docker-compose.yml)
