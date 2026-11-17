@@ -170,8 +170,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <dialog id="dlgDt">
   <h3 style="margin-top:0">Создание базы из архива .dt</h3>
   <label>Имя новой информационной базы 1С</label><input id="dtName" value="mybase" placeholder="например mybase">
-  <label>Имя отдельной базы PostgreSQL</label><input id="dtDbName" value="mybase" placeholder="например mybase">
-  <label>Пользователь PostgreSQL <span class="mut">(пусто — из .env)</span></label><input id="dtDbUser" placeholder="postgres">
+  <label>Имя отдельной базы PostgreSQL</label><input id="dtDbName" value="" placeholder="например mybase">
+  <label>Пользователь PostgreSQL <span class="mut">(пусто — из .env; свой пользователь должен существовать и иметь CREATEDB)</span></label><input id="dtDbUser" placeholder="postgres">
   <label>Пароль PostgreSQL <span class="mut">(пусто — из .env)</span></label><input id="dtDbPwd" type="password" autocomplete="new-password">
   <p class="mut">Подключение внутри Docker: postgres:5432. Для каждой новой базы создаётся отдельная БД PostgreSQL. Сервер и порт заданы конфигурацией Docker и здесь не меняются.</p>
   <label>Файл резервной копии .dt</label><input id="dtFile" type="file" accept=".dt,application/octet-stream">
@@ -480,7 +480,7 @@ document.addEventListener('click', async e => {
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
 $('clearCon').onclick = () => { $('conOut').textContent = ''; };
-$('newBase').onclick = () => { dtLaunchMode = 'base'; $('dtDbName').value = $('dtName').value.trim() || 'mybase'; $('dtDbUser').value = ''; $('dtDbPwd').value = ''; $('dtDialogHint').textContent = 'Будет создана отдельная новая база PostgreSQL и зарегистрирована в кластере 1С. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Создать базу из .dt'; $('dlgDt').showModal(); };
+$('newBase').onclick = () => { dtLaunchMode = 'base'; $('dtDbName').value = ''; $('dtDbUser').value = ''; $('dtDbPwd').value = ''; $('dtDialogHint').textContent = 'Будет создана отдельная новая база PostgreSQL и зарегистрирована в кластере 1С. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Создать базу из .dt'; $('dlgDt').showModal(); };
 $('dtCancel').onclick = () => $('dlgDt').close(); $('dCancel').onclick = () => $('dlgDump').close();
 $('dOk').onclick = () => { $('dlgDump').close();
   runAction({action: 'backup_dt', ib: $('dName').value, user: $('dUser').value, pwd: $('dPwd').value}); };
@@ -544,6 +544,7 @@ $('dtOk').onclick = async () => {
   if (!/^[A-Za-z0-9_.-]{1,64}$/.test(ib)) { $('uploadStatus').textContent = 'Имя базы 1С: латинские буквы, цифры, точка, дефис или подчёркивание (до 64 символов).'; return; }
   if (!/^[A-Za-z0-9_.-]{1,63}$/.test(dbName)) { $('uploadStatus').textContent = 'Имя базы PostgreSQL должно содержать 1–63 допустимых символа.'; return; }
   if (dbUser && !/^[A-Za-z0-9_.-]{1,64}$/.test(dbUser)) { $('uploadStatus').textContent = 'Недопустимое имя пользователя PostgreSQL.'; return; }
+  if ((dbUser && !dbPwd) || (!dbUser && dbPwd)) { $('uploadStatus').textContent = 'Для отдельного пользователя PostgreSQL укажите и логин, и пароль; если используете .env, оставьте оба поля пустыми.'; return; }
   if (dbPwd.length > 200) { $('uploadStatus').textContent = 'Пароль PostgreSQL слишком длинный.'; return; }
   if (!file) { $('uploadStatus').textContent = 'Выберите файл .dt.'; return; }
   if (!/\.dt$/i.test(file.name)) { $('uploadStatus').textContent = 'Поддерживается только файл .dt.'; return; }
