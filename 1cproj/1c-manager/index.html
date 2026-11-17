@@ -539,7 +539,7 @@ $('createFromDt').onclick = async () => {
   const file = $('newDtFile').files[0], ib = $('newDtName').value.trim();
   if (!/^[A-Za-z0-9_.-]{1,64}$/.test(ib)) { $('uploadStatus').textContent = 'Имя базы: латинские буквы, цифры, точка, дефис или подчёркивание (до 64 символов).'; return; }
   if (!file) { $('uploadStatus').textContent = 'Выберите файл .dt.'; return; }
-  if (!/\\.dt$/i.test(file.name)) { $('uploadStatus').textContent = 'Для создания новой базы поддерживается только .dt.'; return; }
+  if (!/\.dt$/i.test(file.name)) { $('uploadStatus').textContent = 'Для создания новой базы поддерживается только .dt.'; return; }
   if (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024) { $('uploadStatus').textContent = 'Размер .dt должен быть от 1 байта до 8 ГБ.'; return; }
   $('createFromDt').disabled = true;
   $('uploadStatus').textContent = 'Загружаю архив ' + file.name + ' (' + fmtSize(file.size) + ')…';
