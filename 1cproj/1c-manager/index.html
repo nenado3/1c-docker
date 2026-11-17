@@ -555,11 +555,12 @@ $('dtOk').onclick = async () => {
     const result = await uploadFileWithProgress(file);
     $('uploadStatus').textContent = 'Архив загружен. ' + (dtLaunchMode === 'startup' ? 'Запускаю сервер и восстанавливаю базу ' : 'Создаю базу ') + ib + '…';
     if (dtLaunchMode === 'startup') {
-      await runAction({action:'start_server_with_dt', ib, filename:result.filename});
+      await runAction({action:'start_server_with_dt', ib, filename:result.filename,
+                       db_name:dbName, db_user:dbUser, db_pwd:dbPwd});
     } else {
       await runAction({action:'import_file', ib, filename:result.filename, new_base:true,
                        user:$('importUser').value, pwd:$('importPwd').value,
-                       db_user:$('importDbUser').value, db_pwd:$('importDbPwd').value});
+                       db_name:dbName, db_user:dbUser, db_pwd:dbPwd});
     }
     $('dtFile').value = '';
   } catch (e) { $('uploadStatus').textContent = 'Ошибка: ' + e.message; }
