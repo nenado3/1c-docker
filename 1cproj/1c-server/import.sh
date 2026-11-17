@@ -103,8 +103,12 @@ case "$USERS" in ''|*[!0-9]*) USERS=0;; esac
 # остаётся виден в BACKUP_DIR на хосте и в веб-панели); /tmp используется как запасной вариант,
 # если bind-mount BACKUP_DIR в контейнере нет (веб-панель и compose могут иметь разные cwd).
 [ -r "$HOST_FILE" ] || die "файл на хосте недоступен для чтения: $HOST_FILE"
-FILE_SIZE=$(stat -c '%s' "$HOST_FILE")
+echo "Путь к исходному файлу на хосте: $HOST_FILE"
+[ -f "$HOST_FILE" ] || die "файл исчез до передачи в контейнер: $HOST_FILE"
+[ -r "$HOST_FILE" ] || die "нет прав на чтение исходного файла: $HOST_FILE"
+FILE_SIZE=$(stat -c '%s' -- "$HOST_FILE") || die "не удалось получить размер файла: $HOST_FILE"
 [ "$FILE_SIZE" -gt 0 ] || die "файл на хосте пустой: $HOST_FILE"
+echo "Исходный файл подтверждён: $FILE_SIZE байт"
 
 REMOTE_DIR="/home/usr1cv8/backups/$KIND"
 CONTAINER="onec-server"
@@ -124,8 +128,13 @@ $DOCKER exec "$CONTAINER" mkdir -p "$REMOTE_DIR" \
 # Сначала удаляем одноимённый остаток предыдущего прерванного импорта.
 $DOCKER exec "$CONTAINER" rm -f "$REMOTE" 2>/dev/null || true
 echo "Передача файла в контейнер $CONTAINER (размер: $(numfmt --to=iec "$FILE_SIZE"))..."
-$DOCKER cp "$HOST_FILE" "$CONTAINER:$REMOTE" \
-    || die "docker cp не смог передать файл в контейнер $CONTAINER"
+if ! $DOCKER cp "$HOST_FILE" "$CONTAINER:$REMOTE"; then
+    echo "Диагностика источника после ошибки docker cp:" >&2
+    ls -ld -- "$(dirname "$HOST_FILE")" >&2 || true
+    ls -l -- "$HOST_FILE" >&2 || true
+    stat -c '%n | %s байт | %A | %U:%G' -- "$HOST_FILE" >&2 || true
+    die "docker cp не смог передать файл '$HOST_FILE' в контейнер $CONTAINER:$REMOTE"
+fi
 
 # Проверяем не только наличие, но и точное совпадение размера.
 REMOTE_SIZE=$($DOCKER exec "$CONTAINER" stat -c '%s' "$REMOTE" 2>/dev/null) \
