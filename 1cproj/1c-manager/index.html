@@ -598,6 +598,7 @@ $('uploadImport').onclick = async () => {
                      user:$('importUser').value, pwd:$('importPwd').value,
                      db_user:$('importDbUser').value, db_pwd:$('importDbPwd').value});
     $('importFile').value = '';
+    $('dlgImport').close();
   } catch (e) { $('importStatus').textContent = 'Ошибка: ' + e.message; }
   finally { $('uploadImport').disabled = false; }
 };
