@@ -313,7 +313,7 @@ def do_action(body):
         if new_base and kind != "dt":
             raise ValueError("создание новой базы поддерживается только из файла .dt")
         # Девятый аргумент включает строгий режим: только новая ИБ и новая БД PostgreSQL.
-        args = [ib, filename, kind, user, pwd, db_user, db_pwd, uploaded_file, "new" if new_base else "", db_name]
+        args = [ib, filename, kind, user, pwd, db_user, db_pwd, uploaded_file, "new" if new_base else "", db_name if new_base else ""]
         title = "Создание базы %s из .dt" % ib if new_base else "Импорт .%s в базу %s" % (kind, ib)
         return script_job(title, "server", "import.sh", *args)
     if a == "backup_pg":
