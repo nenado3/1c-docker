@@ -450,7 +450,7 @@ document.addEventListener('click', async e => {
   }
   if (t.dataset.pickdir) { $(t.dataset.pickdir).click(); return; }
   if (t.dataset.act === 'build-server') { $('dlgBuild').showModal(); loadBuild(); return; }
-  if (t.dataset.act === 'server-up') { dtLaunchMode = 'startup'; $('dtDialogHint').textContent = 'Сначала запустятся PostgreSQL и сервер 1С, затем будет создана новая база и восстановлен выбранный .dt. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Запустить сервер и восстановить .dt'; $('dlgDt').showModal(); return; }
+  if (t.dataset.act === 'server-up') { dtLaunchMode = 'startup'; $('dtDbName').value = $('dtName').value.trim() || 'mybase'; $('dtDbUser').value = ''; $('dtDbPwd').value = ''; $('dtDialogHint').textContent = 'Сначала запустятся PostgreSQL и сервер 1С, затем будет создана отдельная новая база PostgreSQL и восстановлен выбранный .dt. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Запустить сервер и восстановить .dt'; $('dlgDt').showModal(); return; }
   if (t.dataset.op) {
     if (t.dataset.op === 'logs') { logsFor = t.dataset.c; loadLogs(); return; }
     return runAction({action: 'container_op', name: t.dataset.c, op: t.dataset.op});
