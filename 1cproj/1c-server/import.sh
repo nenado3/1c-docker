@@ -57,8 +57,9 @@ if [[ "$NEW_BASE_ONLY" == "new" ]]; then
   log "Создаю новую регистрацию 1С и PostgreSQL-базу '$DB' для восстановления архива .dt."
 fi
 if [[ -n "$IBID" && "$NEW_BASE_ONLY" != "new" ]]; then
-  log "ИБ уже зарегистрирована (UUID $IBID). Обновляю параметры СУБД в кластере."
-  compose exec -T onec-server "$RAC" infobase update --cluster="$CLUSTER" --infobase="$IBID" --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" 2>&1 | tee -a "$LOG"
+  [[ -n "$USER_1C" && -n "$PASS_1C" ]] || die "для изменения параметров существующей ИБ '$IB' укажите пользователя и пароль администратора 1С в веб-панели"
+  log "ИБ уже зарегистрирована (UUID $IBID). Обновляю параметры СУБД с авторизацией администратора ИБ."
+  compose exec -T onec-server "$RAC" infobase update --cluster="$CLUSTER" --infobase="$IBID" --infobase-user="$USER_1C" --infobase-pwd="$PASS_1C" --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" 2>&1 | tee -a "$LOG"
 else
   log "Создаю регистрацию ИБ и PostgreSQL-базу '$DB'."
   compose exec -T onec-server "$RAC" infobase create --cluster="$CLUSTER" --name="$IB" --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" --locale=ru --create-database 2>&1 | tee -a "$LOG"
