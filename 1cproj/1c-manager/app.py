@@ -270,6 +270,8 @@ def do_action(body):
             raise ValueError("имя базы PostgreSQL должно содержать 1–63 допустимых символа")
         if db_user and not NAME_RE.match(db_user):
             raise ValueError("недопустимое имя пользователя PostgreSQL")
+        if bool(db_user) != bool(db_pwd):
+            raise ValueError("для отдельного пользователя PostgreSQL укажите и логин, и пароль; иначе оставьте оба поля пустыми для использования .env")
         if len(db_pwd) > 200:
             raise ValueError("слишком длинный пароль PostgreSQL")
         uploaded_file = os.path.join(data_dir("backups"), "dt", filename)
@@ -300,6 +302,8 @@ def do_action(body):
         db_pwd = str(body.get("db_pwd", ""))
         if db_user and not NAME_RE.match(db_user):
             raise ValueError("недопустимое имя пользователя PostgreSQL")
+        if new_base and bool(db_user) != bool(db_pwd):
+            raise ValueError("для отдельного пользователя PostgreSQL укажите и логин, и пароль; иначе оставьте оба поля пустыми для использования .env")
         if len(db_pwd) > 200:
             raise ValueError("слишком длинный пароль PostgreSQL")
         # Передаём import.sh тот же абсолютный путь, куда API загрузки реально сохранил файл.
