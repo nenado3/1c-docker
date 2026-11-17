@@ -2,26 +2,26 @@
 # Import .dt/.cf directly into PostgreSQL using ibcmd; register/update the IB with RAC.
 set -Eeuo pipefail
 umask 0027
-SCRIPT_DIR="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")" && pwd -P)"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$SCRIPT_DIR"
 . "$SCRIPT_DIR/common.sh"
 die(){ echo "ОШИБКА: $*" >&2; exit 1; }
 [[ $# -ge 3 ]] || die "использование: import.sh <ИБ> <файл> <dt|cf> [пользователь1С] [пароль1С] [пользовательБД] [парольБД] [абсолютный путь]"
-IB="$1"; FILE="$2"; KIND="\${3,,}"; USER_1C="\${4:-}"; PASS_1C="\${5:-}"
-DB_USER_ARG="\${6:-}"; DB_PASS_ARG="\${7:-}"; UPLOAD_PATH="\${8:-}"
+IB="$1"; FILE="$2"; KIND="${3,,}"; USER_1C="${4:-}"; PASS_1C="${5:-}"
+DB_USER_ARG="${6:-}"; DB_PASS_ARG="${7:-}"; UPLOAD_PATH="${8:-}"
 [[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя ИБ"
-[[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$ && "\${FILE##*.}" == "$KIND" ]] || die "недопустимое имя/расширение файла"
+[[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$ && "${FILE##*.}" == "$KIND" ]] || die "недопустимое имя/расширение файла"
 [[ "$KIND" == dt || "$KIND" == cf ]] || die "тип должен быть dt или cf"
-DB="\${DB_NAME:-$IB}"
-DB_USER="\${DB_USER_ARG:-\${DB_USER:-\${POSTGRES_USER:-postgres}}}"
-DB_PASS="\${DB_PASS_ARG:-\${DB_PASS:-\${POSTGRES_PASSWORD:-}}}"
+DB="${DB_NAME:-$IB}"
+DB_USER="${DB_USER_ARG:-${DB_USER:-${POSTGRES_USER:-postgres}}}"
+DB_PASS="${DB_PASS_ARG:-${DB_PASS:-${POSTGRES_PASSWORD:-}}}"
 [[ "$DB" =~ ^[A-Za-z0-9_.-]{1,63}$ ]] || die "недопустимое имя БД PostgreSQL"
 [[ "$DB_USER" =~ ^[A-Za-z0-9_.-]{1,64}$ && -n "$DB_PASS" ]] || die "не заданы корректные реквизиты PostgreSQL в .env"
 BACKUP_ROOT="$(realpath -m -- "$BACKUP_DIR")"
 if [[ -n "$UPLOAD_PATH" ]]; then HOST_FILE="$UPLOAD_PATH"; else HOST_FILE="$BACKUP_ROOT/$KIND/$FILE"; [[ -s "$HOST_FILE" ]] || HOST_FILE="$BACKUP_ROOT/$FILE"; fi
 [[ -s "$HOST_FILE" ]] || die "файл не найден или пуст: $HOST_FILE"
 HOST_FILE="$(realpath -- "$HOST_FILE")"
-case "$HOST_FILE" in "$BACKUP_ROOT"/*) REL="\${HOST_FILE#"$BACKUP_ROOT"/}";; *) die "файл должен находиться внутри BACKUP_DIR=$BACKUP_ROOT";; esac
+case "$HOST_FILE" in "$BACKUP_ROOT"/*) REL="${HOST_FILE#"$BACKUP_ROOT"/}";; *) die "файл должен находиться внутри BACKUP_DIR=$BACKUP_ROOT";; esac
 CONTAINER_FILE="/home/usr1cv8/backups/$REL"
 SIZE="$(stat -c %s "$HOST_FILE")"
 LOG_DIR="$BACKUP_ROOT/import-logs"; mkdir -p "$LOG_DIR"
@@ -73,11 +73,11 @@ AUTH=()
 if [[ -n "$USER_1C" ]]; then AUTH=(--user="$USER_1C" --password="$PASS_1C"); fi
 if [[ "$KIND" == dt ]]; then
   log "ВНИМАНИЕ: восстановление .dt полностью заменит содержимое ИБ '$IB'. Запускаю ibcmd restore --force."
-  compose exec -T onec-server "$IBCMD" infobase --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" restore --force "\${AUTH[@]}" "$CONTAINER_FILE" 2>&1 | tee -a "$LOG"
+  compose exec -T onec-server "$IBCMD" infobase --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" restore --force "${AUTH[@]}" "$CONTAINER_FILE" 2>&1 | tee -a "$LOG"
 else
   log "Загружаю .cf через ibcmd infobase config load."
-  compose exec -T onec-server "$IBCMD" infobase --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" config load "\${AUTH[@]}" "$CONTAINER_FILE" 2>&1 | tee -a "$LOG"
+  compose exec -T onec-server "$IBCMD" infobase --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" config load "${AUTH[@]}" "$CONTAINER_FILE" 2>&1 | tee -a "$LOG"
   log "Применяю конфигурацию через ibcmd infobase config apply."
-  compose exec -T onec-server "$IBCMD" infobase --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" config apply "\${AUTH[@]}" --force 2>&1 | tee -a "$LOG"
+  compose exec -T onec-server "$IBCMD" infobase --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" config apply "${AUTH[@]}" --force 2>&1 | tee -a "$LOG"
 fi
 log "Операция ibcmd завершилась успешно."
