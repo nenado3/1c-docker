@@ -38,10 +38,14 @@ QIB=$(printf '%q' "$IB")
 
 if [ "$MODE" = dt ]; then
     EXT=dt
+    REMOTE_BACKUP_DIR="$RDIR/backups/dt"
+    DEST_DIR="export/backup/dt"
     REMOTE_CMD="cd $RDIR && ./backup.sh $QIB"
     [ -n "$IB_USER" ] && REMOTE_CMD="$REMOTE_CMD $(printf '%q' "$IB_USER")"
 else
     EXT=dump
+    REMOTE_BACKUP_DIR="$RDIR/backups"
+    DEST_DIR="export/backup/pg"
     REMOTE_CMD="cd $RDIR && ./backup.sh --pg $QIB"
 fi
 
@@ -49,12 +53,11 @@ echo "== Выгрузка на сервере ($SERVER_SSH)"
 RSSH -t "$SERVER_SSH" "$REMOTE_CMD" || die "выгрузка на сервере не удалась (см. сообщения выше)"
 
 echo "== Поиск файла"
-REMOTE_FILE=$(RSSH "$SERVER_SSH" "ls -t $RDIR/backups/dt/${QIB}_*.${EXT} 2>/dev/null | head -n1")
+REMOTE_FILE=$(RSSH "$SERVER_SSH" "ls -t $REMOTE_BACKUP_DIR/${QIB}_*.${EXT} 2>/dev/null | head -n1")
 [ -n "$REMOTE_FILE" ] || die "на сервере не найден файл backups/${IB}_*.${EXT}"
 NAME=$(basename "$REMOTE_FILE")
 RQ=$(printf '%q' "$REMOTE_FILE")
 
-DEST_DIR="export/backup/dt"
 mkdir -p "$DEST_DIR"
 echo "== Копирование $NAME в $DEST_DIR"
 RSIZE=$(RSSH "$SERVER_SSH" "wc -c < $RQ" | tr -d '[:space:]')
