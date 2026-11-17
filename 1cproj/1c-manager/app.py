@@ -293,6 +293,7 @@ def do_action(body):
         ib = need(body, "ib", NAME_RE)
         filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$", re.I), 190)
         kind = filename.rsplit(".", 1)[1].lower()
+        new_base = bool(body.get("new_base"))
         user, pwd = str(body.get("user", "")).strip(), str(body.get("pwd", ""))
         # реквизиты PostgreSQL можно задать в панели; пустые — берутся из .env
         db_name = str(body.get("db_name") or ib).strip()
@@ -313,7 +314,6 @@ def do_action(body):
             raise ValueError("Загрузка не найдена на диске: %s. Проверьте ответ загрузки и каталог BACKUP_DIR." % uploaded_file)
         if os.path.getsize(uploaded_file) <= 0:
             raise ValueError("Загруженный файл пустой: %s" % uploaded_file)
-        new_base = bool(body.get("new_base"))
         if new_base and kind != "dt":
             raise ValueError("создание новой базы поддерживается только из файла .dt")
         # Девятый аргумент включает строгий режим: только новая ИБ и новая БД PostgreSQL.
