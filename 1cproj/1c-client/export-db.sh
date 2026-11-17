@@ -121,8 +121,8 @@ OUT="${IB}_${STAMP}.${KIND}"
 LOG="export_${STAMP}.log"
 
 # выгрузки .dt/.cf кладём в backup-подпапку каталога EXPORT_DIR (она видна на веб со вложенностями)
-BACKUP_SUBDIR="${EXPORT_DIR%/}/backup"
-REMOTE_BACKUP="/home/user1c/export/backup"
+BACKUP_SUBDIR="${EXPORT_DIR%/}/backup/$KIND"
+REMOTE_BACKUP="/home/user1c/export/backup/$KIND"
 mkdir -p "$BACKUP_SUBDIR"
 $DOCKER exec onec-client mkdir -p "$REMOTE_BACKUP" 2>/dev/null || true
 
