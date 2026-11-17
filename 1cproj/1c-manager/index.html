@@ -516,7 +516,7 @@ $('uploadImport').onclick = async () => {
   $('uploadStatus').textContent = 'Загружаю ' + file.name + ' (' + fmtSize(file.size) + ')…';
   try {
     const result = await uploadFileWithProgress(file);
-    $('uploadStatus').textContent = 'Файл загружен на сервер (100%). Запускаю импорт в базу ' + ib + '…';
+    $('uploadStatus').textContent = 'Файл загружен (100%): ' + (result.path || result.filename) + '. Запускаю импорт в базу ' + ib + '…';
     await runAction({action:'import_file', ib, filename:result.filename,
                      user:$('importUser').value, pwd:$('importPwd').value,
                      db_user:$('importDbUser').value, db_pwd:$('importDbPwd').value});
