@@ -35,7 +35,7 @@ else
         --cluster="$CLUSTER_ID" \
         --name="$IB_NAME" \
         --dbms=PostgreSQL \
-        --db-server=postgres \
+        --db-server="postgres port=5432" \
         --db-name="$DB_NAME" \
         --db-user="$DB_USER" \
         --db-pwd="$DB_PASS" \
