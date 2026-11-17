@@ -297,7 +297,7 @@ def do_action(body):
         user, pwd = str(body.get("user", "")).strip(), str(body.get("pwd", ""))
         # реквизиты PostgreSQL можно задать в панели; пустые — берутся из .env
         db_name = str(body.get("db_name") or ib).strip()
-        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,63}", db_name):
+        if new_base and not re.fullmatch(r"[A-Za-z0-9_.-]{1,63}", db_name):
             raise ValueError("имя базы PostgreSQL должно содержать 1–63 допустимых символа")
         db_user = str(body.get("db_user", "")).strip()
         db_pwd = str(body.get("db_pwd", ""))
