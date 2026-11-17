@@ -52,12 +52,16 @@ pull_latest() {
         echo "Копирую $newest в $BACKUP_DIR/$kind"
         cp -p "$newest" "$BACKUP_DIR/$kind/" || die "копирование не удалось"
     else
-        newest=$(ssh "$SRC_HOST" "ls -t '$SRC_DIR'/*.dt '$SRC_DIR'/*.cf 2>/dev/null | head -n1") \
+        newest=$(ssh "$SRC_HOST" "ls -t '$SRC_DIR'/dt/*.dt '$SRC_DIR'/cf/*.cf '$SRC_DIR'/*.dt '$SRC_DIR'/*.cf 2>/dev/null | head -n1") \
             || die "ssh к ${SRC_HOST} не удался: проверьте адрес компьютера сервера (не контейнера), что на нём запущен sshd и порт 22 открыт, и работает ли вход: ssh ${SRC_HOST}"
         [ -n "$newest" ] || die "на сервере в $SRC_DIR нет .dt/.cf файлов (сначала ./backup.sh на сервере)"
-        echo "Копирую $SRC_HOST:$newest в $BACKUP_DIR"
-        scp -p "$SRC_HOST:$newest" "$BACKUP_DIR/" || die "scp не удался"
+        kind="${newest##*.}"
+        mkdir -p "$BACKUP_DIR/$kind"
+        echo "Копирую $SRC_HOST:$newest в $BACKUP_DIR/$kind"
+        scp -p "$SRC_HOST:$newest" "$BACKUP_DIR/$kind/" || die "scp не удался"
     fi
+    kind="${newest##*.}"
+    mkdir -p "$BACKUP_DIR/$kind"
     ls -lh "$BACKUP_DIR/$kind/$(basename "$newest")"
     echo "Готово: $(cd "$BACKUP_DIR/$kind" && pwd)/$(basename "$newest")"
 }
