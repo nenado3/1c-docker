@@ -14,6 +14,8 @@ permissions:
 jobs:
   static-checks:
     runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-only-validation-password
     steps:
       - uses: actions/checkout@v4
 
