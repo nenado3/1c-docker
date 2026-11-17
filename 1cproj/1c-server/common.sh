@@ -11,7 +11,7 @@ IB_NAME="${IB_NAME:-mybase}"
 DB_NAME="${DB_NAME:-mybase}"
 DB_USER="${DB_USER:-${POSTGRES_USER:-postgres}}"
 # тот же пароль, что и POSTGRES_PASSWORD в docker-compose.yml/.env
-DB_PASS="${DB_PASS:-${POSTGRES_PASSWORD:-change_me}}"
+DB_PASS="${DB_PASS:-${POSTGRES_PASSWORD:-}}"
 # /opt/1cv8/current создаётся при сборке образа (не зависит от архитектуры)
 ONEC_BIN="/opt/1cv8/current"
 
