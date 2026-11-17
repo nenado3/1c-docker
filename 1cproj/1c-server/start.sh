@@ -26,6 +26,9 @@ if [ -z "$CLUSTER_ID" ]; then
 fi
 echo "Кластер: $CLUSTER_ID"
 
+if [[ "${START_WITHOUT_BASE:-0}" == "1" ]]; then
+    echo "== Пропускаю создание пустой базы: будет восстановлен выбранный .dt"
+else
 echo "== Проверка информационной базы '$IB_NAME'"
 if RAC infobase summary list --cluster="$CLUSTER_ID" | grep -qE "^name +: +${IB_NAME}$"; then
     echo "База '$IB_NAME' уже есть, пропускаю создание"
@@ -42,6 +45,7 @@ else
         --locale=ru \
         --create-database \
         || die "не удалось создать базу (смотрите ошибку СУБД выше)"
+fi
 fi
 
 echo
