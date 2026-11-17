@@ -110,6 +110,18 @@ FILE_SIZE=$(stat -c '%s' -- "$HOST_FILE") || die "не удалось получ
 [ "$FILE_SIZE" -gt 0 ] || die "файл на хосте пустой: $HOST_FILE"
 echo "Исходный файл подтверждён: $FILE_SIZE байт"
 
+# docker cp получает локальный путь от имени пользователя Docker CLI (часто через sudo).
+# Сначала создаём независимую копию с ASCII-путём в /tmp: это исключает проблемы с
+# пробелами/кириллицей в пути проекта и позволяет диагностировать исчезновение исходника.
+STAGE_DIR="$(mktemp -d /tmp/onec-import.XXXXXX)" || die "не удалось создать временный каталог в /tmp"
+STAGE_FILE="$STAGE_DIR/$FILE"
+cleanup_stage() { rm -rf -- "$STAGE_DIR"; }
+trap cleanup_stage EXIT
+cp -- "$HOST_FILE" "$STAGE_FILE" || die "не удалось скопировать исходный файл во временный каталог: $HOST_FILE"
+STAGE_SIZE=$(stat -c '%s' -- "$STAGE_FILE") || die "не удалось проверить временную копию: $STAGE_FILE"
+[ "$STAGE_SIZE" -eq "$FILE_SIZE" ] || die "временная копия неполная: исходный $FILE_SIZE байт, копия $STAGE_SIZE байт"
+echo "Подготовлена временная копия для Docker: $STAGE_FILE ($STAGE_SIZE байт)"
+
 REMOTE_DIR="/home/usr1cv8/backups/$KIND"
 CONTAINER="onec-server"
 
@@ -128,12 +140,12 @@ $DOCKER exec "$CONTAINER" mkdir -p "$REMOTE_DIR" \
 # Сначала удаляем одноимённый остаток предыдущего прерванного импорта.
 $DOCKER exec "$CONTAINER" rm -f "$REMOTE" 2>/dev/null || true
 echo "Передача файла в контейнер $CONTAINER (размер: $(numfmt --to=iec "$FILE_SIZE"))..."
-if ! $DOCKER cp "$HOST_FILE" "$CONTAINER:$REMOTE"; then
-    echo "Диагностика источника после ошибки docker cp:" >&2
-    ls -ld -- "$(dirname "$HOST_FILE")" >&2 || true
-    ls -l -- "$HOST_FILE" >&2 || true
-    stat -c '%n | %s байт | %A | %U:%G' -- "$HOST_FILE" >&2 || true
-    die "docker cp не смог передать файл '$HOST_FILE' в контейнер $CONTAINER:$REMOTE"
+if ! $DOCKER cp "$STAGE_FILE" "$CONTAINER:$REMOTE"; then
+    echo "Диагностика временной копии после ошибки docker cp:" >&2
+    ls -ld -- "$STAGE_DIR" >&2 || true
+    ls -l -- "$STAGE_FILE" >&2 || true
+    stat -c '%n | %s байт | %A | %U:%G' -- "$STAGE_FILE" >&2 || true
+    die "docker cp не смог передать временный файл '$STAGE_FILE' в контейнер $CONTAINER:$REMOTE (исходный файл: $HOST_FILE)"
 fi
 
 # Проверяем не только наличие, но и точное совпадение размера.
