@@ -49,24 +49,26 @@ echo "== Выгрузка на сервере ($SERVER_SSH)"
 RSSH -t "$SERVER_SSH" "$REMOTE_CMD" || die "выгрузка на сервере не удалась (см. сообщения выше)"
 
 echo "== Поиск файла"
-REMOTE_FILE=$(RSSH "$SERVER_SSH" "ls -t $RDIR/backups/${QIB}_*.${EXT} 2>/dev/null | head -n1")
+REMOTE_FILE=$(RSSH "$SERVER_SSH" "ls -t $RDIR/backups/dt/${QIB}_*.${EXT} 2>/dev/null | head -n1")
 [ -n "$REMOTE_FILE" ] || die "на сервере не найден файл backups/${IB}_*.${EXT}"
 NAME=$(basename "$REMOTE_FILE")
 RQ=$(printf '%q' "$REMOTE_FILE")
 
-echo "== Копирование $NAME в ./export"
+DEST_DIR="export/backup/dt"
+mkdir -p "$DEST_DIR"
+echo "== Копирование $NAME в $DEST_DIR"
 RSIZE=$(RSSH "$SERVER_SSH" "wc -c < $RQ" | tr -d '[:space:]')
-RSSH "$SERVER_SSH" "cat $RQ" > "export/${NAME}.part" || { rm -f "export/${NAME}.part"; die "копирование не удалось"; }
-LSIZE=$(wc -c < "export/${NAME}.part" | tr -d '[:space:]')
+RSSH "$SERVER_SSH" "cat $RQ" > "$DEST_DIR/${NAME}.part" || { rm -f "$DEST_DIR/${NAME}.part"; die "копирование не удалось"; }
+LSIZE=$(wc -c < "$DEST_DIR/${NAME}.part" | tr -d '[:space:]')
 if [ "$RSIZE" != "$LSIZE" ]; then
-    rm -f "export/${NAME}.part"
+    rm -f "$DEST_DIR/${NAME}.part"
     die "размеры не совпали (на сервере $RSIZE, получено $LSIZE байт)"
 fi
-mv "export/${NAME}.part" "export/${NAME}"
+mv "$DEST_DIR/${NAME}.part" "$DEST_DIR/${NAME}"
 
 if [ "$MOVE" = 1 ]; then
     RSSH "$SERVER_SSH" "rm -f $RQ" && echo "Файл на сервере удалён."
 fi
 
-ls -lh "export/${NAME}"
-echo "Готово: $(pwd)/export/${NAME}"
+ls -lh "$DEST_DIR/${NAME}"
+echo "Готово: $(pwd)/$DEST_DIR/${NAME}"
