@@ -541,7 +541,7 @@ class H(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(n) or b"{}")
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
-            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "set_memory"):
+            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "set_memory"):
                 return self._send(400, {"error": "Docker недоступен для этого пользователя"})
             return self._send(200, {"job": do_action(body)})
         except ValueError as e:
