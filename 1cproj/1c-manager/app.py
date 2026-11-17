@@ -487,7 +487,7 @@ class H(BaseHTTPRequestHandler):
                     try: os.unlink(part)
                     except OSError: pass
                     raise
-                return self._send(200, {"filename": safe_name, "size": n, "kind": ext})
+                return self._send(200, {"filename": safe_name, "size": n, "kind": ext, "path": dest, "backup_dir": data_dir("backups")})
             if u.path == "/api/upload_dist":
                 target = parse_qs(u.query).get("target", [""])[0]
                 if target not in ("server", "postgres"):
