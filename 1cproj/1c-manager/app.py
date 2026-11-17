@@ -21,7 +21,7 @@ RAC = {
     "sessions": RAC_PRE + '$R session list --cluster=$C',
     "create": RAC_PRE + ('$R infobase create --cluster=$C --name="$1" --dbms=PostgreSQL --db-server=postgres '
                          '--db-name="$2" --db-user="$3" --db-pwd="$4" --locale=ru --create-database'),
-    "drop": RAC_PRE + '$R infobase drop --cluster=$C --infobase="$1" ${2:+"$2"}',
+    "drop": RAC_PRE + '$R infobase drop --cluster=$C --infobase="$1" --infobase-user="$2" --infobase-pwd="$3" ${4:+"$4"}',
     "kill": RAC_PRE + '$R session terminate --cluster=$C --session="$1"',
 }
 
@@ -305,7 +305,10 @@ def do_action(body):
         return rac_job("Создание базы %s" % n, "create", n, db, need(body, "db_user", NAME_RE), need(body, "db_pwd"))
     if a == "infobase_drop":
         i = need(body, "id", UUID_RE)
-        return rac_job("Удаление базы %s" % i, "drop", i, "--drop-database" if body.get("drop_db") else "")
+        ib_user = need(body, "ib_user", maxlen=128)
+        ib_pwd = need(body, "ib_pwd", maxlen=256)
+        return rac_job("Удаление базы %s" % i, "drop", i, ib_user, ib_pwd,
+                       "--drop-database" if body.get("drop_db") else "")
     if a == "session_kill":
         return rac_job("Завершение сеанса", "kill", need(body, "id", UUID_RE))
     raise ValueError("неизвестное действие")
