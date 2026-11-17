@@ -52,14 +52,15 @@ SUMMARY="$(compose exec -T onec-server "$RAC" infobase summary list --cluster="$
 IBID="$(printf '%s\n' "$SUMMARY" | find_ib | tr -d '\r')"
 if [[ "$NEW_BASE_ONLY" == "new" ]]; then
   [[ -z "$IBID" ]] || die "информационная база '$IB' уже существует в кластере; выберите другое имя"
-  PG_EXISTS="$(compose exec -T postgres runuser -u postgres -- /usr/local/pgbin/psql -d postgres -Atc "SELECT 1 FROM pg_database WHERE datname='$DB'" | tr -d '\\r')"
+  PG_EXISTS="$(compose exec -T postgres runuser -u postgres -- /usr/local/pgbin/psql -d postgres -Atc "SELECT 1 FROM pg_database WHERE datname='$DB'")"
   [[ -z "$PG_EXISTS" ]] || die "база PostgreSQL '$DB' уже существует; выберите другое имя"
-  log "Создаю новую регистрацию 1С и пустую PostgreSQL-базу '$DB' для восстановления архива .dt."
-elif [[ -n "$IBID" ]]; then
+  log "Создаю новую регистрацию 1С и PostgreSQL-базу '$DB' для восстановления архива .dt."
+fi
+if [[ -n "$IBID" && "$NEW_BASE_ONLY" != "new" ]]; then
   log "ИБ уже зарегистрирована (UUID $IBID). Обновляю параметры СУБД в кластере."
   compose exec -T onec-server "$RAC" infobase update --cluster="$CLUSTER" --infobase="$IBID" --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" 2>&1 | tee -a "$LOG"
 else
-  log "ИБ отсутствует в кластере. Создаю регистрацию и PostgreSQL базу '$DB'."
+  log "Создаю регистрацию ИБ и PostgreSQL-базу '$DB'."
   compose exec -T onec-server "$RAC" infobase create --cluster="$CLUSTER" --name="$IB" --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" --locale=ru --create-database 2>&1 | tee -a "$LOG"
   SUMMARY="$(compose exec -T onec-server "$RAC" infobase summary list --cluster="$CLUSTER")"
   IBID="$(printf '%s\n' "$SUMMARY" | find_ib | tr -d '\r')"
