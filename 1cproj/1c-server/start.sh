@@ -3,6 +3,8 @@
 
 mkdir -p licenses && chmod 1777 licenses
 
+[ -n "${POSTGRES_PASSWORD:-}" ] || die "задайте уникальный POSTGRES_PASSWORD в .env до запуска PostgreSQL"
+
 echo "== Запуск postgres и сервера 1С"
 $DOCKER compose up -d || die "не удалось запустить контейнеры"
 
