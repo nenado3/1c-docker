@@ -33,11 +33,16 @@ if [[ -f ./.env ]]; then
 fi
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
 if [[ "$BACKUP_DIR" = /* ]]; then
-    HOST_FILE="$BACKUP_DIR/$FILE"
+    BACKUP_ROOT="$BACKUP_DIR"
 else
-    HOST_FILE="$(pwd)/$BACKUP_DIR/$FILE"
+    BACKUP_ROOT="$(pwd)/$BACKUP_DIR"
 fi
-[[ -s "$HOST_FILE" ]] || die "файл не найден на сервере: $HOST_FILE (проверьте BACKUP_DIR в .env)"
+HOST_FILE="$BACKUP_ROOT/$KIND/$FILE"
+# Совместимость со старыми резервными копиями, которые лежали прямо в BACKUP_DIR.
+if [[ ! -s "$HOST_FILE" && -s "$BACKUP_ROOT/$FILE" ]]; then
+    HOST_FILE="$BACKUP_ROOT/$FILE"
+fi
+[[ -s "$HOST_FILE" ]] || die "файл не найден на сервере: $HOST_FILE (проверьте BACKUP_DIR и подпапку $KIND)"
 
 # Имя базы PostgreSQL: у базы по умолчанию это DB_NAME из .env (её создаёт start.sh),
 # у остальных баз (созданы панелью) — совпадает с именем информационной базы.
@@ -50,7 +55,7 @@ if [ -n "${DB_NAME:-}" ] && [ "$IB" = "${IB_NAME:-$IB}" ]; then DB="$DB_NAME"; f
 if [ -n "$DB_USER_ARG" ]; then
     [[ "$DB_USER_ARG" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя пользователя PostgreSQL"
     DB_USER="$DB_USER_ARG"
-    DB_PASS="$DB_PASS_ARG"
+    DB_PASS="${DB_PASS_ARG:-$DB_PASS}"
 fi
 
 $DOCKER compose ps --status running --services | grep -qx onec-server || die "контейнер onec-server не запущен: ./start.sh"
@@ -69,7 +74,7 @@ case "$USERS" in ''|*[!0-9]*) USERS=0;; esac
 FILE_SIZE=$(stat -c '%s' "$HOST_FILE")
 [ "$FILE_SIZE" -gt 0 ] || die "файл на хосте пустой: $HOST_FILE"
 
-REMOTE_DIR="/home/usr1cv8/backups"
+REMOTE_DIR="/home/usr1cv8/backups/$KIND"
 CONTAINER="onec-server"
 
 # Проверяем контейнер до работы с каталогами.
@@ -111,6 +116,21 @@ designer_run() {
     $DOCKER compose exec -T onec-server \
         /usr/local/bin/1c-xvfb /opt/1cv8/current/1cv8 DESIGNER \
         /S "onec-server:1541\\${IB}" "$@" "${ACTION[@]}" /Out "$LOG"
+}
+
+# ibcmd не выдаёт надёжный процент восстановления. Показываем время выполнения,
+# не подменяя его фиктивным процентом; вывод самой команды остаётся в журнале задачи.
+run_with_progress() {
+    local pid rc=0 secs=0
+    "$@" &
+    pid=$!
+    while kill -0 "$pid" 2>/dev/null; do
+        printf 'Операция 1С выполняется... %02d:%02d\n' "$((secs/60))" "$((secs%60))"
+        sleep 10
+        secs=$((secs+10))
+    done
+    wait "$pid" || rc=$?
+    return "$rc"
 }
 
 designer_try() {
@@ -178,7 +198,7 @@ if [[ "$KIND" == "dt" ]]; then
     DONE=0
     if [ "$USERS" -gt 0 ] && [ -n "$USER_1C" ] && $DOCKER compose exec -T onec-server test -x /opt/1cv8/current/ibcmd; then
         echo "== Попытка через ibcmd (пользователь 1С: $USER_1C) ..."
-        ibcmd_dt && DONE=1
+        run_with_progress ibcmd_dt && DONE=1
     fi
 
     if [ "$DONE" != "1" ]; then
@@ -204,7 +224,7 @@ echo "Загрузка конфигурации из $FILE в базу '$IB' ...
 DONE=0
 if [ "$USERS" -gt 0 ] && [ -n "$USER_1C" ] && $DOCKER compose exec -T onec-server test -x /opt/1cv8/current/ibcmd; then
     echo "== Попытка через ibcmd ..."
-    ibcmd_cf && DONE=1
+    run_with_progress ibcmd_cf && DONE=1
 fi
 
 if [ "$DONE" != "1" ]; then
