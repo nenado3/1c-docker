@@ -453,8 +453,8 @@ class H(BaseHTTPRequestHandler):
                     return self._send(413, {"error": "размер файла должен быть от 1 байта до 8 ГБ"})
                 filename = parse_qs(u.query).get("name", [""])[0]
                 filename = os.path.basename(filename).strip()
-                if (not filename or filename.startswith(".") or len(filename) > 180 or
-                        any(ord(c) < 32 for c in filename) or os.path.splitext(filename)[1].lower() not in (".dt", ".cf")):
+                if (not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.(dt|cf)", filename, re.I)
+                        or filename.startswith(".")):
                     return self._send(400, {"error": "разрешены только файлы .dt и .cf (имя до 180 символов)"})
                 ext = filename.rsplit(".", 1)[1].lower()
                 # .dt и .cf хранятся раздельно. Сначала пишем во временный файл,
@@ -535,7 +535,12 @@ def main():
     a = ap.parse_args()
     cfg.update(server_dir=os.path.abspath(a.server_dir), client_dir=os.path.abspath(a.client_dir),
                token=a.token or secrets.token_urlsafe(16), docker=detect_docker())
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
+    try:
+        srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
+    except OSError as e:
+        print("Не удалось запустить веб-панель на порту %d: %s" % (a.port, e), file=sys.stderr)
+        print("Возможно, другая копия панели уже работает. Остановите её или выберите другой порт через --port.", file=sys.stderr)
+        return 2
     url = "http://127.0.0.1:%d/?token=%s" % (a.port, cfg["token"])
     print("Менеджер 1С запущен. Откройте в браузере:\n  %s" % url)
     print("Docker: %s" % (" ".join(cfg["docker"]) if cfg["docker"] else "НЕДОСТУПЕН (см. подсказку в панели)"))
@@ -549,4 +554,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
