@@ -8,7 +8,7 @@ cd "$SCRIPT_DIR"
 die(){ echo "ОШИБКА: $*" >&2; exit 1; }
 [[ $# -ge 3 ]] || die "использование: import.sh <ИБ> <файл> <dt|cf> [пользователь1С] [пароль1С] [пользовательБД] [парольБД] [абсолютный путь]"
 IB="$1"; FILE="$2"; KIND="${3,,}"; USER_1C="${4:-}"; PASS_1C="${5:-}"
-DB_USER_ARG="${6:-}"; DB_PASS_ARG="${7:-}"; UPLOAD_PATH="${8:-}"
+DB_USER_ARG="${6:-}"; DB_PASS_ARG="${7:-}"; UPLOAD_PATH="${8:-}"; NEW_BASE_ONLY="${9:-}"
 [[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя ИБ"
 [[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$ && "${FILE##*.}" == "$KIND" ]] || die "недопустимое имя/расширение файла"
 [[ "$KIND" == dt || "$KIND" == cf ]] || die "тип должен быть dt или cf"
@@ -50,7 +50,12 @@ function trim(s){sub(/^[ \t]+/,"",s);sub(/[ \t]+$/,"",s);gsub(/^"|"$/,"",s);retu
 '; }
 SUMMARY="$(compose exec -T onec-server "$RAC" infobase summary list --cluster="$CLUSTER")"
 IBID="$(printf '%s\n' "$SUMMARY" | find_ib | tr -d '\r')"
-if [[ -n "$IBID" ]]; then
+if [[ "$NEW_BASE_ONLY" == "new" ]]; then
+  [[ -z "$IBID" ]] || die "информационная база '$IB' уже существует в кластере; выберите другое имя"
+  PG_EXISTS="$(compose exec -T postgres runuser -u postgres -- /usr/local/pgbin/psql -d postgres -Atc "SELECT 1 FROM pg_database WHERE datname='$DB'" | tr -d '\\r')"
+  [[ -z "$PG_EXISTS" ]] || die "база PostgreSQL '$DB' уже существует; выберите другое имя"
+  log "Создаю новую регистрацию 1С и пустую PostgreSQL-базу '$DB' для восстановления архива .dt."
+elif [[ -n "$IBID" ]]; then
   log "ИБ уже зарегистрирована (UUID $IBID). Обновляю параметры СУБД в кластере."
   compose exec -T onec-server "$RAC" infobase update --cluster="$CLUSTER" --infobase="$IBID" --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" 2>&1 | tee -a "$LOG"
 else
