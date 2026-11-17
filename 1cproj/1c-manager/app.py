@@ -260,6 +260,14 @@ def do_action(body):
         return run_job(title, cfg["docker"] + ["compose", "up", "-d", "onec-server"], cwd=d)
     if a == "start_server":
         return script_job("Запуск сервера и создание базы", "server", "start.sh")
+    if a == "start_server_with_dt":
+        ib = need(body, "ib", NAME_RE)
+        filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.dt$", re.I), 190)
+        uploaded_file = os.path.join(data_dir("backups"), "dt", filename)
+        if not os.path.isfile(uploaded_file) or os.path.getsize(uploaded_file) <= 0:
+            raise ValueError("Загруженный .dt не найден или пуст: %s" % uploaded_file)
+        return script_job("Запуск сервера и создание базы %s из .dt" % ib, "server",
+                          "start-with-dt.sh", ib, filename, uploaded_file)
     if a == "backup_dt":
         ib = need(body, "ib", NAME_RE)
         user, pwd = str(body.get("user", "")).strip(), str(body.get("pwd", ""))
