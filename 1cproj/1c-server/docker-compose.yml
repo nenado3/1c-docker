@@ -13,6 +13,9 @@ services:
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in 1c-server/.env}"
     volumes:
       - pg-data:/var/lib/postgresql/data
+      # Общая папка с .dt/.cf (PostgreSQL не импортирует .dt самостоятельно;
+      # файл доступен здесь для диагностики и сопутствующих операций).
+      - ./import:/import:z
     # Без healthcheck 1С успевала создать базу раньше, чем PostgreSQL начинал принимать подключения
     healthcheck:
       test: ["CMD-SHELL", "/usr/local/pgbin/pg_isready -U ${POSTGRES_USER:-postgres} -h 127.0.0.1"]
@@ -51,6 +54,8 @@ services:
       # правка адресов NetHASP применяется после ./update-image.sh или пересоздания контейнера
       - ./server/nethasp.ini:/opt/1cv8/conf/nethasp.ini:ro,z
       - ${BACKUP_DIR:-./backups}:/home/usr1cv8/backups:z
+      # Общий каталог импорта: один и тот же файл виден 1С и PostgreSQL.
+      - ./import:/import:z
     depends_on:
       postgres:
         condition: service_healthy
