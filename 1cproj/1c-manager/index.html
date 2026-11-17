@@ -182,6 +182,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <label>Пароль</label><input id="dPwd" type="password">
   <div class="row"><button class="b" id="dOk">Выгрузить</button><button class="b sec" id="dCancel">Отмена</button></div>
 </dialog>
+<dialog id="dlgDrop">
+  <h3 style="margin-top:0">Удаление информационной базы</h3>
+  <label>База</label><input id="dropName" readonly>
+  <label>Пользователь 1С с правами администратора этой базы</label><input id="dropUser" autocomplete="username">
+  <label>Пароль пользователя 1С</label><input id="dropPwd" type="password" autocomplete="current-password">
+  <p class="mut">Учётные данные используются только для этой операции и не сохраняются в настройках панели.</p>
+  <div class="row"><button class="b red" id="dropOk">Продолжить</button><button class="b sec" id="dropCancel">Отмена</button></div>
+</dialog>
 
 <dialog id="dlgBuild">
   <h3 style="margin-top:0">Создание образов сервера</h3>
@@ -437,9 +445,12 @@ document.addEventListener('click', async e => {
   }
   if (t.dataset.dump) { $('dName').value = t.dataset.dump; $('dUser').value = $('dPwd').value = ''; $('dlgDump').showModal(); return; }
   if (t.dataset.drop) {
-    if (!confirm('Удалить базу «' + t.dataset.name + '» из кластера?')) return;
-    const withDb = confirm('Удалить также базу данных в PostgreSQL (все данные будут потеряны)?\n\nОК: удалить данные, Отмена: оставить базу данных');
-    return runAction({action: 'infobase_drop', id: t.dataset.drop, drop_db: withDb});
+    $('dropName').value = t.dataset.name;
+    $('dropUser').value = '';
+    $('dropPwd').value = '';
+    $('dlgDrop').dataset.id = t.dataset.drop;
+    $('dlgDrop').showModal();
+    return;
   }
   if (t.dataset.kill) { if (confirm('Завершить сеанс?')) runAction({action: 'session_kill', id: t.dataset.kill}); return; }
   if (t.dataset.pgdump) return runAction({action: 'backup_pg', db: t.dataset.pgdump});
@@ -463,6 +474,17 @@ $('cOk').onclick = () => { $('dlgCreate').close();
   runAction({action: 'infobase_create', name: $('cName').value, db_name: $('cDb').value, db_user: $('cUser').value, db_pwd: $('cPwd').value}); };
 $('dOk').onclick = () => { $('dlgDump').close();
   runAction({action: 'backup_dt', ib: $('dName').value, user: $('dUser').value, pwd: $('dPwd').value}); };
+$('dropCancel').onclick = () => { $('dropPwd').value = ''; $('dlgDrop').close(); };
+$('dropOk').onclick = () => {
+  const ibUser = $('dropUser').value.trim(), ibPwd = $('dropPwd').value;
+  if (!ibUser || !ibPwd) { conLine('ОШИБКА: укажите пользователя 1С и пароль.'); return; }
+  const id = $('dlgDrop').dataset.id, name = $('dropName').value;
+  if (!confirm('Удалить базу «' + name + '» из кластера?')) return;
+  const withDb = confirm('Удалить также базу данных в PostgreSQL (все данные будут потеряны)?\n\nОК: удалить данные, Отмена: оставить базу данных');
+  $('dlgDrop').close();
+  $('dropPwd').value = '';
+  runAction({action:'infobase_drop', id, ib_user:ibUser, ib_pwd:ibPwd, drop_db:withDb});
+};
 
 $('srvDir').onchange = () => dirInfo('srvDir', 'srvDirInfo', /\.(run|deb)$/i);
 $('pgDir').onchange = () => dirInfo('pgDir', 'pgDirInfo', /\.deb$/i);
