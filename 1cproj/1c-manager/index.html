@@ -106,13 +106,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <input id="importDbPwd" type="password" placeholder="Пароль PostgreSQL (по умолчанию из .env)">
     </div>
     <p class="mut">Импорт в существующую базу полностью заменяет её данные для .dt. Для создания новой базы из архива используйте блок ниже. Максимальный размер файла — 8 ГБ.</p>
-    <h2>Создать новую базу непосредственно из .dt</h2>
-    <div class="row">
-      <input id="newDtName" placeholder="Имя новой базы, например mybase">
-      <input id="newDtFile" type="file" accept=".dt,application/octet-stream">
-      <button class="b" id="createFromDt">Создать из .dt</button>
-    </div>
-    <p class="mut">Панель сама создаст PostgreSQL-базу, восстановит архив .dt и зарегистрирует информационную базу в кластере. Если база с таким именем уже существует в 1С или PostgreSQL, операция остановится без перезаписи.</p>
     <div id="uploadStatus" class="mut" aria-live="polite"></div>
     <div id="uploadProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки файла">
       <div class="upload-progress-track"><div id="uploadProgressFill" class="upload-progress-fill"></div></div>
@@ -174,6 +167,13 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <pre id="conOut"></pre>
 </div>
 
+<dialog id="dlgDt">
+  <h3 style="margin-top:0">Создание базы из архива .dt</h3>
+  <label>Имя новой базы</label><input id="dtName" value="mybase" placeholder="например mybase">
+  <label>Файл резервной копии .dt</label><input id="dtFile" type="file" accept=".dt,application/octet-stream">
+  <p class="mut" id="dtDialogHint">Будет создана новая база PostgreSQL и зарегистрирована в кластере 1С. Существующие базы не перезаписываются.</p>
+  <div class="row"><button class="b" id="dtOk">Продолжить</button><button class="b sec" id="dtCancel">Отмена</button></div>
+</dialog>
 <dialog id="dlgCreate">
   <h3 style="margin-top:0">Создать информационную базу</h3>
   <label>Имя базы в кластере</label><input id="cName" value="mybase">
@@ -228,7 +228,7 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtSize = n => n > 1048576 ? (n/1048576).toFixed(1)+' МБ' : n > 1024 ? (n/1024).toFixed(1)+' КБ' : n+' Б';
 const fmtDate = t => new Date(t*1000).toLocaleString('ru-RU');
-let state = {docker:false}, curTab = 'containers', logsFor = null, polling = null;
+let state = {docker:false}, curTab = 'containers', logsFor = null, polling = null, dtLaunchMode = 'base';
 
 async function api(path, body) {
   const opt = {headers: {'X-Token': TOKEN}};
@@ -446,6 +446,7 @@ document.addEventListener('click', async e => {
   }
   if (t.dataset.pickdir) { $(t.dataset.pickdir).click(); return; }
   if (t.dataset.act === 'build-server') { $('dlgBuild').showModal(); loadBuild(); return; }
+  if (t.dataset.act === 'server-up') { dtLaunchMode = 'startup'; $('dtDialogHint').textContent = 'Сначала запустятся PostgreSQL и сервер 1С, затем будет создана новая база и восстановлен выбранный .dt. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Запустить сервер и восстановить .dt'; $('dlgDt').showModal(); return; }
   if (t.dataset.op) {
     if (t.dataset.op === 'logs') { logsFor = t.dataset.c; loadLogs(); return; }
     return runAction({action: 'container_op', name: t.dataset.c, op: t.dataset.op});
@@ -475,10 +476,8 @@ document.addEventListener('click', async e => {
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
 $('clearCon').onclick = () => { $('conOut').textContent = ''; };
-$('newBase').onclick = () => $('dlgCreate').showModal();
-$('cCancel').onclick = () => $('dlgCreate').close(); $('dCancel').onclick = () => $('dlgDump').close();
-$('cOk').onclick = () => { $('dlgCreate').close();
-  runAction({action: 'infobase_create', name: $('cName').value, db_name: $('cDb').value, db_user: $('cUser').value, db_pwd: $('cPwd').value}); };
+$('newBase').onclick = () => { dtLaunchMode = 'base'; $('dtDialogHint').textContent = 'Будет создана новая база PostgreSQL и зарегистрирована в кластере 1С. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Создать базу из .dt'; $('dlgDt').showModal(); };
+$('dtCancel').onclick = () => $('dlgDt').close(); $('dCancel').onclick = () => $('dlgDump').close();
 $('dOk').onclick = () => { $('dlgDump').close();
   runAction({action: 'backup_dt', ib: $('dName').value, user: $('dUser').value, pwd: $('dPwd').value}); };
 $('dropCancel').onclick = () => { $('dropPwd').value = ''; $('dlgDrop').close(); };
@@ -535,23 +534,28 @@ function uploadFileWithProgress(file) {
   });
 }
 
-$('createFromDt').onclick = async () => {
-  const file = $('newDtFile').files[0], ib = $('newDtName').value.trim();
+$('dtOk').onclick = async () => {
+  const file = $('dtFile').files[0], ib = $('dtName').value.trim();
   if (!/^[A-Za-z0-9_.-]{1,64}$/.test(ib)) { $('uploadStatus').textContent = 'Имя базы: латинские буквы, цифры, точка, дефис или подчёркивание (до 64 символов).'; return; }
   if (!file) { $('uploadStatus').textContent = 'Выберите файл .dt.'; return; }
-  if (!/\.dt$/i.test(file.name)) { $('uploadStatus').textContent = 'Для создания новой базы поддерживается только .dt.'; return; }
+  if (!/\.dt$/i.test(file.name)) { $('uploadStatus').textContent = 'Поддерживается только файл .dt.'; return; }
   if (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024) { $('uploadStatus').textContent = 'Размер .dt должен быть от 1 байта до 8 ГБ.'; return; }
-  $('createFromDt').disabled = true;
+  $('dtOk').disabled = true;
+  $('dlgDt').close();
   $('uploadStatus').textContent = 'Загружаю архив ' + file.name + ' (' + fmtSize(file.size) + ')…';
   try {
     const result = await uploadFileWithProgress(file);
-    $('uploadStatus').textContent = 'Архив загружен. Создаю новую базу ' + ib + ' и восстанавливаю .dt…';
-    await runAction({action:'import_file', ib, filename:result.filename, new_base:true,
-                     user:$('importUser').value, pwd:$('importPwd').value,
-                     db_user:$('importDbUser').value, db_pwd:$('importDbPwd').value});
-    $('newDtFile').value = '';
+    $('uploadStatus').textContent = 'Архив загружен. ' + (dtLaunchMode === 'startup' ? 'Запускаю сервер и восстанавливаю базу ' : 'Создаю базу ') + ib + '…';
+    if (dtLaunchMode === 'startup') {
+      await runAction({action:'start_server_with_dt', ib, filename:result.filename});
+    } else {
+      await runAction({action:'import_file', ib, filename:result.filename, new_base:true,
+                       user:$('importUser').value, pwd:$('importPwd').value,
+                       db_user:$('importDbUser').value, db_pwd:$('importDbPwd').value});
+    }
+    $('dtFile').value = '';
   } catch (e) { $('uploadStatus').textContent = 'Ошибка: ' + e.message; }
-  finally { $('createFromDt').disabled = false; }
+  finally { $('dtOk').disabled = false; }
 };
 
 $('uploadImport').onclick = async () => {
