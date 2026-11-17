@@ -45,10 +45,12 @@ pull_latest() {
     local newest
     mkdir -p "$BACKUP_DIR"
     if [ -z "$SRC_HOST" ]; then
-        newest=$(ls -t "$SRC_DIR"/*.dt "$SRC_DIR"/*.cf 2>/dev/null | head -n1)
+        newest=$(ls -t "$SRC_DIR"/dt/*.dt "$SRC_DIR"/cf/*.cf "$SRC_DIR"/*.dt "$SRC_DIR"/*.cf 2>/dev/null | head -n1)
         [ -n "$newest" ] || die "в $SRC_DIR нет .dt/.cf файлов (сначала ./backup.sh в 1c-server)"
-        echo "Копирую $newest в $BACKUP_DIR"
-        cp -p "$newest" "$BACKUP_DIR/" || die "копирование не удалось"
+        kind="${newest##*.}"
+        mkdir -p "$BACKUP_DIR/$kind"
+        echo "Копирую $newest в $BACKUP_DIR/$kind"
+        cp -p "$newest" "$BACKUP_DIR/$kind/" || die "копирование не удалось"
     else
         newest=$(ssh "$SRC_HOST" "ls -t '$SRC_DIR'/*.dt '$SRC_DIR'/*.cf 2>/dev/null | head -n1") \
             || die "ssh к ${SRC_HOST} не удался: проверьте адрес компьютера сервера (не контейнера), что на нём запущен sshd и порт 22 открыт, и работает ли вход: ssh ${SRC_HOST}"
@@ -56,8 +58,8 @@ pull_latest() {
         echo "Копирую $SRC_HOST:$newest в $BACKUP_DIR"
         scp -p "$SRC_HOST:$newest" "$BACKUP_DIR/" || die "scp не удался"
     fi
-    ls -lh "$BACKUP_DIR/$(basename "$newest")"
-    echo "Готово: $(cd "$BACKUP_DIR" && pwd)/$(basename "$newest")"
+    ls -lh "$BACKUP_DIR/$kind/$(basename "$newest")"
+    echo "Готово: $(cd "$BACKUP_DIR/$kind" && pwd)/$(basename "$newest")"
 }
 
 # Экранирование аргумента одинарными кавычками для удалённой оболочки (любой, не только bash)
