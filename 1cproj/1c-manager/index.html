@@ -480,7 +480,7 @@ document.addEventListener('click', async e => {
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
 $('clearCon').onclick = () => { $('conOut').textContent = ''; };
-$('newBase').onclick = () => { dtLaunchMode = 'base'; $('dtDialogHint').textContent = 'Будет создана новая база PostgreSQL и зарегистрирована в кластере 1С. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Создать базу из .dt'; $('dlgDt').showModal(); };
+$('newBase').onclick = () => { dtLaunchMode = 'base'; $('dtDbName').value = $('dtName').value.trim() || 'mybase'; $('dtDbUser').value = ''; $('dtDbPwd').value = ''; $('dtDialogHint').textContent = 'Будет создана отдельная новая база PostgreSQL и зарегистрирована в кластере 1С. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Создать базу из .dt'; $('dlgDt').showModal(); };
 $('dtCancel').onclick = () => $('dlgDt').close(); $('dCancel').onclick = () => $('dlgDump').close();
 $('dOk').onclick = () => { $('dlgDump').close();
   runAction({action: 'backup_dt', ib: $('dName').value, user: $('dUser').value, pwd: $('dPwd').value}); };
