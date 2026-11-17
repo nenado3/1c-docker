@@ -289,8 +289,13 @@ def do_action(body):
             raise ValueError("Загрузка не найдена на диске: %s. Проверьте ответ загрузки и каталог BACKUP_DIR." % uploaded_file)
         if os.path.getsize(uploaded_file) <= 0:
             raise ValueError("Загруженный файл пустой: %s" % uploaded_file)
-        args = [ib, filename, kind, user, pwd, db_user, db_pwd, uploaded_file]
-        return script_job("Импорт .%s в базу %s" % (kind, ib), "server", "import.sh", *args)
+        new_base = bool(body.get("new_base"))
+        if new_base and kind != "dt":
+            raise ValueError("создание новой базы поддерживается только из файла .dt")
+        # Девятый аргумент включает строгий режим: только новая ИБ и новая БД PostgreSQL.
+        args = [ib, filename, kind, user, pwd, db_user, db_pwd, uploaded_file, "new" if new_base else ""]
+        title = "Создание базы %s из .dt" % ib if new_base else "Импорт .%s в базу %s" % (kind, ib)
+        return script_job(title, "server", "import.sh", *args)
     if a == "backup_pg":
         return script_job("Дамп PostgreSQL %s" % need(body, "db", NAME_RE), "server", "backup.sh", "--pg", need(body, "db", NAME_RE))
     if a == "client_start":
