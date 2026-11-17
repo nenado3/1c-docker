@@ -3,12 +3,14 @@
 set -Eeuo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "\${BASH_SOURCE[0]}")" && pwd -P)"
 cd "$SCRIPT_DIR"
+. "$SCRIPT_DIR/common.sh"
+BACKUP_ROOT="$(realpath -m -- "$BACKUP_DIR")"
 die(){ echo "ОШИБКА: $*" >&2; exit 1; }
 [[ $# -eq 3 ]] || die "использование: start-with-dt.sh <имя_ИБ> <файл.dt> <абсолютный_путь>"
 IB="$1"; FILE="$2"; UPLOAD_PATH="$3"
 [[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя ИБ"
 [[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.dt$ ]] || die "разрешён только файл .dt"
-[[ "$UPLOAD_PATH" = "$SCRIPT_DIR"/backups/dt/* ]] || die "файл должен находиться в backups/dt"
+case "$(realpath -m -- "$UPLOAD_PATH")" in "$BACKUP_ROOT"/dt/*) ;; *) die "файл должен находиться в BACKUP_DIR/dt";; esac
 [[ -s "$UPLOAD_PATH" ]] || die "файл .dt не найден или пуст: $UPLOAD_PATH"
 echo "== Шаг 1/2. Запуск PostgreSQL и сервера 1С"
 START_WITHOUT_BASE=1 bash "$SCRIPT_DIR/start.sh"
