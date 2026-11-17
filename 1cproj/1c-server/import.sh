@@ -98,68 +98,45 @@ USERS=$($DOCKER compose exec -T postgres runuser -u postgres -- "$PGBIN/psql" -d
     "SELECT count(*) FROM v8users" 2>/dev/null | tr -d '[:space:]')
 case "$USERS" in ''|*[!0-9]*) USERS=0;; esac
 
-# Передаём файл в контейнер onec-server через docker cp.
-# Основной путь — смонтированный backup-каталог /home/usr1cv8/backups (файл с исходным именем
-# остаётся виден в BACKUP_DIR на хосте и в веб-панели); /tmp используется как запасной вариант,
-# если bind-mount BACKUP_DIR в контейнере нет (веб-панель и compose могут иметь разные cwd).
+# Общий bind mount ./import доступен одновременно в onec-server и onec-postgres.
+# Файл копируется один раз на хосте; docker cp и дублирование внутри контейнера не нужны.
 [ -r "$HOST_FILE" ] || die "файл на хосте недоступен для чтения: $HOST_FILE"
 echo "Путь к исходному файлу на хосте: $HOST_FILE"
-[ -f "$HOST_FILE" ] || die "файл исчез до передачи в контейнер: $HOST_FILE"
-[ -r "$HOST_FILE" ] || die "нет прав на чтение исходного файла: $HOST_FILE"
+[ -f "$HOST_FILE" ] || die "файл исчез до подготовки импорта: $HOST_FILE"
 FILE_SIZE=$(stat -c '%s' -- "$HOST_FILE") || die "не удалось получить размер файла: $HOST_FILE"
 [ "$FILE_SIZE" -gt 0 ] || die "файл на хосте пустой: $HOST_FILE"
 echo "Исходный файл подтверждён: $FILE_SIZE байт"
 
-# docker cp получает локальный путь от имени пользователя Docker CLI (часто через sudo).
-# Сначала создаём независимую копию с ASCII-путём в /tmp: это исключает проблемы с
-# пробелами/кириллицей в пути проекта и позволяет диагностировать исчезновение исходника.
-STAGE_DIR="$(mktemp -d /tmp/onec-import.XXXXXX)" || die "не удалось создать временный каталог в /tmp"
-STAGE_FILE="$STAGE_DIR/$FILE"
-cleanup_stage() { rm -rf -- "$STAGE_DIR"; }
-trap cleanup_stage EXIT
-cp -- "$HOST_FILE" "$STAGE_FILE" || die "не удалось скопировать исходный файл во временный каталог: $HOST_FILE"
-STAGE_SIZE=$(stat -c '%s' -- "$STAGE_FILE") || die "не удалось проверить временную копию: $STAGE_FILE"
-[ "$STAGE_SIZE" -eq "$FILE_SIZE" ] || die "временная копия неполная: исходный $FILE_SIZE байт, копия $STAGE_SIZE байт"
-echo "Подготовлена временная копия для Docker: $STAGE_FILE ($STAGE_SIZE байт)"
-
-REMOTE_DIR="/home/usr1cv8/backups/$KIND"
+IMPORT_HOST_DIR="$(cd "$(dirname "$0")" && pwd)/import"
+mkdir -p "$IMPORT_HOST_DIR" || die "не удалось создать общую папку импорта: $IMPORT_HOST_DIR"
+STAMP=$(date +%Y%m%d_%H%M%S)
+IMPORT_FILE="${STAMP}_$FILE"
+HOST_IMPORT_FILE="$IMPORT_HOST_DIR/$IMPORT_FILE"
+REMOTE="/import/$IMPORT_FILE"
 CONTAINER="onec-server"
 
-# Проверяем контейнер до работы с каталогами.
-$DOCKER inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -qx true \
-    || die "контейнер $CONTAINER не запущен; сначала запустите сервер 1С"
+# Атомарная публикация файла в общей папке, смонтированной в оба контейнера.
+IMPORT_PART="$HOST_IMPORT_FILE.part"
+cp -- "$HOST_FILE" "$IMPORT_PART" || die "не удалось скопировать файл в общую папку импорта"
+chmod 0644 "$IMPORT_PART" || die "не удалось назначить права файлу импорта"
+IMPORT_SIZE=$(stat -c '%s' -- "$IMPORT_PART") || die "не удалось проверить файл общей папки"
+[ "$IMPORT_SIZE" -eq "$FILE_SIZE" ] || die "копия в общей папке неполная: $IMPORT_SIZE из $FILE_SIZE байт"
+mv -f -- "$IMPORT_PART" "$HOST_IMPORT_FILE" || die "не удалось опубликовать файл общей папки"
 
-if ! $DOCKER exec "$CONTAINER" test -d "$REMOTE_DIR" 2>/dev/null; then
-    # если смонтированного backup-каталога в контейнере нет — используем /tmp
-    REMOTE_DIR="/tmp/onec-import"
-fi
-REMOTE="$REMOTE_DIR/$FILE"
-$DOCKER exec "$CONTAINER" mkdir -p "$REMOTE_DIR" \
-    || die "не удалось создать каталог $REMOTE_DIR в контейнере"
-
-# Сначала удаляем одноимённый остаток предыдущего прерванного импорта.
-$DOCKER exec "$CONTAINER" rm -f "$REMOTE" 2>/dev/null || true
-echo "Передача файла в контейнер $CONTAINER (размер: $(numfmt --to=iec "$FILE_SIZE"))..."
-if ! $DOCKER cp "$STAGE_FILE" "$CONTAINER:$REMOTE"; then
-    echo "Диагностика временной копии после ошибки docker cp:" >&2
-    ls -ld -- "$STAGE_DIR" >&2 || true
-    ls -l -- "$STAGE_FILE" >&2 || true
-    stat -c '%n | %s байт | %A | %U:%G' -- "$STAGE_FILE" >&2 || true
-    die "docker cp не смог передать временный файл '$STAGE_FILE' в контейнер $CONTAINER:$REMOTE (исходный файл: $HOST_FILE)"
-fi
-
-# Проверяем не только наличие, но и точное совпадение размера.
-REMOTE_SIZE=$($DOCKER exec "$CONTAINER" stat -c '%s' "$REMOTE" 2>/dev/null) \
-    || die "файл скопирован, но не найден внутри контейнера: $REMOTE"
-[[ "$REMOTE_SIZE" =~ ^[0-9]+$ ]] || die "не удалось определить размер файла в контейнере: $REMOTE"
-[ "$REMOTE_SIZE" -eq "$FILE_SIZE" ] \
-    || die "файл передан не полностью: на хосте $FILE_SIZE байт, в контейнере $REMOTE_SIZE байт"
-$DOCKER exec "$CONTAINER" test -r "$REMOTE" \
-    || die "файл существует, но недоступен для чтения в контейнере: $REMOTE"
-echo "Файл успешно передан и проверен: $REMOTE ($REMOTE_SIZE байт)"
+# Убеждаемся, что bind mount виден обоим контейнерам и содержимое совпадает.
+for SERVICE in onec-server postgres; do
+    $DOCKER compose exec -T "$SERVICE" test -r "$REMOTE" \
+        || die "общая папка не видна в контейнере $SERVICE: $REMOTE. Пересоздайте контейнеры через docker compose up -d"
+    CONTAINER_SIZE=$($DOCKER compose exec -T "$SERVICE" stat -c '%s' "$REMOTE" 2>/dev/null) \
+        || die "не удалось проверить файл в контейнере $SERVICE"
+    [ "$CONTAINER_SIZE" = "$FILE_SIZE" ] \
+        || die "размер файла в $SERVICE не совпадает: $CONTAINER_SIZE вместо $FILE_SIZE"
+done
+echo "Файл доступен обоим контейнерам: $REMOTE ($(numfmt --to=iec "$FILE_SIZE"))"
+echo "onec-server и postgres читают один и тот же файл из общей папки /import."
 
 STAMP=$(date +%Y%m%d_%H%M%S)
-LOG="$(dirname "$REMOTE")/import_${STAMP}.log"
+LOG="/import/import_${STAMP}.log"
 ACTION=()
 CAUTH=()
 [[ -n "$USER_1C" ]] && CAUTH=(/N "$USER_1C" /P "$PASS_1C")
@@ -186,17 +163,45 @@ run_with_progress() {
     return "$rc"
 }
 
+diagnose_restore() {
+    echo "--- диагностика импорта: ${secs}s ---"
+    local p
+    p=$($DOCKER exec onec-server sh -c "ps -eo pid=,args= | grep '[1]cv8 DESIGNER' | grep '[R]estoreIB' | head -n 1 | awk '{print \\$1}'" 2>/dev/null || true)
+    if [[ "$p" =~ ^[0-9]+$ ]]; then
+        $DOCKER exec onec-server sh -c "
+            echo 'PID: $p'
+            grep -E '^(State|VmRSS|voluntary_ctxt_switches|nonvoluntary_ctxt_switches):' /proc/$p/status 2>/dev/null
+            printf 'wchan: '; cat /proc/$p/wchan 2>/dev/null || true
+            if [ -r /proc/$p/io ]; then grep -E '^(rchar|wchar|read_bytes|write_bytes):' /proc/$p/io; fi
+        " 2>&1 || true
+    else
+        echo "Процесс DESIGNER /RestoreIB в контейнере не найден (возможно, уже завершился)."
+    fi
+    echo "Активность PostgreSQL по базе $DB:"
+    $DOCKER compose exec -T postgres runuser -u postgres -- "$PGBIN/psql" -d postgres -P pager=off -c \
+        "SELECT pid, usename, application_name, client_addr, state, wait_event_type, wait_event, \
+                now()-state_change AS state_for, left(query,120) AS query \
+         FROM pg_stat_activity WHERE datname='$DB' AND backend_type='client backend' ORDER BY pid;" 2>&1 || true
+    echo "Размер журнала конфигуратора:"
+    $DOCKER exec onec-server sh -c "if [ -f '$LOG' ]; then wc -c '$LOG'; tail -n 5 '$LOG'; else echo 'журнал пока не создан'; fi" 2>&1 || true
+    echo "------------------------------"
+}
+
 designer_try() {
     $DOCKER compose exec -T onec-server test -x /opt/1cv8/current/1cv8 \
         || die "в образе нет конфигуратора 1С (компонент client_full): пересоберите образ"
     $DOCKER compose exec -T onec-server test -x /usr/local/bin/1c-xvfb \
         || die "в образе нет /usr/local/bin/1c-xvfb: пересоберите образ сервера (./build.sh)"
     local rc=0 pid secs=0
-    # конфигуратор не сообщает процент выполнения — показываем ход по времени
+    # Конфигуратор не сообщает процент. Каждые 30 секунд снимаем фактическое
+    # состояние процесса 1С и активность PostgreSQL, чтобы отличить работу от зависания.
     designer_run "$@" &
     pid=$!
     while kill -0 "$pid" 2>/dev/null; do
         printf 'Операция 1С выполняется... %02d:%02d\n' "$((secs/60))" "$((secs%60))"
+        if [ "$secs" -gt 0 ] && [ $((secs % 30)) -eq 0 ]; then
+            diagnose_restore
+        fi
         sleep 10; secs=$((secs+10))
     done
     wait "$pid" || rc=$?
