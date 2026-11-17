@@ -169,7 +169,11 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
 <dialog id="dlgDt">
   <h3 style="margin-top:0">Создание базы из архива .dt</h3>
-  <label>Имя новой базы</label><input id="dtName" value="mybase" placeholder="например mybase">
+  <label>Имя новой информационной базы 1С</label><input id="dtName" value="mybase" placeholder="например mybase">
+  <label>Имя отдельной базы PostgreSQL</label><input id="dtDbName" value="mybase" placeholder="например mybase">
+  <label>Пользователь PostgreSQL <span class="mut">(пусто — из .env)</span></label><input id="dtDbUser" placeholder="postgres">
+  <label>Пароль PostgreSQL <span class="mut">(пусто — из .env)</span></label><input id="dtDbPwd" type="password" autocomplete="new-password">
+  <p class="mut">Подключение внутри Docker: postgres:5432. Для каждой новой базы создаётся отдельная БД PostgreSQL. Сервер и порт заданы конфигурацией Docker и здесь не меняются.</p>
   <label>Файл резервной копии .dt</label><input id="dtFile" type="file" accept=".dt,application/octet-stream">
   <p class="mut" id="dtDialogHint">Будет создана новая база PostgreSQL и зарегистрирована в кластере 1С. Существующие базы не перезаписываются.</p>
   <div class="row"><button class="b" id="dtOk">Продолжить</button><button class="b sec" id="dtCancel">Отмена</button></div>
