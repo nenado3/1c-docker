@@ -412,8 +412,12 @@ class H(BaseHTTPRequestHandler):
                 # защита от выхода за пределы каталога — normpath + проверка префикса
                 if kind not in ("backups", "export") or not name or name.startswith(".") or "\x00" in name:
                     return self._send(400, {"error": "недопустимый запрос"})
-                base = os.path.abspath(data_dir(kind))
+                base = os.path.realpath(data_dir(kind))
                 p = os.path.normpath(os.path.join(base, name))
+                if not (p == base or p.startswith(base + os.sep)):
+                    return self._send(400, {"error": "недопустимый путь"})
+                # Не разрешаем обход каталога через символьные ссылки внутри backup/export.
+                p = os.path.realpath(p)
                 if not (p == base or p.startswith(base + os.sep)):
                     return self._send(400, {"error": "недопустимый путь"})
                 if not os.path.isfile(p):
@@ -453,25 +457,30 @@ class H(BaseHTTPRequestHandler):
                         any(ord(c) < 32 for c in filename) or os.path.splitext(filename)[1].lower() not in (".dt", ".cf")):
                     return self._send(400, {"error": "разрешены только файлы .dt и .cf (имя до 180 символов)"})
                 ext = filename.rsplit(".", 1)[1].lower()
-                # файл сохраняем в backup с исходным именем без изменений (перезаписывает одноимённый)
+                # .dt и .cf хранятся раздельно. Сначала пишем во временный файл,
+                # затем атомарно заменяем целевой: оборванная загрузка не уничтожит старую копию.
                 safe_name = filename
-                dest_dir = data_dir("backups")
+                dest_dir = os.path.join(data_dir("backups"), ext)
                 os.makedirs(dest_dir, exist_ok=True)
                 dest = os.path.join(dest_dir, safe_name)
+                part = dest + "." + secrets.token_hex(8) + ".part"
                 remaining = n
                 try:
-                    with open(dest, "wb") as f:
+                    with open(part, "xb") as f:
                         while remaining:
                             chunk = self.rfile.read(min(1024 * 1024, remaining))
                             if not chunk:
                                 raise ValueError("соединение прервано во время загрузки")
                             f.write(chunk); remaining -= len(chunk)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(part, dest)
                     os.chmod(dest, 0o666)
                 except Exception:
-                    try: os.unlink(dest)
+                    try: os.unlink(part)
                     except OSError: pass
                     raise
-                return self._send(200, {"filename": safe_name, "size": n})
+                return self._send(200, {"filename": safe_name, "size": n, "kind": ext})
             if u.path == "/api/upload_dist":
                 target = parse_qs(u.query).get("target", [""])[0]
                 if target not in ("server", "postgres"):
