@@ -58,7 +58,8 @@ chmod +x *.sh
 
 ## Резервная копия
 
-    ./backup.sh mybase [пользователь] [пароль]   # выгрузка в .dt в ./backups
+    ./backup.sh mybase [пользователь] [пароль]   # выгрузка в .dt в ./backups/dt
+    ./backup.sh --cf mybase [пользователь] [пароль] # конфигурация в ./backups/cf
     ./backup.sh --pg mybase                      # дамп PostgreSQL (pg_dump -Fc) в ./backups
 
 Выгрузку в .dt делает конфигуратор внутри контейнера сервера (компонент `client_full`,
@@ -101,9 +102,9 @@ chmod +x *.sh
       restore --force \
       --session-terminate-message="Идёт загрузка базы" \
       --user=Администратор --password='пароль_1С' \
-      /home/usr1cv8/backups/mybase.dt
+      /home/usr1cv8/backups/dt/mybase.dt
 
-Файл должен лежать в BACKUP_DIR (он смонтирован в контейнер как `/home/usr1cv8/backups`).
+Файл `.dt` должен лежать в `BACKUP_DIR/dt`, `.cf` — в `BACKUP_DIR/cf` (каталог BACKUP_DIR смонтирован в контейнер как `/home/usr1cv8/backups`). Старые файлы, оставленные непосредственно в BACKUP_DIR, также поддерживаются при импорте.
 
 Для `.cf` выполняется `ibcmd infobase config load` и `config apply --force --session-terminate=force`.
 Если платформа отказывает (для кластерной базы `ibcmd infobase config` может быть недоступен),
