@@ -42,7 +42,32 @@ HOST_FILE="$BACKUP_ROOT/$KIND/$FILE"
 if [[ ! -s "$HOST_FILE" && -s "$BACKUP_ROOT/$FILE" ]]; then
     HOST_FILE="$BACKUP_ROOT/$FILE"
 fi
-[[ -s "$HOST_FILE" ]] || die "файл не найден на сервере: $HOST_FILE (проверьте BACKUP_DIR и подпапку $KIND)"
+
+# Веб-панель и shell-скрипт могут запускаться с разными cwd/настройками BACKUP_DIR.
+# После проверки стандартных мест ищем файл по точному имени в каталоге проекта
+# и в настроенном BACKUP_DIR. Это устраняет ситуацию, когда загрузка прошла,
+# но импорт пытается передать в docker cp устаревший/неверно вычисленный путь.
+if [[ ! -s "$HOST_FILE" ]]; then
+    PROJECT_BACKUPS="$(cd "$(dirname "$0")" && pwd)/backups"
+    for SEARCH_ROOT in "$BACKUP_ROOT" "$PROJECT_BACKUPS"; do
+        [[ -d "$SEARCH_ROOT" ]] || continue
+        FOUND_FILE="$(find "$SEARCH_ROOT" -type f -name "$FILE" -print -quit 2>/dev/null || true)"
+        if [[ -n "$FOUND_FILE" && -s "$FOUND_FILE" ]]; then
+            HOST_FILE="$FOUND_FILE"
+            echo "Файл найден в альтернативном каталоге резервных копий: $HOST_FILE"
+            break
+        fi
+    done
+fi
+
+[[ -s "$HOST_FILE" ]] || {
+    echo "ОШИБКА: файл не найден на сервере." >&2
+    echo "Проверенные пути: $BACKUP_ROOT/$KIND/$FILE и $BACKUP_ROOT/$FILE" >&2
+    echo "Каталог BACKUP_DIR: $BACKUP_ROOT" >&2
+    echo "Содержимое каталога типа $KIND:" >&2
+    ls -lah "$BACKUP_ROOT/$KIND" 2>&1 | tail -n 30 >&2 || true
+    die "проверьте, что файл загрузился на сервер и BACKUP_DIR в веб-панели совпадает с 1c-server/.env"
+}
 
 # Имя базы PostgreSQL: у базы по умолчанию это DB_NAME из .env (её создаёт start.sh),
 # у остальных баз (созданы панелью) — совпадает с именем информационной базы.
