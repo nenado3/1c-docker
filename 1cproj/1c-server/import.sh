@@ -21,6 +21,7 @@ USER_1C="${4:-}"
 PASS_1C="${5:-}"
 DB_USER_ARG="${6:-}"
 DB_PASS_ARG="${7:-}"
+UPLOAD_PATH_ARG="${8:-}"
 [[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя базы"
 [[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$ ]] || die "недопустимое имя файла"
 [[ "$KIND" == "dt" || "$KIND" == "cf" ]] || die "тип файла должен быть dt или cf"
@@ -38,9 +39,15 @@ else
     BACKUP_ROOT="$(pwd)/$BACKUP_DIR"
 fi
 HOST_FILE="$BACKUP_ROOT/$KIND/$FILE"
-# Совместимость со старыми резервными копиями, которые лежали прямо в BACKUP_DIR.
-if [[ ! -s "$HOST_FILE" && -s "$BACKUP_ROOT/$FILE" ]]; then
-    HOST_FILE="$BACKUP_ROOT/$FILE"
+# Веб-панель передаёт абсолютный путь, вычисленный тем же Python-процессом,
+# который принял загрузку. Это основной источник истины для web upload/import.
+if [[ -n "$UPLOAD_PATH_ARG" ]]; then
+    HOST_FILE="$UPLOAD_PATH_ARG"
+else
+    # Совместимость с ручным запуском и старыми резервными копиями.
+    if [[ ! -s "$HOST_FILE" && -s "$BACKUP_ROOT/$FILE" ]]; then
+        HOST_FILE="$BACKUP_ROOT/$FILE"
+    fi
 fi
 
 # Веб-панель и shell-скрипт могут запускаться с разными cwd/настройками BACKUP_DIR.
