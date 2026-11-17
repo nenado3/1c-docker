@@ -12,7 +12,7 @@ DB_USER_ARG="${6:-}"; DB_PASS_ARG="${7:-}"; UPLOAD_PATH="${8:-}"; NEW_BASE_ONLY=
 [[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя ИБ"
 [[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$ && "${FILE##*.}" == "$KIND" ]] || die "недопустимое имя/расширение файла"
 [[ "$KIND" == dt || "$KIND" == cf ]] || die "тип должен быть dt или cf"
-DB="${DB_NAME:-$IB}"
+DB="${DB_NAME_ARG:-${DB_NAME:-$IB}}"
 DB_USER="${DB_USER_ARG:-${DB_USER:-${POSTGRES_USER:-postgres}}}"
 DB_PASS="${DB_PASS_ARG:-${DB_PASS:-${POSTGRES_PASSWORD:-}}}"
 [[ "$DB" =~ ^[A-Za-z0-9_.-]{1,63}$ ]] || die "недопустимое имя БД PostgreSQL"
