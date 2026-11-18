@@ -44,12 +44,19 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .settings-hero p{max-width:680px;margin:0;color:var(--mut);font-size:14px;line-height:1.6}
 .settings-status{display:flex;align-items:center;gap:9px;padding:11px 14px;margin:0 0 16px;border:1px solid var(--line);border-radius:11px;background:var(--card);font-size:13px}
 .settings-status:before{content:"";width:8px;height:8px;flex:none;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 13%,transparent)}
-.settings-card{overflow:hidden;margin:0 0 16px;border:1px solid var(--line);border-radius:15px;background:var(--bg);box-shadow:0 3px 14px rgba(15,23,42,.035)}
-.settings-card-head{display:flex;align-items:center;gap:13px;padding:17px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+.settings-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;margin:0 0 16px}
+.settings-card{min-width:0;overflow:hidden;margin:0;border:1px solid var(--line);border-radius:15px;background:var(--bg);box-shadow:0 3px 14px rgba(15,23,42,.035)}
+.settings-card-head{display:flex;align-items:center;gap:13px;padding:15px 17px;background:var(--card);cursor:pointer;list-style:none;user-select:none}
+.settings-card-head::-webkit-details-marker{display:none}
+.settings-card-head:after{content:"⌄";margin-left:auto;color:var(--mut);font-size:21px;transition:transform .18s}
+.settings-card[open]>.settings-card-head{border-bottom:1px solid var(--line)}
+.settings-card[open]>.settings-card-head:after{transform:rotate(180deg)}
 .settings-card-icon{display:grid;place-items:center;width:39px;height:39px;flex:none;border-radius:11px;background:color-mix(in srgb,var(--acc) 13%,var(--bg));color:var(--acc);font-size:19px}
 .settings-card-head h3{margin:0;font-size:15px;font-weight:700}
 .settings-card-head p{margin:2px 0 0;color:var(--mut);font-size:12px}
 .settings-card-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px;padding:19px 20px 21px}
+@media(max-width:760px){.settings-layout{grid-template-columns:1fr}}
+@media(max-width:520px){.settings-card-body{grid-template-columns:1fr}}
 .settings-field{min-width:0}
 .settings-field label{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 7px;color:var(--fg);font-size:12px;font-weight:650}
 .settings-field label code{padding:2px 6px;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--mut);font-size:10px;font-weight:500}
@@ -601,13 +608,13 @@ const settingsGroups = {server:'Сервер 1С и PostgreSQL',client:'Клие
 async function loadSettings() {
   const r = await api('/api/settings');
   if (r.error) { $('settingsStatus').textContent = 'Ошибка чтения .env: ' + r.error; return; }
-  let out = '';
+  let out = '<div class="settings-layout">';
   const meta = {
     server:{icon:'▦',title:'Сервер 1С и PostgreSQL',subtitle:'Параметры серверной части и хранилища данных'},
     client:{icon:'▣',title:'Клиент 1С',subtitle:'Подключение клиентского приложения и лицензирование'}
   };
   for (const section of ['server','client']) {
-    out += '<div class="settings-card"><div class="settings-card-head"><div class="settings-card-icon">' + meta[section].icon + '</div><div><h3>' + meta[section].title + '</h3><p>' + meta[section].subtitle + '</p></div></div><div class="settings-card-body">';
+    out += '<details class="settings-card"><summary class="settings-card-head"><div class="settings-card-icon">' + meta[section].icon + '</div><div><h3>' + meta[section].title + '</h3><p>' + meta[section].subtitle + '</p></div></summary><div class="settings-card-body">';
     for (const [key, item] of Object.entries(r[section] || {})) {
       const type = item.secret ? 'password' : 'text';
       const hint = item.secret ? (item.configured ? 'Пароль задан · пустое поле — оставить без изменений' : 'Пароль ещё не задан') : '';
@@ -622,8 +629,9 @@ async function loadSettings() {
           (hint ? '<p class="settings-field-hint">' + esc(hint) + '</p>' : '') + '</div>';
       }
     }
-    out += '</div></div>';
+    out += '</div></details>';
   }
+  out += '</div>';
   $('settingsFields').innerHTML = out;
   $('settingsStatus').textContent = '✓ Настройки загружены из файлов .env.';
 }
