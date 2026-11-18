@@ -668,7 +668,16 @@ async function saveSettings() {
   const r = await api('/api/settings', payload);
   $('saveSettings').disabled = false;
   if (r.error) { $('settingsStatus').textContent = 'Ошибка: ' + r.error; return; }
-  $('settingsStatus').textContent = 'Сохранено параметров: ' + (r.saved || []).length + '. Для применения может потребоваться пересоздать контейнеры или пересобрать образы.';
+  $('settingsStatus').textContent = 'Сохранено параметров: ' + (r.saved || []).length + '.';
+  if (r.backup_dir_changed) {
+    if (confirm('Каталог резервных копий изменён на:\\n' + r.backup_dir +
+        '\\n\\nЧтобы Docker подключил новую папку, необходимо пересоздать контейнер onec-server. PostgreSQL перезапускаться не будет.\\n\\nОбновить контейнер сервера сейчас?')) {
+      $('settingsStatus').textContent = 'Пересоздаю контейнер onec-server…';
+      await runAction({action:'recreate_server'});
+    } else {
+      $('settingsStatus').textContent = 'Настройки сохранены. Новый каталог будет подключён после пересоздания контейнера onec-server.';
+    }
+  }
 }
 
 function loadTab(t) {
