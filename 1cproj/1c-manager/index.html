@@ -652,13 +652,15 @@ async function loadSettings() {
     for (const [key, item] of Object.entries(r[section] || {})) {
       const type = item.secret ? 'password' : 'text';
       const hint = item.secret ? (item.configured ? 'Пароль задан · пустое поле — оставить без изменений' : 'Пароль ещё не задан') : '';
+      const label = key === 'SERVER_MEMORY_LIMIT' ? 'Лимит оперативной памяти сервера 1С' :
+                    key === 'POSTGRES_MEMORY_LIMIT' ? 'Лимит оперативной памяти PostgreSQL' : item.label;
       if (section === 'server' && key === 'BACKUP_DIR') {
-        out += '<div class="settings-field"><label for="env_server_BACKUP_DIR">' + esc(item.label) + '<code>' + esc(key) + '</code></label>' +
+        out += '<div class="settings-field"><label for="env_server_BACKUP_DIR">' + esc(label) + '<code>' + esc(key) + '</code></label>' +
           '<div class="backup-picker-row"><input id="env_server_BACKUP_DIR" data-env-section="server" data-env-key="BACKUP_DIR" type="text" value="' + esc(item.value || '') + '" placeholder="/home/user/backups">' +
           '<button class="b sec" type="button" id="chooseBackupDir">Выбрать папку…</button></div>' +
           '<p class="settings-field-hint">Папка на хосте, в которой будут храниться .dt и .cf. После изменения необходимо пересоздать контейнер onec-server, чтобы обновился подключённый каталог.</p></div>';
       } else {
-        out += '<div class="settings-field"><label for="env_' + section + '_' + key + '">' + esc(item.label) + '<code>' + esc(key) + '</code></label>' +
+        out += '<div class="settings-field"><label for="env_' + section + '_' + key + '">' + esc(label) + '<code>' + esc(key) + '</code></label>' +
           '<input id="env_' + section + '_' + key + '" data-env-section="' + section + '" data-env-key="' + key + '" type="' + type + '" value="' + esc(item.value || '') + '" placeholder="' + esc(hint) + '">' +
           (hint ? '<p class="settings-field-hint">' + esc(hint) + '</p>' : '') + '</div>';
       }
