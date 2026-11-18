@@ -48,8 +48,12 @@ chmod +x *.sh
 
 ## Подключение клиентов
 
-- Клиент на другой машине подключается по IP. Откройте порты на этой машине:
-  1540-1541/tcp и 1560-1591/tcp (1545/tcp нужен только для rac/RAS и наружу не публикуется):
+- Клиент 1С на другой машине подключается по IP. Для тонкого/толстого клиента откройте:
+      sudo firewall-cmd --permanent --add-port=1540-1541/tcp --add-port=1560-1591/tcp
+- Для веб-клиента откройте HTTP и HTTPS:
+      sudo firewall-cmd --permanent --add-port=80/tcp --add-port=443/tcp
+- Примените правила:
+      sudo firewall-cmd --reload
 
       sudo firewall-cmd --permanent --add-port=1540-1541/tcp --add-port=1560-1591/tcp
       sudo firewall-cmd --reload
