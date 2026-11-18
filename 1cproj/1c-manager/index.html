@@ -107,7 +107,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-pg">
-    <div class="row"><button class="b sec" id="refreshP">Обновить</button></div>
+    <div class="row"><button class="b sec" id="refreshP">Обновить</button><button class="b" id="openPgRestore">Загрузить .dump и восстановить</button></div>
     <div id="pErr" class="mut"></div>
     <table><thead><tr><th>База PostgreSQL</th><th>Размер</th><th></th></tr></thead>
       <tbody id="pBody"><tr><td colspan="3" class="mut">Загрузка…</td></tr></tbody></table>
@@ -155,6 +155,21 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <pre id="conOut"></pre>
 </div>
 
+<dialog id="dlgPgRestore">
+  <h3 style="margin-top:0">Восстановить PostgreSQL из .dump</h3>
+  <label>Файл PostgreSQL (.dump, формат pg_dump -Fc)</label>
+  <input id="pgRestoreFile" type="file" accept=".dump,application/octet-stream">
+  <label>Целевая база PostgreSQL</label>
+  <select id="pgRestoreDb"><option value="">Сначала загрузите список баз</option></select>
+  <label><input id="pgRestoreClean" type="checkbox"> Очистить существующие объекты перед восстановлением</label>
+  <p class="mut">Без отметки восстановление добавит объекты в целевую базу и может завершиться конфликтами. С очисткой существующие объекты будут удалены. Саму базу PostgreSQL панель не удаляет.</p>
+  <div id="pgRestoreStatus" class="mut" aria-live="polite"></div>
+  <div id="pgRestoreProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки дампа">
+    <div class="upload-progress-track"><div id="pgRestoreProgressFill" class="upload-progress-fill"></div></div>
+    <div class="upload-progress-meta"><span id="pgRestoreProgressLabel">Загрузка: 0%</span><span id="pgRestoreProgressSize">0 / 0 МБ</span></div>
+  </div>
+  <div class="row"><button class="b" id="pgRestoreOk">Загрузить и восстановить</button><button class="b sec" id="pgRestoreCancel">Отмена</button></div>
+</dialog>
 <dialog id="dlgImport">
   <h3 style="margin-top:0">Загрузить файл в Docker и импортировать в базу</h3>
   <label><input id="importNewBase" type="checkbox"> Создать новую информационную базу и отдельную БД PostgreSQL (только для .dt)</label>
@@ -342,6 +357,7 @@ async function loadPg() {
   $('pBody').innerHTML = items.length ? items.map(i => '<tr><td><b>' + esc(i.name) + '</b></td><td>' + esc(i.size) +
     '</td><td><button class="b sec" data-pgdump="' + esc(i.name) + '">Дамп PostgreSQL</button></td></tr>').join('')
     : '<tr><td colspan="3" class="mut">Баз нет</td></tr>';
+  $('pgRestoreDb').innerHTML = items.length ? '<option value="">Выберите целевую базу</option>' + items.map(i => '<option value="' + esc(i.name) + '">' + esc(i.name) + '</option>').join('') : '<option value="">Баз нет</option>';
 }
 
 function fileRows(list, kind) {
@@ -499,6 +515,44 @@ document.addEventListener('click', async e => {
   }
 });
 
+$('openPgRestore').onclick = async () => {
+  $('pgRestoreStatus').textContent = ''; $('pgRestoreFile').value = ''; $('pgRestoreClean').checked = false;
+  await loadPg(); $('dlgPgRestore').showModal();
+};
+$('pgRestoreCancel').onclick = () => $('dlgPgRestore').close();
+$('pgRestoreOk').onclick = async () => {
+  const file = $('pgRestoreFile').files[0], db = $('pgRestoreDb').value;
+  if (!file) { $('pgRestoreStatus').textContent = 'Выберите файл .dump.'; return; }
+  if (!/\.dump$/i.test(file.name)) { $('pgRestoreStatus').textContent = 'Поддерживается только .dump.'; return; }
+  if (!db) { $('pgRestoreStatus').textContent = 'Выберите целевую базу PostgreSQL.'; return; }
+  if (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024) { $('pgRestoreStatus').textContent = 'Размер файла должен быть от 1 байта до 8 ГБ.'; return; }
+  const clean = $('pgRestoreClean').checked;
+  const warning = clean ? 'ВНИМАНИЕ: существующие объекты базы «' + db + '» будут удалены перед восстановлением. Продолжить?' : 'Восстановить дамп в базу «' + db + '» без очистки? Возможны конфликты с уже существующими объектами.';
+  if (!confirm(warning)) return;
+  $('pgRestoreOk').disabled = true;
+  $('pgRestoreStatus').textContent = 'Загружаю ' + file.name + ' (' + fmtSize(file.size) + ')…';
+  try {
+    const result = await uploadPgDump(file);
+    $('pgRestoreStatus').textContent = 'Дамп загружен. Запускаю восстановление в ' + db + '…';
+    await runAction({action:'restore_pg_dump', filename:result.filename, db, clean});
+    $('dlgPgRestore').close();
+  } catch (e) { $('pgRestoreStatus').textContent = 'Ошибка: ' + e.message; }
+  finally { $('pgRestoreOk').disabled = false; }
+};
+function uploadPgDump(file) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    $('pgRestoreProgress').style.display = 'block';
+    const update = (loaded, total) => { const pct = total ? loaded / total * 100 : 0; $('pgRestoreProgressFill').style.width = pct + '%'; $('pgRestoreProgressLabel').textContent = 'Загрузка: ' + Math.round(pct) + '%'; $('pgRestoreProgressSize').textContent = fmtSize(loaded) + ' / ' + fmtSize(total); };
+    update(0, file.size);
+    xhr.open('POST', '/api/upload_pg_dump?name=' + encodeURIComponent(file.name));
+    xhr.setRequestHeader('X-Token', TOKEN); xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = e => { if (e.lengthComputable) update(e.loaded, e.total); };
+    xhr.onload = () => { let r = {}; try { r = JSON.parse(xhr.responseText || '{}'); } catch (_) {} if (xhr.status >= 200 && xhr.status < 300 && !r.error) { update(file.size, file.size); resolve(r); } else reject(new Error(r.error || ('Ошибка загрузки HTTP ' + xhr.status))); };
+    xhr.onerror = () => reject(new Error('Сетевая ошибка при загрузке дампа'));
+    xhr.send(file);
+  });
+};
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
 $('clearCon').onclick = () => { $('conOut').textContent = ''; };
