@@ -839,7 +839,7 @@ $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loa
 $('activateServerLicense').onclick = async () => {
   const file = $('serverLicenseFile').files[0];
   if (!file) { $('serverLicenseStatus').textContent = 'Сначала выберите файл лицензии .lic.'; return; }
-  if (!/\\.lic$/i.test(file.name) || file.size <= 0 || file.size > 50 * 1024 * 1024) { $('serverLicenseStatus').textContent = 'Выберите непустой файл .lic размером не более 50 МБ.'; return; }
+  if (!/\.lic$/i.test(file.name) || file.size <= 0 || file.size > 50 * 1024 * 1024) { $('serverLicenseStatus').textContent = 'Выберите непустой файл .lic размером не более 50 МБ.'; return; }
   const button = $('activateServerLicense'); button.disabled = true;
   $('serverLicenseStatus').textContent = 'Загружаю файл лицензии ' + file.name + '…';
   try {
