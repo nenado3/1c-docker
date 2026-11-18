@@ -129,8 +129,11 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .upload-progress-track{height:16px;background:var(--line);border-radius:999px;overflow:hidden}
 .upload-progress-fill{height:100%;width:0;background:var(--acc);transition:width .12s ease}
 .upload-progress-meta{display:flex;justify-content:space-between;gap:12px;margin-top:5px;font-size:12px;color:var(--mut)}
-#console{position:fixed;left:0;right:0;bottom:0;height:240px;background:var(--con);color:var(--confg);border-top:2px solid var(--line);display:flex;flex-direction:column}
-#console .bar{display:flex;gap:10px;align-items:center;padding:6px 14px;font-size:13px;border-bottom:1px solid #1f2937}
+#console{position:fixed;left:0;right:0;bottom:0;height:240px;min-height:100px;max-height:80vh;background:var(--con);color:var(--confg);border-top:2px solid var(--line);display:flex;flex-direction:column;z-index:20}
+#console-resize{height:9px;flex:none;cursor:ns-resize;touch-action:none;display:grid;place-items:center;background:var(--con)}
+#console-resize:after{content:"";width:42px;height:3px;border-radius:3px;background:#64748b;opacity:.75}
+#console-resize:hover:after{background:var(--acc);opacity:1}
+#console .bar{display:flex;gap:10px;align-items:center;padding:6px 14px;font-size:13px;border-bottom:1px solid #1f2937;flex:none}
 #console pre{margin:0;padding:8px 14px;overflow:auto;flex:1;font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}
 .logs{background:var(--con);color:var(--confg);padding:10px;border-radius:8px;max-height:340px;overflow:auto;white-space:pre-wrap;font:12.5px/1.4 ui-monospace,Menlo,monospace}
 </style>
@@ -268,6 +271,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 </dialog>
 
 <div id="console">
+  <div id="console-resize" role="separator" aria-label="Изменить высоту консоли" aria-orientation="horizontal" title="Перетащите, чтобы изменить высоту"></div>
   <div class="bar"><b>Консоль</b><span id="jobTitle" class="mut">нет задач</span><span id="jobState" class="badge"></span>
     <button class="b sec" id="clearCon" style="margin-left:auto">Очистить</button></div>
   <pre id="conOut"></pre>
@@ -431,6 +435,33 @@ async function api(path, body) {
     if (!r.ok && !j.error) j.error = 'Ошибка ' + r.status;
     return j;
   } catch (e) { return {error: 'Нет связи с панелью: ' + e.message}; }
+}
+
+function setupConsoleResize() {
+  const panel = $('console'), grip = $('console-resize');
+  const minHeight = 100, maxRatio = 0.8;
+  const applyHeight = value => {
+    const height = Math.max(minHeight, Math.min(Math.round(window.innerHeight * maxRatio), value));
+    panel.style.height = height + 'px';
+    document.body.style.paddingBottom = (height + 20) + 'px';
+  };
+  const saved = Number(localStorage.getItem('oneCConsoleHeight'));
+  applyHeight(saved >= minHeight ? saved : 240);
+  let dragging = false;
+  grip.addEventListener('pointerdown', event => {
+    dragging = true;
+    grip.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  grip.addEventListener('pointermove', event => {
+    if (!dragging) return;
+    applyHeight(window.innerHeight - event.clientY);
+    localStorage.setItem('oneCConsoleHeight', String(Math.round(panel.getBoundingClientRect().height)));
+  });
+  const stop = () => { dragging = false; };
+  grip.addEventListener('pointerup', stop);
+  grip.addEventListener('pointercancel', stop);
+  window.addEventListener('resize', () => applyHeight(panel.getBoundingClientRect().height));
 }
 
 function conLine(t) { const o = $('conOut'); o.textContent += t + '\n'; o.scrollTop = o.scrollHeight; }
@@ -795,7 +826,13 @@ function uploadPgDump(file) {
 };
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
-$('clearCon').onclick = () => { $('conOut').textContent = ''; };
+$('clearCon').onclick = () => {
+  $('conOut').textContent = '';
+  $('jobTitle').textContent = '';
+  $('jobState').textContent = '';
+  $('jobState').className = 'badge';
+  $('console').style.borderTopColor = 'var(--line)';
+};
 $('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
 document.addEventListener('click', e => {
   if (e.target.closest('#chooseBackupDir')) openBackupPicker();
@@ -931,6 +968,7 @@ $('uploadImport').onclick = async () => {
   finally { $('uploadImport').disabled = false; }
 };
 
+setupConsoleResize();
 init();
 </script>
 </body>
