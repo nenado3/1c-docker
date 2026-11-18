@@ -425,6 +425,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp
 const fmtSize = n => n > 1048576 ? (n/1048576).toFixed(1)+' МБ' : n > 1024 ? (n/1024).toFixed(1)+' КБ' : n+' Б';
 const fmtDate = t => new Date(t*1000).toLocaleString('ru-RU');
 let state = {docker:false}, curTab = 'containers', logsFor = null, polling = null, dtLaunchMode = 'base';
+let consoleHeadersCleared = false;
 
 async function api(path, body) {
   const opt = {headers: {'X-Token': TOKEN}};
@@ -473,17 +474,20 @@ async function runAction(body) {
 }
 
 function followJob(id) {
+  consoleHeadersCleared = false;
   if (polling) clearInterval(polling);
   let since = 0;
   $('conOut').textContent = '';
   const tick = async () => {
     const j = await api('/api/job?id=' + id + '&since=' + since);
     if (j.error) { conLine('ОШИБКА: ' + j.error); clearInterval(polling); return; }
-    $('jobTitle').textContent = j.title;
+    if (!consoleHeadersCleared) {
+      $('jobTitle').textContent = j.title;
+      const st = $('jobState');
+      st.textContent = j.status === 'running' ? 'выполняется…' : (j.status === 'done' ? 'готово' : 'ошибка (код ' + j.rc + ')');
+      st.className = 'badge ' + (j.status === 'running' ? 'warn' : j.status === 'done' ? 'ok' : 'bad');
+    }
     j.lines.forEach(conLine); since = j.next;
-    const st = $('jobState');
-    st.textContent = j.status === 'running' ? 'выполняется…' : (j.status === 'done' ? 'готово' : 'ошибка (код ' + j.rc + ')');
-    st.className = 'badge ' + (j.status === 'running' ? 'warn' : j.status === 'done' ? 'ok' : 'bad');
     $('console').style.borderTopColor = j.status === 'error' ? 'var(--bad)' : (j.status === 'done' ? 'var(--ok)' : 'var(--line)');
     if (j.status !== 'running') { clearInterval(polling); polling = null; loadTab(curTab); }
   };
@@ -827,6 +831,7 @@ function uploadPgDump(file) {
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
 $('clearCon').onclick = () => {
+  consoleHeadersCleared = true;
   $('conOut').textContent = '';
   $('jobTitle').textContent = '';
   $('jobState').textContent = '';
