@@ -831,12 +831,16 @@ function uploadPgDump(file) {
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
 $('clearCon').onclick = () => {
-  consoleHeadersCleared = true;
+  // Во время выполнения очищаем только вывод: заголовок и статус текущей задачи оставляем.
+  const taskRunning = Boolean(polling);
+  consoleHeadersCleared = taskRunning;
   $('conOut').textContent = '';
-  $('jobTitle').textContent = '';
-  $('jobState').textContent = '';
-  $('jobState').className = 'badge';
-  $('console').style.borderTopColor = 'var(--line)';
+  if (!taskRunning) {
+    $('jobTitle').textContent = '';
+    $('jobState').textContent = '';
+    $('jobState').className = 'badge';
+    $('console').style.borderTopColor = 'var(--line)';
+  }
 };
 $('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
 document.addEventListener('click', e => {
