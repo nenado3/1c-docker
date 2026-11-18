@@ -72,51 +72,64 @@ elif [ -n "$RUNFILE" ]; then
     chmod +x "$RUNFILE"
     if [ -f "$DIST/v8-install-deps.sh" ]; then (apt-get update; bash "$DIST/v8-install-deps.sh") || true; fi
 
-    attempts=()
+    # Перед запуском фиксируем состояние временной ФС и раздела установки.
+    echo "== Диагностика места перед установкой =="
+    df -hT /tmp "$OPT_DIR" 2>&1 || true
+    df -i /tmp "$OPT_DIR" 2>&1 || true
+    echo "Параметры установщика: компоненты=${COMPONENTS:-(по умолчанию)}"
+
+    # Не повторяем установку с другими компонентами после ошибки: setup-full
+    # может оставить частично распакованное дерево, после чего повторный запуск
+    # маскирует первичную причину сообщением payload initialization failed.
+    INSTALL_TRACE="/tmp/onec-installer-debugtrace.log"
+    rm -f "$INSTALL_TRACE"
+    INSTALL_ARGS=()
     case "$(basename "$RUNFILE")" in
-        setup-thin*) ;;   # тонкий установщик сам ставит клиент; его --enable-components принимает только языки
+        setup-thin*) ;; # setup-thin не принимает серверные компоненты
         *)
             if [ -n "$COMPONENTS" ]; then
-                attempts+=("--enable-components $COMPONENTS")
-                # допустимые значения берём из справки установщика и оставляем только их
                 allowed=$("$RUNFILE" --help 2>&1 | awk '
                     /--enable-components/ {f=1; next}
                     f && /(Разрешено|Allowed)/ {sub(/^.*(Разрешено|Allowed)[^:]*:[ ]*/, ""); print; exit}
                     f && /^[ ]*--/ {exit}') || true
                 echo "Допустимые значения --enable-components: ${allowed:-(определить не удалось)}"
-                # в справке список через запятую, в COMPONENTS — тоже; сравниваем нормализованные наборы
                 allowed_norm=$(echo "$allowed" | tr ',' ' ')
-                filtered=""; nonlang=0
+                filtered=""
                 for c in ${COMPONENTS//,/ }; do
-                    case " $allowed_norm " in *" $c "*)
-                        filtered="${filtered:+$filtered,}$c"
-                        case " az ar hy bg hu el vi ka kk zh it es lv lt de pl ro ru tr tk fr uk en langs " in
-                            *" $c "*) ;; *) nonlang=1;; esac ;;
+                    case " $allowed_norm " in
+                        *" $c "*) filtered="${filtered:+$filtered,}$c" ;;
+                        *) echo "ПРЕДУПРЕЖДЕНИЕ: компонент '$c' отсутствует в списке установщика и будет пропущен" ;;
                     esac
                 done
-                if [ -n "$filtered" ] && [ "$nonlang" = 1 ] && [ "$filtered" != "$COMPONENTS" ]; then
-                    attempts+=("--enable-components $filtered")
-                fi
+                [ -z "$filtered" ] || INSTALL_ARGS+=(--enable-components "$filtered")
             fi ;;
     esac
-    attempts+=("")   # последняя попытка: компоненты по умолчанию
 
-    done_ok=0
-    for a in "${attempts[@]}"; do
-        echo ">>> $(basename "$RUNFILE") --mode unattended ${a:-(компоненты по умолчанию)}"
-        # shellcheck disable=SC2086
-        if "$RUNFILE" --mode unattended $a; then
-            missing_required
-            if [ -z "$MISSING" ]; then done_ok=1; break; fi
-            echo "Установщик отработал, но не хватает:$MISSING. Пробую следующий вариант компонентов."
-        else
-            echo "Установщик вернул ошибку с этими параметрами."
+    echo ">>> $(basename "$RUNFILE") --mode unattended --debuglevel 4 --debugtrace $INSTALL_TRACE ${INSTALL_ARGS[*]:-(компоненты по умолчанию)}"
+    if "$RUNFILE" --mode unattended --debuglevel 4 --debugtrace "$INSTALL_TRACE" "${INSTALL_ARGS[@]}"; then
+        missing_required
+        if [ -n "$MISSING" ]; then
+            echo "Установщик завершился с кодом 0, но отсутствуют обязательные бинарники:$MISSING"
+            d=$(find_bin_dir)
+            [ -z "$d" ] || { echo "Содержимое $d:"; ls -la "$d" | head -60; }
+            [ ! -f "$INSTALL_TRACE" ] || { echo "Последние строки журнала установщика:"; tail -n 120 "$INSTALL_TRACE"; }
+            die "установка из $(basename "$RUNFILE") неполная; повторный запуск автоматически не выполняется"
         fi
-    done
-    if [ "$done_ok" = 0 ]; then
-        echo "Справка установщика:"; "$RUNFILE" --help 2>&1 || true
-        d=$(find_bin_dir); [ -n "$d" ] && { echo "Содержимое $d:"; ls -la "$d" | head -40; }
-        die "установка из $(basename "$RUNFILE") не удалась (нет:${MISSING:- ?}). Задайте допустимые компоненты в ONEC_RUN_COMPONENTS (.env), список выше"
+    else
+        rc=$?
+        echo "Установщик завершился с кодом $rc"
+        echo "== Состояние файловой системы после ошибки =="
+        df -hT /tmp "$OPT_DIR" 2>&1 || true
+        df -i /tmp "$OPT_DIR" 2>&1 || true
+        d=$(find_bin_dir)
+        [ -z "$d" ] || { echo "Содержимое $d:"; ls -la "$d" | head -60; }
+        if [ -f "$INSTALL_TRACE" ]; then
+            echo "== Последние 160 строк debugtrace =="
+            tail -n 160 "$INSTALL_TRACE"
+        else
+            echo "Установщик не создал debugtrace: $INSTALL_TRACE"
+        fi
+        die "установка из $(basename "$RUNFILE") завершилась ошибкой; повторная попытка отключена, см. debugtrace выше"
     fi
 else
     die "в $DIST нет .deb или .run для архитектуры $ARCH ($RARCH) и версии $ONEC_VERSION"
