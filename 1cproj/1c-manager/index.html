@@ -186,10 +186,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-bases">
-    <div class="row" id="basesActions" style="flex-wrap:nowrap">
+    <div class="row" id="basesActions" style="flex-wrap:wrap">
       <button class="b" id="openImport">Создать/Загрузить базу 1С</button>
+      <button class="b sec" data-apache="start">Запустить Apache</button>
+      <button class="b sec" data-apache="stop">Остановить Apache</button>
+      <button class="b sec" data-apache="restart">Перезапустить Apache</button>
       <button class="b sec" id="refreshB">Обновить</button>
     </div>
+    <p class="mut">Публикация веб-клиента выполняется для выбранной базы. После публикации откройте <span class="mono">http://IP-СЕРВЕРА/имя-базы</span>. Порты 80 и 443 обслуживаются контейнером onec-server.</p>
     <div id="bErr" class="mut"></div>
     <table><thead><tr><th>Имя</th><th>Идентификатор</th><th>Описание</th><th>Действия</th></tr></thead>
       <tbody id="bBody"><tr><td colspan="4" class="mut">Загрузка…</td></tr></tbody></table>
@@ -539,7 +543,9 @@ async function loadBases() {
   const items = r.items || [];
   $('importBase').innerHTML = items.length ? '<option value="">Выберите базу</option>' + items.map(i => '<option value="' + esc(i.name) + '">' + esc(i.name) + '</option>').join('') : '<option value="">Нет доступных баз</option>';
   $('bBody').innerHTML = items.length ? items.map(i => '<tr><td><b>' + esc(i.name) + '</b></td><td class="mono">' + esc(i.infobase) + '</td><td>' + esc(i.descr || '') +
-    '</td><td><button class="b sec" data-dump="' + esc(i.name) + '">Выгрузить .dt</button>' +
+    '</td><td><button class="b" data-webpub="' + esc(i.name) + '">Опубликовать в браузере</button>' +
+    '<button class="b sec" data-webdel="' + esc(i.name) + '">Снять публикацию</button>' +
+    '<button class="b sec" data-dump="' + esc(i.name) + '">Выгрузить .dt</button>' +
     '<button class="b red" data-drop="' + esc(i.infobase) + '" data-name="' + esc(i.name) + '">Удалить</button></td></tr>').join('')
     : '<tr><td colspan="4" class="mut">Баз нет</td></tr>';
   const s = await api('/api/sessions');
@@ -782,6 +788,18 @@ document.addEventListener('click', async e => {
   if (t.dataset.op) {
     if (t.dataset.op === 'logs') { logsFor = t.dataset.c; loadLogs(); return; }
     return runAction({action: 'container_op', name: t.dataset.c, op: t.dataset.op});
+  }
+  if (t.dataset.apache) {
+    if (t.dataset.apache === 'stop' && !confirm('Остановить Apache? Веб-клиент станет недоступен.')) return;
+    return runAction({action:'apache_op', op:t.dataset.apache});
+  }
+  if (t.dataset.webpub) {
+    if (!confirm('Опубликовать базу «' + t.dataset.webpub + '» для веб-клиента 1С?')) return;
+    return runAction({action:'web_publish', name:t.dataset.webpub});
+  }
+  if (t.dataset.webdel) {
+    if (!confirm('Снять веб-публикацию базы «' + t.dataset.webdel + '»?')) return;
+    return runAction({action:'web_delete', name:t.dataset.webdel});
   }
   if (t.dataset.dump) { $('dName').value = t.dataset.dump; $('dUser').value = $('dPwd').value = ''; $('dlgDump').showModal(); return; }
   if (t.dataset.drop) {
