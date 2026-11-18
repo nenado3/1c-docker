@@ -420,6 +420,12 @@ def do_action(body):
         return script_job("Запуск клиента 1С", "client", "client.sh")
     if a == "license_install":
         return script_job("Перенос лицензий", "client", "license.sh", "install")
+    if a == "license_server_activate":
+        filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,176}\\.lic$", re.I), 180)
+        license_file = os.path.join(data_dir("licenses"), filename)
+        if not os.path.isfile(license_file) or os.path.getsize(license_file) <= 0:
+            raise ValueError("Файл лицензии не найден или пуст: %s" % license_file)
+        return script_job("Активация лицензии на сервере: %s" % filename, "server", "license.sh", "activate", filename)
     if a == "infobase_create":
         n = need(body, "name", NAME_RE)
         db = str(body.get("db_name") or n).strip()
@@ -644,6 +650,33 @@ class H(BaseHTTPRequestHandler):
                     except OSError: pass
                     raise
                 return self._send(200, {"filename": safe_name, "size": n, "kind": ext, "path": dest, "backup_dir": data_dir("backups")})
+            if u.path == "/api/upload_license":
+                if n <= 0 or n > 50 * 1024 * 1024:
+                    return self._send(413, {"error": "размер файла лицензии должен быть от 1 байта до 50 МБ"})
+                filename = os.path.basename(parse_qs(u.query).get("name", [""])[0]).strip()
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\\.lic", filename, re.I) or filename.startswith("."):
+                    return self._send(400, {"error": "выберите файл лицензии с расширением .lic"})
+                dest_dir = data_dir("licenses")
+                os.makedirs(dest_dir, exist_ok=True)
+                dest = os.path.join(dest_dir, filename)
+                part = os.path.join(dest_dir, ".license-upload-" + secrets.token_hex(8) + ".part")
+                remaining = n
+                try:
+                    with open(part, "xb") as f:
+                        while remaining:
+                            chunk = self.rfile.read(min(1024 * 1024, remaining))
+                            if not chunk:
+                                raise ValueError("соединение прервано во время загрузки лицензии")
+                            f.write(chunk); remaining -= len(chunk)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(part, dest)
+                    os.chmod(dest, 0o666)
+                except Exception:
+                    try: os.unlink(part)
+                    except OSError: pass
+                    raise
+                return self._send(200, {"filename": filename, "size": n, "path": dest})
             if u.path == "/api/upload_pg_dump":
                 if n <= 0 or n > 8 * 1024 * 1024 * 1024:
                     return self._send(413, {"error": "размер файла должен быть от 1 байта до 8 ГБ"})
@@ -708,7 +741,7 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, save_settings(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
-            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory", "recreate_server"):
+            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory", "recreate_server", "license_server_activate"):
                 return self._send(400, {"error": "Docker недоступен для этого пользователя"})
             return self._send(200, {"job": do_action(body)})
         except ValueError as e:
