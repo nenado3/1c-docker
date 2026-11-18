@@ -10,6 +10,8 @@ services:
     container_name: onec-client
     hostname: onec-client
     restart: unless-stopped
+    # Общий лимит памяти клиентского контейнера для всех пользовательских сеансов; 0 — без ограничения.
+    mem_limit: ${CLIENT_MEMORY_LIMIT:-0}
     command: ["sleep", "infinity"]
     shm_size: "1gb"
     security_opt:
