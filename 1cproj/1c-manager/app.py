@@ -102,12 +102,14 @@ ENV_SETTINGS = {
         "POSTGRES_PASSWORD": "Пароль PostgreSQL", "IB_NAME": "Имя информационной базы по умолчанию",
         "DB_NAME": "Имя базы PostgreSQL по умолчанию", "DB_USER": "Пользователь БД по умолчанию",
         "SERVER_BASE_IMAGE": "Базовый образ сервера", "POSTGRES_BASE_IMAGE": "Базовый образ PostgreSQL",
-        "BACKUP_DIR": "Каталог резервных копий", "SERVER_MEMORY_LIMIT": "Лимит памяти сервера"
+        "BACKUP_DIR": "Каталог резервных копий", "SERVER_MEMORY_LIMIT": "Лимит памяти сервера",
+        "POSTGRES_MEMORY_LIMIT": "Лимит памяти PostgreSQL"
     },
     "client": {
         "ONEC_VERSION": "Версия платформы 1С", "ONEC_RUN_COMPONENTS": "Компоненты установщика",
         "CLIENT_UID": "UID пользователя клиента", "SERVER_IP": "IP-адрес сервера 1С",
-        "NETHASP_ADDRS": "Адреса NetHASP", "EXPORT_DIR": "Каталог выгрузок"
+        "NETHASP_ADDRS": "Адреса NetHASP", "EXPORT_DIR": "Каталог выгрузок",
+        "CLIENT_MEMORY_LIMIT": "Лимит памяти клиентского контейнера"
     }
 }
 ENV_SECRET_KEYS = {"POSTGRES_PASSWORD"}
@@ -145,8 +147,8 @@ def save_settings(body):
                 raise ValueError("недопустимое значение параметра " + key)
             if any(ch in value for ch in ('"', "'", "\\", "#", "$")):
                 raise ValueError("параметр %s содержит символы, несовместимые с форматом .env: кавычки, #, $ и обратная косая черта не поддерживаются" % key)
-            if key == "SERVER_MEMORY_LIMIT" and not MEM_RE.match(value.lower()):
-                raise ValueError("SERVER_MEMORY_LIMIT: укажите 0 или значение, например 8g или 512m")
+            if key in ("SERVER_MEMORY_LIMIT", "POSTGRES_MEMORY_LIMIT", "CLIENT_MEMORY_LIMIT") and not MEM_RE.match(value.lower()):
+                raise ValueError("%s: укажите 0 или значение, например 8g или 512m" % key)
             if key == "CLIENT_UID" and value and not value.isdigit():
                 raise ValueError("CLIENT_UID должен быть числом")
             if key == "ONEC_VERSION" and value and not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+", value):
@@ -300,12 +302,18 @@ def do_action(body):
                     if len(v) > 400 or not os.path.isabs(v) or not os.path.isdir(v):
                         raise ValueError("папка для %s не найдена: %s" % (label, v))
                 args.append(v)
-            # память сервера задаётся сразу при создании образов: пишем в .env, применится при запуске
-            mem = str(body.get("memory", "")).strip().lower()
-            if mem:
-                if not MEM_RE.match(mem):
-                    raise ValueError("лимит памяти: 0 или число с суффиксом, например 8g, 512m")
-                write_env_value(os.path.join(project("server"), ".env"), "SERVER_MEMORY_LIMIT", mem)
+            # Лимиты контейнеров сохраняются в .env и применяются при запуске/пересоздании.
+            limits = (
+                ("memory", "SERVER_MEMORY_LIMIT", project("server")),
+                ("postgres_memory", "POSTGRES_MEMORY_LIMIT", project("server")),
+                ("client_memory", "CLIENT_MEMORY_LIMIT", project("client")),
+            )
+            for field, env_key, directory in limits:
+                value = str(body.get(field, "")).strip().lower()
+                if value:
+                    if not MEM_RE.match(value):
+                        raise ValueError("%s: укажите 0 или значение, например 8g, 512m" % env_key)
+                    write_env_value(os.path.join(directory, ".env"), env_key, value)
         return script_job("Сборка образов (%s)" % proj, proj, "build.sh", *args)
     if a == "update_image":
         proj = need(body, "project")
@@ -436,6 +444,9 @@ def api_get(path, q):
     if path == "/api/memory":
         env = read_env(cfg["server_dir"])
         limit = (env.get("SERVER_MEMORY_LIMIT") or "0").strip()
+        postgres_limit = (env.get("POSTGRES_MEMORY_LIMIT") or "0").strip()
+        client_env = read_env(cfg["client_dir"])
+        client_limit = (client_env.get("CLIENT_MEMORY_LIMIT") or "0").strip()
         usage, percent = "", ""
         try:
             r = dk("stats", "--no-stream", "--format", "{{.MemUsage}}|{{.MemPerc}}", "onec-server")
@@ -443,7 +454,8 @@ def api_get(path, q):
                 usage, percent = r.stdout.strip().split("|", 1)
         except Exception:
             pass
-        return {"limit": limit, "usage": usage, "percent": percent}
+        return {"limit": limit, "postgres_limit": postgres_limit, "client_limit": client_limit,
+                "usage": usage, "percent": percent}
     if path == "/api/dist":
         target = q.get("target", [""])[0]
         if target not in ("server", "postgres"):
