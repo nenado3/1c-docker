@@ -39,8 +39,6 @@ services:
     restart: unless-stopped
     # Лимит памяти: 0 — без лимита. Меняется в .env или в веб-панели (вкладка «Контейнеры»).
     mem_limit: ${SERVER_MEMORY_LIMIT:-0}
-    # Мягкий резерв оперативной памяти для контейнера сервера 1С.
-    mem_reservation: ${SERVER_MEMORY_RESERVATION:-0}
     # ragent корректно завершает сеансы по SIGTERM, но ему нужно время
     stop_grace_period: 2m
     ports:
