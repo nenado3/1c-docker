@@ -79,6 +79,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <button data-tab="files">Выгрузки</button>
   <button data-tab="client">Клиент и лицензии</button>
   <button data-tab="build">Сборка</button>
+  <button data-tab="settings">Настройки</button>
 </nav>
 <main>
   <div id="dockerWarn" class="warnbox" style="display:none"></div>
@@ -165,6 +166,15 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <button class="b" data-act="update-server">Обновить сервер (PostgreSQL + 1С)</button>
       <button class="b" data-act="update-client">Обновить клиент 1С</button>
     </div>
+  </section>
+
+  <section id="t-settings">
+    <h2>Настройки Docker-проектов (.env)</h2>
+    <p class="mut">Изменения записываются в файлы <span class="mono">1c-server/.env</span> и <span class="mono">1c-client/.env</span>. Пароль PostgreSQL не отображается: оставьте поле пустым, чтобы сохранить текущий пароль.</p>
+    <div id="settingsStatus" class="mut" aria-live="polite"></div>
+    <div id="settingsFields"></div>
+    <div class="row"><button class="b" id="saveSettings">Сохранить настройки</button><button class="b sec" id="reloadSettings">Перечитать .env</button></div>
+    <p class="mut">После изменения параметров, используемых Docker Compose, пересоздайте соответствующие контейнеры. Изменение версии 1С или базового образа также может потребовать пересборки образов.</p>
   </section>
 </main>
 
@@ -496,12 +506,43 @@ async function uploadSelectedDist() {
   }
 }
 
+const settingsGroups = {server:'Сервер 1С и PostgreSQL',client:'Клиент 1С'};
+async function loadSettings() {
+  const r = await api('/api/settings');
+  if (r.error) { $('settingsStatus').textContent = 'Ошибка чтения .env: ' + r.error; return; }
+  let out = '';
+  for (const section of ['server','client']) {
+    out += '<h2>' + esc(settingsGroups[section]) + '</h2><div class="import-group"><div class="import-grid">';
+    for (const [key, item] of Object.entries(r[section] || {})) {
+      const type = item.secret ? 'password' : 'text';
+      const hint = item.secret ? (item.configured ? 'Пароль задан. Пустое поле — не менять.' : 'Пароль не задан') : '';
+      out += '<div><label for="env_' + section + '_' + key + '">' + esc(item.label) + ' <span class="mut mono">' + esc(key) + '</span></label>' +
+        '<input id="env_' + section + '_' + key + '" data-env-section="' + section + '" data-env-key="' + key + '" type="' + type + '" value="' + esc(item.value || '') + '" placeholder="' + esc(hint) + '"></div>';
+    }
+    out += '</div></div>';
+  }
+  $('settingsFields').innerHTML = out;
+  $('settingsStatus').textContent = 'Настройки загружены из .env.';
+}
+async function saveSettings() {
+  const payload = {server:{},client:{}};
+  document.querySelectorAll('#settingsFields [data-env-key]').forEach(el => { payload[el.dataset.envSection][el.dataset.envKey] = el.value; });
+  $('saveSettings').disabled = true;
+  $('settingsStatus').textContent = 'Сохраняю настройки…';
+  const r = await api('/api/settings', payload);
+  $('saveSettings').disabled = false;
+  if (r.error) { $('settingsStatus').textContent = 'Ошибка: ' + r.error; return; }
+  $('settingsStatus').textContent = 'Сохранено параметров: ' + (r.saved || []).length + '. Для применения может потребоваться пересоздать контейнеры или пересобрать образы.';
+  loadSettings();
+}
+
 function loadTab(t) {
   if (t === 'containers') { loadContainers().then(loadLogs); loadMemory(); }
   else if (t === 'bases') loadBases();
   else if (t === 'pg') loadPg();
   else if (t === 'files' || t === 'client') loadFiles();
   else if (t === 'build') loadBuild();
+  else if (t === 'settings') loadSettings();
 }
 
 async function init() {
@@ -604,6 +645,7 @@ function uploadPgDump(file) {
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
 $('clearCon').onclick = () => { $('conOut').textContent = ''; };
+$('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
 $('openImport').onclick = () => { $('dlgImport').showModal(); };
 $('importCancel').onclick = () => $('dlgImport').close();
 $('dtCancel').onclick = () => $('dlgDt').close(); $('dCancel').onclick = () => $('dlgDump').close();
