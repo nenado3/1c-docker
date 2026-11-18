@@ -322,6 +322,15 @@ def do_action(body):
         return script_job(title, "server", "import.sh", *args)
     if a == "backup_pg":
         return script_job("Дамп PostgreSQL %s" % need(body, "db", NAME_RE), "server", "backup.sh", "--pg", need(body, "db", NAME_RE))
+    if a == "restore_pg_dump":
+        db = need(body, "db", NAME_RE)
+        filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.dump$", re.I), 190)
+        uploaded_file = os.path.join(data_dir("backups"), "pg", filename)
+        if not os.path.isfile(uploaded_file) or os.path.getsize(uploaded_file) <= 0:
+            raise ValueError("Загруженный .dump не найден или пуст")
+        clean = "yes" if body.get("clean") else "no"
+        title = "Восстановление PostgreSQL dump в %s%s" % (db, " с очисткой объектов" if clean == "yes" else "")
+        return script_job(title, "server", "restore-pg.sh", db, uploaded_file, clean)
     if a == "client_start":
         return script_job("Запуск клиента 1С", "client", "client.sh")
     if a == "license_install":
@@ -522,6 +531,33 @@ class H(BaseHTTPRequestHandler):
                     except OSError: pass
                     raise
                 return self._send(200, {"filename": safe_name, "size": n, "kind": ext, "path": dest, "backup_dir": data_dir("backups")})
+            if u.path == "/api/upload_pg_dump":
+                if n <= 0 or n > 8 * 1024 * 1024 * 1024:
+                    return self._send(413, {"error": "размер файла должен быть от 1 байта до 8 ГБ"})
+                filename = os.path.basename(parse_qs(u.query).get("name", [""])[0]).strip()
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.dump", filename, re.I) or filename.startswith("."):
+                    return self._send(400, {"error": "разрешены только файлы .dump"})
+                dest_dir = os.path.join(data_dir("backups"), "pg")
+                os.makedirs(dest_dir, exist_ok=True)
+                dest = os.path.join(dest_dir, filename)
+                part = os.path.join(dest_dir, ".upload-" + secrets.token_hex(8) + ".part")
+                remaining = n
+                try:
+                    with open(part, "xb") as f:
+                        while remaining:
+                            chunk = self.rfile.read(min(1024 * 1024, remaining))
+                            if not chunk:
+                                raise ValueError("соединение прервано во время загрузки")
+                            f.write(chunk); remaining -= len(chunk)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(part, dest)
+                    os.chmod(dest, 0o666)
+                except Exception:
+                    try: os.unlink(part)
+                    except OSError: pass
+                    raise
+                return self._send(200, {"filename": filename, "size": n, "path": dest})
             if u.path == "/api/upload_dist":
                 target = parse_qs(u.query).get("target", [""])[0]
                 if target not in ("server", "postgres"):
