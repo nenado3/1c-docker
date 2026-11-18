@@ -3,26 +3,21 @@ services:
     build:
       context: ./postgres
       args:
-        # Должно совпадать с дистрибутивом ваших deb-пакетов PostgreSQL от 1С
-        # (зависимости libc6 2.43 / libicu78 / libxml2-16 => ubuntu:26.04)
         BASE_IMAGE: ${POSTGRES_BASE_IMAGE:-ubuntu:26.04}
     container_name: onec-postgres
     restart: unless-stopped
-    # Верхний лимит RAM контейнера PostgreSQL; 0 — без ограничения.
     mem_limit: ${POSTGRES_MEMORY_LIMIT:-0}
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in 1c-server/.env}"
     volumes:
       - pg-data:/var/lib/postgresql/data
-    # Без healthcheck 1С успевала создать базу раньше, чем PostgreSQL начинал принимать подключения
     healthcheck:
       test: ["CMD-SHELL", "/usr/local/pgbin/pg_isready -U ${POSTGRES_USER:-postgres} -h 127.0.0.1"]
       interval: 5s
       timeout: 3s
       retries: 24
       start_period: 30s
-    # даём PostgreSQL корректно завершиться (иначе docker stop убивает его через 10 с)
     stop_grace_period: 1m
     networks: [onec]
 
@@ -32,25 +27,24 @@ services:
       args:
         BASE_IMAGE: ${SERVER_BASE_IMAGE:-ubuntu:24.04}
         ONEC_VERSION: ${ONEC_VERSION}
-        # client_full нужен для ./backup.sh (выгрузка .dt конфигуратором в контейнере)
-        ONEC_RUN_COMPONENTS: ${ONEC_RUN_COMPONENTS:-server,server_admin,client_full,ru}
+        ONEC_RUN_COMPONENTS: ${ONEC_RUN_COMPONENTS:-server,server_admin,client_full,ws,ru}
     container_name: onec-server
     hostname: onec-server
     restart: unless-stopped
-    # Лимит памяти: 0 — без лимита. Меняется в .env или в веб-панели (вкладка «Контейнеры»).
     mem_limit: ${SERVER_MEMORY_LIMIT:-0}
-    # ragent корректно завершает сеансы по SIGTERM, но ему нужно время
     stop_grace_period: 2m
     ports:
+      - "80:80"
+      - "443:443"
       - "1540:1540"
       - "1541:1541"
-      # RAS: управление кластером без пароля (-seclev 0), поэтому только с этого хоста
       - "127.0.0.1:1545:1545"
       - "1560-1591:1560-1591"
     volumes:
       - onec-data:/home/usr1cv8/.1cv8
+      - apache-config:/etc/apache2
+      - apache-web:/var/www/onec
       - ./licenses:/var/1C/licenses:z
-      # правка адресов NetHASP применяется после ./update-image.sh или пересоздания контейнера
       - ./server/nethasp.ini:/opt/1cv8/conf/nethasp.ini:ro,z
       - ${BACKUP_DIR:-./backups}:/home/usr1cv8/backups:z
     depends_on:
@@ -61,8 +55,9 @@ services:
 volumes:
   onec-data:
   pg-data:
+  apache-config:
+  apache-web:
 
-# Сеть создаётся этим проектом; клиентский проект подключается к ней как к внешней
 networks:
   onec:
     name: onec-net
