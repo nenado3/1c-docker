@@ -62,7 +62,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .settings-field input{display:block;width:100%;min-width:0;height:42px;padding:9px 12px;border-radius:9px;background:var(--bg);transition:border-color .15s,box-shadow .15s}
 .settings-field input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 15%,transparent)}
 .settings-field .settings-field-hint{margin:5px 0 0;color:var(--mut);font-size:11px;line-height:1.4}
-.settings-actions{position:sticky;bottom:248px;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;margin:18px 0 12px;border:1px solid var(--line);border-radius:13px;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);box-shadow:0 6px 24px rgba(15,23,42,.08)}
+.settings-actions{position:sticky;top:8px;bottom:auto;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;margin:0 0 16px;border:1px solid var(--line);border-radius:13px;background:color-mix(in srgb,var(--bg) 96%,transparent);backdrop-filter:blur(12px);box-shadow:0 6px 24px rgba(15,23,42,.08)}
 .settings-actions-note{color:var(--mut);font-size:11px}
 .settings-actions .b{min-height:40px;padding:8px 16px;border-radius:9px}
 .settings-footnote{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 6%,var(--bg));color:var(--mut);font-size:12px;line-height:1.55}
@@ -102,7 +102,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #dlgBuild .build-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:17px;margin-top:18px;border-top:1px solid var(--line)}
 #dlgBuild .build-actions button{min-height:40px;padding:8px 17px;border-radius:9px}
 @media(max-width:620px){#dlgBuild .build-body{padding:17px}#dlgBuild .build-pick,#dlgBuild .build-memory-grid{grid-template-columns:1fr}#dlgBuild .build-actions{flex-direction:column-reverse}#dlgBuild .build-actions button{width:100%}}
-@media(max-width:650px){.settings-hero{padding:20px}.settings-hero h2{font-size:21px}.settings-card-body{grid-template-columns:1fr;padding:16px}.settings-card-head{padding:14px 16px}.settings-actions{bottom:248px;align-items:stretch;flex-direction:column}.settings-actions .row{margin:0}.settings-actions .b{flex:1}}
+@media(max-width:650px){.settings-hero{padding:20px}.settings-hero h2{font-size:21px}.settings-card-body{grid-template-columns:1fr;padding:16px}.settings-card-head{padding:14px 16px}.settings-actions{top:8px;bottom:auto;align-items:stretch;flex-direction:column}.settings-actions .row{margin:0}.settings-actions .b{flex:1}}
 
 /* Оформление окна импорта */
 #dlgImport{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 32px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
