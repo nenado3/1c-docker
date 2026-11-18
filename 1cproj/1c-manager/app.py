@@ -168,9 +168,9 @@ def save_settings(body):
 
 def data_dir(kind):
     if kind == "backups":
-        # Для DT/CF используем строго каталог проекта 1c-server/backups,
-        # не допускаем расхождения с ожидаемыми backups/dt и backups/cf.
-        return os.path.join(cfg["server_dir"], "backups")
+        # Должен совпадать с BACKUP_DIR в docker-compose.yml и common.sh:
+        # этот каталог используется и веб-загрузкой, и контейнером onec-server.
+        base, key, default = cfg["server_dir"], "BACKUP_DIR", "./backups"
     elif kind == "export":
         base, key, default = cfg["client_dir"], "EXPORT_DIR", "./export"
     else:
