@@ -499,8 +499,8 @@ class H(BaseHTTPRequestHandler):
         try:
             n = int(self.headers.get("Content-Length") or 0)
             if u.path == "/api/upload":
-                if n <= 0 or n > 8 * 1024 * 1024 * 1024:
-                    return self._send(413, {"error": "размер файла должен быть от 1 байта до 8 ГБ"})
+                if n <= 0:
+                    return self._send(400, {"error": "загружаемый файл пуст"})
                 filename = parse_qs(u.query).get("name", [""])[0]
                 filename = os.path.basename(filename).strip()
                 if (not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.(dt|cf)", filename, re.I)
