@@ -26,14 +26,14 @@ case "$ACTION" in
       "$WEBINST" -publish -apache24 -wsdir "$NAME" -dir "$WEB_ROOT/$NAME" -connstr "Srvr=localhost;Ref=$NAME;" -confpath "$APACHE_CONF"
       chown -R usr1cv8:grp1cv8 "$WEB_ROOT/$NAME"
       apache2ctl configtest
-      apache2ctl -k graceful
+      apache2ctl -k graceful || apache2ctl -k start
       echo "Веб-клиент опубликован: http://<IP-сервера>/$NAME"
     else
       echo "Удаление публикации '$NAME'..."
       "$WEBINST" -delete -apache24 -wsdir "$NAME" -confpath "$APACHE_CONF"
       rm -rf -- "$WEB_ROOT/$NAME"
       apache2ctl configtest
-      apache2ctl -k graceful
+      apache2ctl -k graceful || apache2ctl -k start
       echo "Публикация '$NAME' удалена."
     fi
     ;;
