@@ -48,7 +48,7 @@ ARG ONEC_RUN_COMPONENTS=server,server_admin,client_full,ws,ru
 COPY install-platform.sh /usr/local/bin/install-platform.sh
 COPY dist/ /tmp/dist/
 RUN chmod +x /usr/local/bin/install-platform.sh \
-    && ONEC_REQUIRED_BIN="ragent ras rac ibcmd" ONEC_OPTIONAL_BIN="1cv8 webinst" /usr/local/bin/install-platform.sh \
+    && ONEC_REQUIRED_BIN="ragent ras rac ibcmd webinst" ONEC_OPTIONAL_BIN="1cv8" /usr/local/bin/install-platform.sh \
     && rm -rf /tmp/dist /var/lib/apt/lists/*
 
 RUN set -eux; \
