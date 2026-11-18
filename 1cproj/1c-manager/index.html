@@ -215,15 +215,11 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-client">
-    <div class="row">
+    <div class="row" style="flex-wrap:wrap">
       <button class="b" data-act="client-start">Запустить клиент 1С</button>
       <button class="b sec" data-act="license-install">Перенести полученные лицензии на сервер</button>
+      <button class="b" id="openServerLicenseDialog">Активировать лицензию на сервере</button>
     </div>
-    <div class="row" style="align-items:flex-end">
-      <div style="flex:1;min-width:240px"><label for="serverLicenseFile">Файл лицензии 1С (.lic)</label><input id="serverLicenseFile" type="file" accept=".lic,application/octet-stream" style="display:block;width:100%;min-width:0"></div>
-      <button class="b" id="activateServerLicense">Загрузить и активировать на сервере</button>
-    </div>
-    <div id="serverLicenseStatus" class="mut" aria-live="polite"></div>
     <p class="mut">Окно клиента откроется на вашем рабочем столе. Для получения лицензии запустите клиент, получите её в окне 1С,
       затем нажмите «Перенести полученные лицензии». Сетевой ключ NetHASP настраивается в 1c-client/.env (NETHASP_ADDRS).</p>
     <h2>Файлы лицензий на сервере <span class="mut mono" id="dirLic"></span></h2>
@@ -260,6 +256,18 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <div class="settings-footnote"><span>ⓘ</span><div><strong>Обратите внимание.</strong> После изменения каталога резервных копий обязательно пересоздайте контейнер <span class="mono">onec-server</span>, иначе он продолжит использовать старую папку. Для этого сохраните настройки и обновите/пересоздайте контейнер. Изменение версии 1С или базового образа может потребовать пересборки образов. Пароль PostgreSQL не отображается: пустое поле сохраняет прежнее значение.</div></div>
   </section>
 </main>
+
+<dialog id="dlgServerLicense">
+  <h3 style="margin-top:0">Активация лицензии на сервере 1С</h3>
+  <p class="mut">Выберите готовый файл лицензии .lic. Он будет сохранён в папку licenses сервера, после чего контейнер 1С перезапустится.</p>
+  <label for="serverLicenseFile">Файл лицензии (.lic)</label>
+  <input id="serverLicenseFile" type="file" accept=".lic,application/octet-stream" style="display:block;width:100%;margin:8px 0 12px">
+  <div id="serverLicenseStatus" class="mut" aria-live="polite"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:16px">
+    <button class="b sec" id="cancelServerLicense">Отмена</button>
+    <button class="b" id="activateServerLicense">Загрузить и активировать</button>
+  </div>
+</dialog>
 
 <dialog id="dlgBackupPicker" aria-labelledby="backupPickerTitle">
   <div class="picker-head"><h3 id="backupPickerTitle">Выбор каталога резервных копий</h3></div>
@@ -836,6 +844,12 @@ function uploadPgDump(file) {
   });
 };
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
+$('openServerLicenseDialog').onclick = () => {
+  $('serverLicenseStatus').textContent = '';
+  $('serverLicenseFile').value = '';
+  $('dlgServerLicense').showModal();
+};
+$('cancelServerLicense').onclick = () => $('dlgServerLicense').close();
 $('activateServerLicense').onclick = async () => {
   const file = $('serverLicenseFile').files[0];
   if (!file) { $('serverLicenseStatus').textContent = 'Сначала выберите файл лицензии .lic.'; return; }
@@ -852,6 +866,7 @@ $('activateServerLicense').onclick = async () => {
     });
     $('serverLicenseStatus').textContent = 'Файл загружен. Перезапускаю сервер 1С для применения лицензии…';
     await runAction({action:'license_server_activate', filename:result.filename});
+    $('dlgServerLicense').close();
     $('serverLicenseFile').value = ''; await loadFiles();
   } catch (e) { $('serverLicenseStatus').textContent = 'Ошибка: ' + e.message; }
   finally { button.disabled = false; }
