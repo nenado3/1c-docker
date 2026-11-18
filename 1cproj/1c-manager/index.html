@@ -35,6 +35,28 @@ label{display:block;margin:8px 0 2px;color:var(--mut);font-size:13px}
 dialog{border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);padding:18px 20px;min-width:340px}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 .upload-progress{display:none;max-width:680px;margin:10px 0 14px}
+/* Оформление окна импорта */
+#dlgImport{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 32px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
+#dlgImport h3{margin:0;padding:22px 26px 18px;font-size:20px;font-weight:700;letter-spacing:-.02em;border-bottom:1px solid var(--line);background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 12%,var(--bg)),var(--bg))}
+#dlgImport .import-body{padding:20px 26px 24px}
+#dlgImport .import-intro{margin:0 0 18px;color:var(--mut);font-size:13px}
+#dlgImport .import-group{padding:15px 16px;margin:0 0 14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+#dlgImport .import-group-title{display:flex;align-items:center;gap:9px;margin:0 0 12px;font-size:14px;font-weight:650;color:var(--fg)}
+#dlgImport .import-step{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:var(--acc);color:var(--accfg);font-size:12px;font-weight:700}
+#dlgImport label{margin:10px 0 5px;color:var(--fg);font-size:13px;font-weight:550}
+#dlgImport input:not([type=checkbox]):not([type=file]),#dlgImport select{display:block;width:100%;min-width:0;min-height:40px;padding:8px 11px;border-radius:8px;background:var(--bg)}
+#dlgImport input[type=file]{display:block;width:100%;min-width:0;padding:14px;border:1px dashed var(--acc);border-radius:10px;background:var(--bg);cursor:pointer}
+#dlgImport input[type=checkbox]{min-width:0;accent-color:var(--acc);margin:0 7px 0 0;vertical-align:middle}
+#dlgImport .import-check{display:flex;align-items:center;gap:8px;margin:0 0 12px;color:var(--fg);font-weight:600}
+#dlgImport .import-hint{margin:10px 0 0;color:var(--mut);font-size:12px;line-height:1.5}
+#dlgImport .import-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+#dlgImport .import-actions{display:flex;justify-content:flex-end;gap:8px;margin:18px 0 0;padding-top:16px;border-top:1px solid var(--line)}
+#dlgImport .import-actions button{min-height:40px;padding:8px 16px;border-radius:9px}
+#dlgImport #importStatus{padding:0 2px;margin-top:10px;font-size:13px;overflow-wrap:anywhere}
+#dlgImport .upload-progress{max-width:none;margin:12px 0 0}
+#dlgImport .upload-progress-track{height:9px}
+@media(max-width:560px){#dlgImport{min-width:0}#dlgImport h3{padding:18px 18px 14px;font-size:18px}#dlgImport .import-body{padding:16px 18px 20px}#dlgImport .import-grid{grid-template-columns:1fr}#dlgImport .import-actions{flex-direction:column-reverse}#dlgImport .import-actions button{width:100%}}
+
 .upload-progress-track{height:16px;background:var(--line);border-radius:999px;overflow:hidden}
 .upload-progress-fill{height:100%;width:0;background:var(--acc);transition:width .12s ease}
 .upload-progress-meta{display:flex;justify-content:space-between;gap:12px;margin-top:5px;font-size:12px;color:var(--mut)}
@@ -169,38 +191,67 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </div>
   <div class="row"><button class="b" id="pgRestoreOk">Загрузить и восстановить</button><button class="b sec" id="pgRestoreCancel">Отмена</button></div>
 </dialog>
-<dialog id="dlgImport">
-  <h3 style="margin-top:0">Загрузить файл в Docker и импортировать в базу</h3>
-  <label><input id="importNewBase" type="checkbox"> Создать новую информационную базу и отдельную БД PostgreSQL (только для .dt)</label>
-  <div id="importNewBaseFields" hidden>
-    <label>Имя новой информационной базы 1С</label>
-    <input id="importNewIb" placeholder="например mybase2">
-    <label>Имя новой базы PostgreSQL <span class="mut">(пусто — как имя ИБ)</span></label>
-    <input id="importNewDbName" placeholder="например mybase2">
-  </div>
-  <div id="importExistingBaseFields">
-    <label>Существующая информационная база 1С</label>
-    <select id="importBase" aria-label="Информационная база"><option value="">Сначала загрузите список баз</option></select>
-  </div>
-  <label>Файл .dt или .cf</label>
-  <input id="importFile" type="file" accept=".dt,.cf,application/octet-stream">
-  <label>Пользователь 1С <span class="mut">(если требуется)</span></label>
-  <input id="importUser" placeholder="Пользователь 1С">
-  <label>Пароль 1С</label>
-  <input id="importPwd" type="password" placeholder="Пароль 1С" autocomplete="new-password">
-  <label>Пользователь PostgreSQL <span class="mut">(по умолчанию из .env)</span></label>
-  <input id="importDbUser" placeholder="Пользователь PostgreSQL">
-  <label>Пароль PostgreSQL <span class="mut">(по умолчанию из .env)</span></label>
-  <input id="importDbPwd" type="password" placeholder="Пароль PostgreSQL" autocomplete="new-password">
-  <p class="mut">Импорт .dt в существующую базу полностью заменяет её данные. .cf обновляет конфигурацию. Максимальный размер файла — 8 ГБ.</p>
-  <div id="importStatus" class="mut" aria-live="polite"></div>
-  <div id="importProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки файла" style="display:none">
-    <div class="upload-progress-track"><div id="importProgressFill" class="upload-progress-fill"></div></div>
-    <div class="upload-progress-meta"><span id="importProgressLabel">Загрузка: 0%</span><span id="importProgressSize">0 / 0 МБ</span></div>
-  </div>
-  <div class="row" style="margin-top:12px">
-    <button class="b" id="uploadImport">Загрузить и импортировать</button>
-    <button class="b sec" id="importCancel">Отмена</button>
+<dialog id="dlgImport" aria-labelledby="importDialogTitle">
+  <h3 id="importDialogTitle">Загрузить файл в Docker и импортировать в базу</h3>
+  <div class="import-body">
+    <p class="import-intro">Выберите базу и архив. Файл будет передан в Docker, после чего панель запустит импорт.</p>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">1</span> Куда импортировать</div>
+      <label class="import-check"><input id="importNewBase" type="checkbox"> Создать новую информационную базу и отдельную БД PostgreSQL</label>
+      <div id="importNewBaseFields" hidden>
+        <div class="import-grid">
+          <div>
+            <label>Имя новой информационной базы 1С</label>
+            <input id="importNewIb" placeholder="например mybase2">
+          </div>
+          <div>
+            <label>Имя новой базы PostgreSQL <span class="mut">(пусто — как имя ИБ)</span></label>
+            <input id="importNewDbName" placeholder="например mybase2">
+          </div>
+        </div>
+      </div>
+      <div id="importExistingBaseFields">
+        <label>Существующая информационная база 1С</label>
+        <select id="importBase" aria-label="Информационная база"><option value="">Сначала загрузите список баз</option></select>
+      </div>
+    </div>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">2</span> Файл для импорта</div>
+      <label>Выберите архив .dt или файл конфигурации .cf</label>
+      <input id="importFile" type="file" accept=".dt,.cf,application/octet-stream">
+      <p class="import-hint">.dt — восстановление данных базы; .cf — обновление конфигурации. Максимальный размер — 8 ГБ.</p>
+    </div>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">3</span> Доступы (если требуются)</div>
+      <div class="import-grid">
+        <div>
+          <label>Пользователь 1С</label>
+          <input id="importUser" placeholder="Пользователь 1С">
+        </div>
+        <div>
+          <label>Пароль 1С</label>
+          <input id="importPwd" type="password" placeholder="Пароль 1С" autocomplete="new-password">
+        </div>
+        <div>
+          <label>Пользователь PostgreSQL <span class="mut">(по умолчанию из .env)</span></label>
+          <input id="importDbUser" placeholder="Пользователь PostgreSQL">
+        </div>
+        <div>
+          <label>Пароль PostgreSQL <span class="mut">(по умолчанию из .env)</span></label>
+          <input id="importDbPwd" type="password" placeholder="Пароль PostgreSQL" autocomplete="new-password">
+        </div>
+      </div>
+    </div>
+    <p class="import-hint">Важно: импорт .dt в существующую базу полностью заменяет её данные. Файл .cf обновляет конфигурацию.</p>
+    <div id="importStatus" class="mut" aria-live="polite"></div>
+    <div id="importProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки файла" style="display:none">
+      <div class="upload-progress-track"><div id="importProgressFill" class="upload-progress-fill"></div></div>
+      <div class="upload-progress-meta"><span id="importProgressLabel">Загрузка: 0%</span><span id="importProgressSize">0 / 0 МБ</span></div>
+    </div>
+    <div class="import-actions">
+      <button class="b sec" id="importCancel">Отмена</button>
+      <button class="b" id="uploadImport">Загрузить и импортировать</button>
+    </div>
   </div>
 </dialog>
 <dialog id="dlgDt">
