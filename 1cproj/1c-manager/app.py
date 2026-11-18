@@ -421,7 +421,7 @@ def do_action(body):
     if a == "license_install":
         return script_job("Перенос лицензий", "client", "license.sh", "install")
     if a == "license_server_activate":
-        filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,176}\\.lic$", re.I), 180)
+        filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,176}\.lic$", re.I), 180)
         license_file = os.path.join(data_dir("licenses"), filename)
         if not os.path.isfile(license_file) or os.path.getsize(license_file) <= 0:
             raise ValueError("Файл лицензии не найден или пуст: %s" % license_file)
@@ -654,7 +654,7 @@ class H(BaseHTTPRequestHandler):
                 if n <= 0 or n > 50 * 1024 * 1024:
                     return self._send(413, {"error": "размер файла лицензии должен быть от 1 байта до 50 МБ"})
                 filename = os.path.basename(parse_qs(u.query).get("name", [""])[0]).strip()
-                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\\.lic", filename, re.I) or filename.startswith("."):
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.lic", filename, re.I) or filename.startswith("."):
                     return self._send(400, {"error": "выберите файл лицензии с расширением .lic"})
                 dest_dir = data_dir("licenses")
                 os.makedirs(dest_dir, exist_ok=True)
