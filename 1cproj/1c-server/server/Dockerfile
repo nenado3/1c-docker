@@ -42,8 +42,8 @@ RUN groupadd -g 1001 grp1cv8 \
     && mkdir -p /home/usr1cv8/.1cv8 /var/log/1C /var/www/onec \
     && chown -R usr1cv8:grp1cv8 /home/usr1cv8 /var/log/1C /var/www/onec \
     && sed -i 's/^export APACHE_RUN_USER=.*/export APACHE_RUN_USER=usr1cv8/' /etc/apache2/envvars \
-    && sed -i 's/^export APACHE_RUN_GROUP=.*/export APACHE_RUN_GROUP=grp1cv8/' /etc/apache2/envvars \\
-    && printf 'ServerName localhost\\n' > /etc/apache2/conf-available/servername.conf \\
+    && sed -i 's/^export APACHE_RUN_GROUP=.*/export APACHE_RUN_GROUP=grp1cv8/' /etc/apache2/envvars \
+    && printf 'ServerName localhost\\n' > /etc/apache2/conf-available/servername.conf \
     && a2enconf servername
 
 ARG ONEC_RUN_COMPONENTS=server,server_admin,client_full,ws,ru
