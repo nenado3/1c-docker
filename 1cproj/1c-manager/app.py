@@ -129,6 +129,7 @@ def settings_snapshot():
 
 def save_settings(body):
     changed = []
+    old_backup_dir = os.path.realpath(data_dir("backups"))
     for section, keys in ENV_SETTINGS.items():
         values = body.get(section, {})
         if not isinstance(values, dict):
@@ -163,7 +164,9 @@ def save_settings(body):
                 raise ValueError("ONEC_VERSION должен иметь формат 8.5.1.1522")
             write_env_value(path, key, value)
             changed.append(section + ":" + key)
-    return {"saved": changed}
+    new_backup_dir = os.path.realpath(data_dir("backups"))
+    return {"saved": changed, "backup_dir": new_backup_dir,
+            "backup_dir_changed": old_backup_dir != new_backup_dir}
 
 
 def data_dir(kind):
@@ -328,6 +331,10 @@ def do_action(body):
         if proj not in ("server", "client"):
             raise ValueError("недопустимый проект")
         return script_job("Обновление Docker-образа (%s)" % proj, proj, "update-image.sh")
+    if a == "recreate_server":
+        d = project("server")
+        return run_job("Пересоздание контейнера onec-server с новыми настройками",
+                       cfg["docker"] + ["compose", "up", "-d", "--force-recreate", "onec-server"], cwd=d)
     if a == "set_memory":
         val = need(body, "limit").lower()
         if not MEM_RE.match(val):
