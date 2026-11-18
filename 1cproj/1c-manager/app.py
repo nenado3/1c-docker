@@ -103,7 +103,6 @@ ENV_SETTINGS = {
         "DB_NAME": "Имя базы PostgreSQL по умолчанию", "DB_USER": "Пользователь БД по умолчанию",
         "SERVER_BASE_IMAGE": "Базовый образ сервера", "POSTGRES_BASE_IMAGE": "Базовый образ PostgreSQL",
         "BACKUP_DIR": "Каталог резервных копий", "SERVER_MEMORY_LIMIT": "Лимит памяти сервера",
-        "SERVER_MEMORY_RESERVATION": "Резерв памяти сервера",
         "POSTGRES_MEMORY_LIMIT": "Лимит памяти PostgreSQL"
     },
     "client": {
@@ -157,7 +156,7 @@ def save_settings(body):
                 raise ValueError("недопустимое значение параметра " + key)
             if any(ch in value for ch in ('"', "'", "\\", "#", "$")):
                 raise ValueError("параметр %s содержит символы, несовместимые с форматом .env: кавычки, #, $ и обратная косая черта не поддерживаются" % key)
-            if key in ("SERVER_MEMORY_LIMIT", "SERVER_MEMORY_RESERVATION", "POSTGRES_MEMORY_LIMIT", "CLIENT_MEMORY_LIMIT") and not MEM_RE.match(value.lower()):
+            if key in ("SERVER_MEMORY_LIMIT", "POSTGRES_MEMORY_LIMIT", "CLIENT_MEMORY_LIMIT") and not MEM_RE.match(value.lower()):
                 raise ValueError("%s: укажите 0 или значение, например 8g или 512m" % key)
             if key == "CLIENT_UID" and value and not value.isdigit():
                 raise ValueError("CLIENT_UID должен быть числом")
