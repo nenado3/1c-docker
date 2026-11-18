@@ -653,7 +653,7 @@ async function loadSettings() {
       const type = item.secret ? 'password' : 'text';
       const hint = item.secret ? (item.configured ? 'Пароль задан · пустое поле — оставить без изменений' : 'Пароль ещё не задан') : '';
       const label = key === 'SERVER_MEMORY_LIMIT' ? 'Лимит оперативной памяти сервера 1С' :
-                    key === 'SERVER_MEMORY_RESERVATION' ? 'Резерв оперативной памяти контейнера сервера 1С' :
+                    key === 'SERVER_MEMORY_RESERVATION' ? 'Резерв физической памяти контейнера сервера 1С' :
                     key === 'POSTGRES_MEMORY_LIMIT' ? 'Лимит оперативной памяти PostgreSQL' : item.label;
       if (section === 'server' && key === 'BACKUP_DIR') {
         out += '<div class="settings-field"><label for="env_server_BACKUP_DIR">' + esc(label) + '<code>' + esc(key) + '</code></label>' +
