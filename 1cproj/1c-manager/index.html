@@ -61,6 +61,21 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .settings-actions .b{min-height:40px;padding:8px 16px;border-radius:9px}
 .settings-footnote{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 6%,var(--bg));color:var(--mut);font-size:12px;line-height:1.55}
 .settings-footnote strong{color:var(--fg)}
+/* Выбор каталога резервных копий */
+#dlgBackupPicker{width:min(620px,calc(100vw - 28px));max-width:620px;max-height:calc(100vh - 32px);padding:0;overflow:hidden;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
+#dlgBackupPicker .picker-head{padding:18px 21px;border-bottom:1px solid var(--line);background:var(--card)}
+#dlgBackupPicker .picker-head h3{margin:0;font-size:18px}
+#dlgBackupPicker .picker-body{padding:16px 20px}
+#dlgBackupPicker .picker-path{padding:9px 11px;margin:8px 0 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);font:12px ui-monospace,monospace;overflow-wrap:anywhere}
+#dlgBackupPicker .picker-list{height:min(42vh,360px);overflow:auto;border:1px solid var(--line);border-radius:9px}
+#dlgBackupPicker .picker-entry{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;text-align:left;cursor:pointer}
+#dlgBackupPicker .picker-entry:last-child{border-bottom:0}
+#dlgBackupPicker .picker-entry:hover{background:var(--card)}
+#dlgBackupPicker .picker-actions{display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--line)}
+#dlgBackupPicker .picker-actions .right{display:flex;gap:8px}
+.settings-field .backup-picker-row{display:flex;gap:8px;align-items:center}
+.settings-field .backup-picker-row input{flex:1;min-width:0}
+.settings-field .backup-picker-row button{flex:none;min-height:42px}
 /* Диалог ресурсов сборки */
 #dlgBuild{width:min(760px,calc(100vw - 28px));max-width:760px;max-height:calc(100vh - 30px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:19px;box-shadow:0 24px 80px rgba(0,0,0,.3)}
 #dlgBuild h3{margin:0;padding:22px 25px 18px;font-size:21px;border-bottom:1px solid var(--line);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 13%,var(--bg)),var(--bg))}
@@ -228,9 +243,23 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <span class="settings-actions-note">Изменения вступят в силу после применения конфигурации.</span>
       <div class="row"><button class="b sec" id="reloadSettings">↻ Перечитать</button><button class="b" id="saveSettings">Сохранить настройки</button></div>
     </div>
-    <div class="settings-footnote"><span>ⓘ</span><div><strong>Обратите внимание.</strong> После изменения параметров Docker Compose может потребоваться пересоздать контейнеры. Изменение версии 1С или базового образа может потребовать пересборки образов. Пароль PostgreSQL не отображается: пустое поле сохраняет прежнее значение.</div></div>
+    <div class="settings-footnote"><span>ⓘ</span><div><strong>Обратите внимание.</strong> После изменения каталога резервных копий обязательно пересоздайте контейнер <span class="mono">onec-server</span>, иначе он продолжит использовать старую папку. Для этого сохраните настройки и обновите/пересоздайте контейнер. Изменение версии 1С или базового образа может потребовать пересборки образов. Пароль PostgreSQL не отображается: пустое поле сохраняет прежнее значение.</div></div>
   </section>
 </main>
+
+<dialog id="dlgBackupPicker" aria-labelledby="backupPickerTitle">
+  <div class="picker-head"><h3 id="backupPickerTitle">Выбор каталога резервных копий</h3></div>
+  <div class="picker-body">
+    <div class="mut" style="font-size:12px">Перейдите в нужную папку и нажмите «Выбрать этот каталог».</div>
+    <div id="backupPickerPath" class="picker-path">Загрузка…</div>
+    <div id="backupPickerList" class="picker-list"></div>
+    <div id="backupPickerStatus" class="mut" style="margin-top:8px;font-size:12px" aria-live="polite"></div>
+  </div>
+  <div class="picker-actions">
+    <button class="b sec" id="backupPickerUp">↑ На уровень выше</button>
+    <div class="right"><button class="b sec" id="backupPickerCancel">Отмена</button><button class="b" id="backupPickerSelect">Выбрать этот каталог</button></div>
+  </div>
+</dialog>
 
 <div id="console">
   <div class="bar"><b>Консоль</b><span id="jobTitle" class="mut">нет задач</span><span id="jobState" class="badge"></span>
@@ -582,15 +611,55 @@ async function loadSettings() {
     for (const [key, item] of Object.entries(r[section] || {})) {
       const type = item.secret ? 'password' : 'text';
       const hint = item.secret ? (item.configured ? 'Пароль задан · пустое поле — оставить без изменений' : 'Пароль ещё не задан') : '';
-      out += '<div class="settings-field"><label for="env_' + section + '_' + key + '">' + esc(item.label) + '<code>' + esc(key) + '</code></label>' +
-        '<input id="env_' + section + '_' + key + '" data-env-section="' + section + '" data-env-key="' + key + '" type="' + type + '" value="' + esc(item.value || '') + '" placeholder="' + esc(hint) + '">' +
-        (hint ? '<p class="settings-field-hint">' + esc(hint) + '</p>' : '') + '</div>';
+      if (section === 'server' && key === 'BACKUP_DIR') {
+        out += '<div class="settings-field"><label for="env_server_BACKUP_DIR">' + esc(item.label) + '<code>' + esc(key) + '</code></label>' +
+          '<div class="backup-picker-row"><input id="env_server_BACKUP_DIR" data-env-section="server" data-env-key="BACKUP_DIR" type="text" value="' + esc(item.value || '') + '" placeholder="/home/user/backups">' +
+          '<button class="b sec" type="button" id="chooseBackupDir">Выбрать папку…</button></div>' +
+          '<p class="settings-field-hint">Папка на хосте, в которой будут храниться .dt и .cf. После изменения необходимо пересоздать контейнер onec-server, чтобы обновился подключённый каталог.</p></div>';
+      } else {
+        out += '<div class="settings-field"><label for="env_' + section + '_' + key + '">' + esc(item.label) + '<code>' + esc(key) + '</code></label>' +
+          '<input id="env_' + section + '_' + key + '" data-env-section="' + section + '" data-env-key="' + key + '" type="' + type + '" value="' + esc(item.value || '') + '" placeholder="' + esc(hint) + '">' +
+          (hint ? '<p class="settings-field-hint">' + esc(hint) + '</p>' : '') + '</div>';
+      }
     }
     out += '</div></div>';
   }
   $('settingsFields').innerHTML = out;
   $('settingsStatus').textContent = '✓ Настройки загружены из файлов .env.';
 }
+let backupPickerCurrent = '';
+async function loadBackupPicker(path) {
+  $('backupPickerStatus').textContent = 'Читаю каталоги…';
+  const r = await api('/api/browse_dirs?path=' + encodeURIComponent(path || ''));
+  if (r.error) { $('backupPickerStatus').textContent = r.error; return; }
+  backupPickerCurrent = r.path;
+  $('backupPickerPath').textContent = r.path;
+  $('backupPickerUp').disabled = !r.parent;
+  $('backupPickerUp').dataset.parent = r.parent || '';
+  $('backupPickerList').innerHTML = r.dirs.length
+    ? r.dirs.map(d => '<button type="button" class="picker-entry" data-folder-path="' + esc(d.path) + '"><span>📁</span><span>' + esc(d.name) + '</span></button>').join('')
+    : '<div class="mut" style="padding:14px">Вложенных папок нет</div>';
+  $('backupPickerStatus').textContent = 'Папок: ' + r.dirs.length;
+}
+async function openBackupPicker() {
+  const current = $('env_server_BACKUP_DIR').value.trim();
+  await loadBackupPicker(current || '/home');
+  $('dlgBackupPicker').showModal();
+}
+$('backupPickerList').onclick = e => {
+  const entry = e.target.closest('[data-folder-path]');
+  if (entry) loadBackupPicker(entry.dataset.folderPath);
+};
+$('backupPickerUp').onclick = () => {
+  const parent = $('backupPickerUp').dataset.parent;
+  if (parent) loadBackupPicker(parent);
+};
+$('backupPickerSelect').onclick = () => {
+  $('env_server_BACKUP_DIR').value = backupPickerCurrent;
+  $('dlgBackupPicker').close();
+};
+$('backupPickerCancel').onclick = () => $('dlgBackupPicker').close();
+
 async function saveSettings() {
   const payload = {server:{},client:{}};
   document.querySelectorAll('#settingsFields [data-env-key]').forEach(el => { payload[el.dataset.envSection][el.dataset.envKey] = el.value; });
@@ -712,6 +781,9 @@ $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loa
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
 $('clearCon').onclick = () => { $('conOut').textContent = ''; };
 $('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
+document.addEventListener('click', e => {
+  if (e.target.closest('#chooseBackupDir')) openBackupPicker();
+});
 $('openImport').onclick = () => { $('dlgImport').showModal(); };
 $('importCancel').onclick = () => $('dlgImport').close();
 $('dtCancel').onclick = () => $('dlgDt').close(); $('dCancel').onclick = () => $('dlgDump').close();
