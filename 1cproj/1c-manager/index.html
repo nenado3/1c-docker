@@ -35,6 +35,34 @@ label{display:block;margin:8px 0 2px;color:var(--mut);font-size:13px}
 dialog{border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);padding:18px 20px;min-width:340px}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 .upload-progress{display:none;max-width:680px;margin:10px 0 14px}
+/* Современное оформление вкладки настроек */
+#t-settings{max-width:980px}
+.settings-hero{position:relative;overflow:hidden;padding:24px 26px;margin:0 0 20px;border:1px solid color-mix(in srgb,var(--acc) 24%,var(--line));border-radius:18px;background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 13%,var(--bg)),var(--card) 72%)}
+.settings-hero:after{content:"⚙";position:absolute;right:24px;top:4px;font-size:94px;line-height:1;color:var(--acc);opacity:.09;pointer-events:none}
+.settings-eyebrow{display:inline-flex;align-items:center;gap:7px;margin-bottom:8px;color:var(--acc);font-size:11px;font-weight:750;letter-spacing:.11em;text-transform:uppercase}
+.settings-hero h2{margin:0 0 7px;font-size:25px;letter-spacing:-.035em}
+.settings-hero p{max-width:680px;margin:0;color:var(--mut);font-size:14px;line-height:1.6}
+.settings-status{display:flex;align-items:center;gap:9px;padding:11px 14px;margin:0 0 16px;border:1px solid var(--line);border-radius:11px;background:var(--card);font-size:13px}
+.settings-status:before{content:"";width:8px;height:8px;flex:none;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 13%,transparent)}
+.settings-card{overflow:hidden;margin:0 0 16px;border:1px solid var(--line);border-radius:15px;background:var(--bg);box-shadow:0 3px 14px rgba(15,23,42,.035)}
+.settings-card-head{display:flex;align-items:center;gap:13px;padding:17px 20px;border-bottom:1px solid var(--line);background:var(--card)}
+.settings-card-icon{display:grid;place-items:center;width:39px;height:39px;flex:none;border-radius:11px;background:color-mix(in srgb,var(--acc) 13%,var(--bg));color:var(--acc);font-size:19px}
+.settings-card-head h3{margin:0;font-size:15px;font-weight:700}
+.settings-card-head p{margin:2px 0 0;color:var(--mut);font-size:12px}
+.settings-card-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px;padding:19px 20px 21px}
+.settings-field{min-width:0}
+.settings-field label{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 7px;color:var(--fg);font-size:12px;font-weight:650}
+.settings-field label code{padding:2px 6px;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--mut);font-size:10px;font-weight:500}
+.settings-field input{display:block;width:100%;min-width:0;height:42px;padding:9px 12px;border-radius:9px;background:var(--bg);transition:border-color .15s,box-shadow .15s}
+.settings-field input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 15%,transparent)}
+.settings-field .settings-field-hint{margin:5px 0 0;color:var(--mut);font-size:11px;line-height:1.4}
+.settings-actions{position:sticky;bottom:248px;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;margin:18px 0 12px;border:1px solid var(--line);border-radius:13px;background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(12px);box-shadow:0 6px 24px rgba(15,23,42,.08)}
+.settings-actions-note{color:var(--mut);font-size:11px}
+.settings-actions .b{min-height:40px;padding:8px 16px;border-radius:9px}
+.settings-footnote{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 6%,var(--bg));color:var(--mut);font-size:12px;line-height:1.55}
+.settings-footnote strong{color:var(--fg)}
+@media(max-width:650px){.settings-hero{padding:20px}.settings-hero h2{font-size:21px}.settings-card-body{grid-template-columns:1fr;padding:16px}.settings-card-head{padding:14px 16px}.settings-actions{bottom:248px;align-items:stretch;flex-direction:column}.settings-actions .row{margin:0}.settings-actions .b{flex:1}}
+
 /* Оформление окна импорта */
 #dlgImport{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 32px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
 #dlgImport h3{margin:0;padding:22px 26px 18px;font-size:20px;font-weight:700;letter-spacing:-.02em;border-bottom:1px solid var(--line);background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 12%,var(--bg)),var(--bg))}
@@ -169,12 +197,18 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-settings">
-    <h2>Настройки Docker-проектов (.env)</h2>
-    <p class="mut">Изменения записываются в файлы <span class="mono">1c-server/.env</span> и <span class="mono">1c-client/.env</span>. Пароль PostgreSQL не отображается: оставьте поле пустым, чтобы сохранить текущий пароль.</p>
-    <div id="settingsStatus" class="mut" aria-live="polite"></div>
+    <div class="settings-hero">
+      <div class="settings-eyebrow">⚙ ПАРАМЕТРЫ СИСТЕМЫ</div>
+      <h2>Настройки проекта</h2>
+      <p>Управляйте параметрами сервера 1С, PostgreSQL и клиентского приложения в одном месте. Все изменения сохраняются в соответствующие файлы .env.</p>
+    </div>
+    <div id="settingsStatus" class="settings-status" aria-live="polite">Загружаю настройки…</div>
     <div id="settingsFields"></div>
-    <div class="row"><button class="b" id="saveSettings">Сохранить настройки</button><button class="b sec" id="reloadSettings">Перечитать .env</button></div>
-    <p class="mut">После изменения параметров, используемых Docker Compose, пересоздайте соответствующие контейнеры. Изменение версии 1С или базового образа также может потребовать пересборки образов.</p>
+    <div class="settings-actions">
+      <span class="settings-actions-note">Изменения вступят в силу после применения конфигурации.</span>
+      <div class="row"><button class="b sec" id="reloadSettings">↻ Перечитать</button><button class="b" id="saveSettings">Сохранить настройки</button></div>
+    </div>
+    <div class="settings-footnote"><span>ⓘ</span><div><strong>Обратите внимание.</strong> После изменения параметров Docker Compose может потребоваться пересоздать контейнеры. Изменение версии 1С или базового образа может потребовать пересборки образов. Пароль PostgreSQL не отображается: пустое поле сохраняет прежнее значение.</div></div>
   </section>
 </main>
 
@@ -511,18 +545,23 @@ async function loadSettings() {
   const r = await api('/api/settings');
   if (r.error) { $('settingsStatus').textContent = 'Ошибка чтения .env: ' + r.error; return; }
   let out = '';
+  const meta = {
+    server:{icon:'▦',title:'Сервер 1С и PostgreSQL',subtitle:'Параметры серверной части и хранилища данных'},
+    client:{icon:'▣',title:'Клиент 1С',subtitle:'Подключение клиентского приложения и лицензирование'}
+  };
   for (const section of ['server','client']) {
-    out += '<h2>' + esc(settingsGroups[section]) + '</h2><div class="import-group"><div class="import-grid">';
+    out += '<div class="settings-card"><div class="settings-card-head"><div class="settings-card-icon">' + meta[section].icon + '</div><div><h3>' + meta[section].title + '</h3><p>' + meta[section].subtitle + '</p></div></div><div class="settings-card-body">';
     for (const [key, item] of Object.entries(r[section] || {})) {
       const type = item.secret ? 'password' : 'text';
-      const hint = item.secret ? (item.configured ? 'Пароль задан. Пустое поле — не менять.' : 'Пароль не задан') : '';
-      out += '<div><label for="env_' + section + '_' + key + '">' + esc(item.label) + ' <span class="mut mono">' + esc(key) + '</span></label>' +
-        '<input id="env_' + section + '_' + key + '" data-env-section="' + section + '" data-env-key="' + key + '" type="' + type + '" value="' + esc(item.value || '') + '" placeholder="' + esc(hint) + '"></div>';
+      const hint = item.secret ? (item.configured ? 'Пароль задан · пустое поле — оставить без изменений' : 'Пароль ещё не задан') : '';
+      out += '<div class="settings-field"><label for="env_' + section + '_' + key + '">' + esc(item.label) + '<code>' + esc(key) + '</code></label>' +
+        '<input id="env_' + section + '_' + key + '" data-env-section="' + section + '" data-env-key="' + key + '" type="' + type + '" value="' + esc(item.value || '') + '" placeholder="' + esc(hint) + '">' +
+        (hint ? '<p class="settings-field-hint">' + esc(hint) + '</p>' : '') + '</div>';
     }
     out += '</div></div>';
   }
   $('settingsFields').innerHTML = out;
-  $('settingsStatus').textContent = 'Настройки загружены из .env.';
+  $('settingsStatus').textContent = '✓ Настройки загружены из файлов .env.';
 }
 async function saveSettings() {
   const payload = {server:{},client:{}};
