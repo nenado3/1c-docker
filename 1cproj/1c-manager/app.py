@@ -143,6 +143,14 @@ def save_settings(body):
             value = str(raw)
             if key in ENV_SECRET_KEYS and value == "":
                 continue
+            if key == "BACKUP_DIR":
+                value = os.path.expanduser(value.strip())
+                if not value:
+                    raise ValueError("укажите каталог резервных копий")
+                if not os.path.isabs(value):
+                    value = os.path.abspath(os.path.join(directory, value))
+                if not os.path.isdir(value):
+                    raise ValueError("каталог резервных копий не существует или недоступен: " + value)
             if len(value) > 500 or any(ord(ch) < 32 for ch in value):
                 raise ValueError("недопустимое значение параметра " + key)
             if any(ch in value for ch in ('"', "'", "\\", "#", "$")):
@@ -425,6 +433,28 @@ def do_action(body):
 def api_get(path, q):
     if path == "/api/settings":
         return settings_snapshot()
+    if path == "/api/browse_dirs":
+        requested = q.get("path", [os.path.expanduser("~")])[0]
+        if len(requested) > 1000 or any(ord(ch) < 32 for ch in requested):
+            raise ValueError("недопустимый путь к каталогу")
+        current = os.path.abspath(os.path.expanduser(requested or "~"))
+        if not os.path.isdir(current):
+            raise ValueError("каталог не найден или недоступен: " + current)
+        dirs = []
+        try:
+            entries = sorted(os.scandir(current), key=lambda e: e.name.lower())
+            for entry in entries:
+                if entry.name.startswith(".") or entry.is_symlink():
+                    continue
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        dirs.append({"name": entry.name, "path": entry.path})
+                except OSError:
+                    continue
+        except OSError as e:
+            raise ValueError("не удалось прочитать каталог: " + str(e))
+        parent = os.path.dirname(current) if current != os.path.dirname(current) else None
+        return {"path": current, "parent": parent, "dirs": dirs}
     if path == "/api/status":
         return {"docker": bool(cfg["docker"]), "docker_cmd": " ".join(cfg["docker"] or []),
                 "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"]),
