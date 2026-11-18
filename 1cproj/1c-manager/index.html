@@ -533,7 +533,6 @@ async function saveSettings() {
   $('saveSettings').disabled = false;
   if (r.error) { $('settingsStatus').textContent = 'Ошибка: ' + r.error; return; }
   $('settingsStatus').textContent = 'Сохранено параметров: ' + (r.saved || []).length + '. Для применения может потребоваться пересоздать контейнеры или пересобрать образы.';
-  loadSettings();
 }
 
 function loadTab(t) {
