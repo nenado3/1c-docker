@@ -44,7 +44,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .settings-hero p{max-width:680px;margin:0;color:var(--mut);font-size:14px;line-height:1.6}
 .settings-status{display:flex;align-items:center;gap:9px;padding:11px 14px;margin:0 0 16px;border:1px solid var(--line);border-radius:11px;background:var(--card);font-size:13px}
 .settings-status:before{content:"";width:8px;height:8px;flex:none;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 13%,transparent)}
-.settings-layout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;align-items:start;margin:0 0 16px}
+.settings-layout{display:grid;grid-template-columns:1fr;gap:14px;align-items:start;margin:0 0 16px}
 .settings-card{min-width:0;overflow:hidden;margin:0;border:1px solid var(--line);border-radius:15px;background:var(--bg);box-shadow:0 3px 14px rgba(15,23,42,.035)}
 .settings-card-head{display:flex;align-items:center;gap:13px;padding:15px 17px;background:var(--card);cursor:pointer;list-style:none;user-select:none}
 .settings-card-head::-webkit-details-marker{display:none}
@@ -55,7 +55,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .settings-card-head h3{margin:0;font-size:15px;font-weight:700}
 .settings-card-head p{margin:2px 0 0;color:var(--mut);font-size:12px}
 .settings-card-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px;padding:19px 20px 21px}
-@media(max-width:760px){.settings-layout{grid-template-columns:1fr}}
 @media(max-width:520px){.settings-card-body{grid-template-columns:1fr}}
 .settings-field{min-width:0}
 .settings-field label{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 7px;color:var(--fg);font-size:12px;font-weight:650}
