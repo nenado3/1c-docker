@@ -6,12 +6,29 @@ WEB_ROOT="/var/www/onec"
 ACTION="${1:-status}"
 NAME="${2:-}"
 fail() { echo "ОШИБКА: $*" >&2; exit 1; }
+apache_running() { pgrep -x apache2 >/dev/null 2>&1; }
+apache_start() {
+  apache2ctl configtest
+  if apache_running; then
+    echo "Apache уже запущен."
+  else
+    apache2ctl -k start
+  fi
+}
+apache_reload() {
+  apache2ctl configtest
+  if apache_running; then
+    apache2ctl -k graceful
+  else
+    apache2ctl -k start
+  fi
+}
 valid_name() { [[ "$1" =~ ^[A-Za-z0-9_.-]{1,63}$ ]]; }
 case "$ACTION" in
-  start) apache2ctl configtest; apache2ctl -k start ;;
+  start) apache_start ;;
   stop) apache2ctl -k stop ;;
-  restart) apache2ctl configtest; apache2ctl -k graceful ;;
-  status) apache2ctl -S ;;
+  restart) apache_reload ;;
+  status) if apache_running; then echo "Apache запущен."; else echo "Apache остановлен."; fi; apache2ctl -S ;;
   publish|delete)
     valid_name "$NAME" || fail "недопустимое имя публикации"
     WEBINST=""
@@ -26,7 +43,7 @@ case "$ACTION" in
       "$WEBINST" -publish -apache24 -wsdir "$NAME" -dir "$WEB_ROOT/$NAME" -connstr "Srvr=localhost;Ref=$NAME;" -confpath "$APACHE_CONF"
       chown -R usr1cv8:grp1cv8 "$WEB_ROOT/$NAME"
       apache2ctl configtest
-      apache2ctl -k graceful || apache2ctl -k start
+      apache_reload
       echo "Веб-клиент опубликован: http://<IP-сервера>/$NAME"
     else
       echo "Удаление публикации '$NAME'..."
