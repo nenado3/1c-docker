@@ -836,7 +836,7 @@ $('clearCon').onclick = () => {
   consoleHeadersCleared = taskRunning;
   $('conOut').textContent = '';
   if (!taskRunning) {
-    $('jobTitle').textContent = '';
+    $('jobTitle').textContent = 'нет задач';
     $('jobState').textContent = '';
     $('jobState').className = 'badge';
     $('console').style.borderTopColor = 'var(--line)';
