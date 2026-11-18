@@ -92,7 +92,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 
   <section id="t-bases">
     <div class="row">
-      <button class="b" id="newBase">Создать базу</button>
       <button class="b sec" id="refreshB">Обновить</button>
     </div>
     <div id="bErr" class="mut"></div>
@@ -556,7 +555,6 @@ function uploadPgDump(file) {
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
 $('clearCon').onclick = () => { $('conOut').textContent = ''; };
-$('newBase').onclick = () => { dtLaunchMode = 'base'; $('dtDbName').value = ''; $('dtDbUser').value = ''; $('dtDbPwd').value = ''; $('dtDialogHint').textContent = 'Будет создана отдельная новая база PostgreSQL и зарегистрирована в кластере 1С. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Создать базу из .dt'; $('dlgDt').showModal(); };
 $('openImport').onclick = () => { $('dlgImport').showModal(); };
 $('importCancel').onclick = () => $('dlgImport').close();
 $('dtCancel').onclick = () => $('dlgDt').close(); $('dCancel').onclick = () => $('dlgDump').close();
