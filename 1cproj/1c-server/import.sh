@@ -12,7 +12,13 @@ DB_USER_ARG="${6:-}"; DB_PASS_ARG="${7:-}"; UPLOAD_PATH="${8:-}"; NEW_BASE_ONLY=
 [[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя ИБ"
 [[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$ && "${FILE##*.}" == "$KIND" ]] || die "недопустимое имя/расширение файла"
 [[ "$KIND" == dt || "$KIND" == cf ]] || die "тип должен быть dt или cf"
-DB="${DB_NAME_ARG:-${DB_NAME:-$IB}}"
+# Для новой ИБ нельзя подхватывать DB_NAME из .env: там может оставаться имя
+# старой базы (например mybase), из-за чего новая ИБ mybase2 подключится к ней.
+if [[ "$NEW_BASE_ONLY" == "new" ]]; then
+  DB="${DB_NAME_ARG:-$IB}"
+else
+  DB="${DB_NAME_ARG:-${DB_NAME:-$IB}}"
+fi
 DB_USER="${DB_USER_ARG:-${DB_USER:-${POSTGRES_USER:-postgres}}}"
 DB_PASS="${DB_PASS_ARG:-${DB_PASS:-${POSTGRES_PASSWORD:-}}}"
 [[ "$DB" =~ ^[A-Za-z0-9_.-]{1,63}$ ]] || die "недопустимое имя БД PostgreSQL"
@@ -63,6 +69,11 @@ if [[ -n "$IBID" && "$NEW_BASE_ONLY" != "new" ]]; then
 else
   log "Создаю регистрацию ИБ и PostgreSQL-базу '$DB'."
   compose exec -T onec-server "$RAC" infobase create --cluster="$CLUSTER" --name="$IB" --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" --locale=ru --create-database 2>&1 | tee -a "$LOG"
+  if [[ "$NEW_BASE_ONLY" == "new" ]]; then
+    PG_CREATED="$(compose exec -T postgres runuser -u postgres -- /usr/local/pgbin/psql -d postgres -Atc "SELECT 1 FROM pg_database WHERE datname='$DB'")"
+    [[ "$PG_CREATED" == "1" ]] || die "RAC зарегистрировал ИБ, но PostgreSQL-база '$DB' не найдена после команды --create-database"
+    log "Проверка PostgreSQL: отдельная база '$DB' действительно создана."
+  fi
   SUMMARY="$(compose exec -T onec-server "$RAC" infobase summary list --cluster="$CLUSTER")"
   IBID="$(printf '%s\n' "$SUMMARY" | find_ib | tr -d '\r')"
   [[ -n "$IBID" ]] || die "RAC не вернул UUID созданной ИБ"
