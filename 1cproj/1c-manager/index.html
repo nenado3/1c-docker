@@ -61,6 +61,26 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .settings-actions .b{min-height:40px;padding:8px 16px;border-radius:9px}
 .settings-footnote{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 6%,var(--bg));color:var(--mut);font-size:12px;line-height:1.55}
 .settings-footnote strong{color:var(--fg)}
+/* Диалог ресурсов сборки */
+#dlgBuild{width:min(760px,calc(100vw - 28px));max-width:760px;max-height:calc(100vh - 30px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:19px;box-shadow:0 24px 80px rgba(0,0,0,.3)}
+#dlgBuild h3{margin:0;padding:22px 25px 18px;font-size:21px;border-bottom:1px solid var(--line);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 13%,var(--bg)),var(--bg))}
+#dlgBuild .build-body{padding:20px 24px 23px}
+#dlgBuild .build-intro{margin:0 0 18px;color:var(--mut);font-size:14px;line-height:1.55}
+#dlgBuild .build-pick{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:19px}
+#dlgBuild .build-pick-card{min-width:0;padding:13px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+#dlgBuild .build-pick-card .b{margin:0 0 8px}
+#dlgBuild .build-pick-card .mut{display:block;font-size:12px;overflow-wrap:anywhere}
+#dlgBuild .build-memory-title{margin:0 0 10px;font-size:14px;font-weight:750}
+#dlgBuild .build-memory-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+#dlgBuild .build-memory-card{min-width:0;padding:14px;border:1px solid var(--line);border-radius:13px;background:var(--bg)}
+#dlgBuild .build-memory-card .build-memory-icon{display:grid;place-items:center;width:34px;height:34px;margin-bottom:10px;border-radius:10px;background:color-mix(in srgb,var(--acc) 12%,var(--bg));color:var(--acc);font-size:17px}
+#dlgBuild .build-memory-card label{margin:0 0 7px;color:var(--fg);font-size:12px;font-weight:700}
+#dlgBuild .build-memory-card input{display:block;width:100%;min-width:0;height:41px;padding:8px 10px;border-radius:8px}
+#dlgBuild .build-memory-card small{display:block;margin-top:6px;color:var(--mut);font-size:10px;line-height:1.4}
+#dlgBuild .build-note{padding:11px 13px;margin:15px 0 0;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 6%,var(--bg));color:var(--mut);font-size:12px;line-height:1.5}
+#dlgBuild .build-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:17px;margin-top:18px;border-top:1px solid var(--line)}
+#dlgBuild .build-actions button{min-height:40px;padding:8px 17px;border-radius:9px}
+@media(max-width:620px){#dlgBuild .build-body{padding:17px}#dlgBuild .build-pick,#dlgBuild .build-memory-grid{grid-template-columns:1fr}#dlgBuild .build-actions{flex-direction:column-reverse}#dlgBuild .build-actions button{width:100%}}
 @media(max-width:650px){.settings-hero{padding:20px}.settings-hero h2{font-size:21px}.settings-card-body{grid-template-columns:1fr;padding:16px}.settings-card-head{padding:14px 16px}.settings-actions{bottom:248px;align-items:stretch;flex-direction:column}.settings-actions .row{margin:0}.settings-actions .b{flex:1}}
 
 /* Оформление окна импорта */
@@ -332,27 +352,31 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 </dialog>
 
 <dialog id="dlgBuild">
-  <h3 style="margin-top:0">Создание образов сервера</h3>
-  <div class="row">
-    <input id="srvDir" type="file" webkitdirectory directory multiple style="display:none">
-    <button class="b sec" data-pickdir="srvDir">Папка с 1С (.run/.deb)…</button>
-    <span id="srvDirInfo" class="mut">папка не выбрана</span>
+  <h3>Сборка образов и распределение памяти</h3>
+  <div class="build-body">
+    <p class="build-intro">Выберите установочные файлы и задайте максимальный объём оперативной памяти для каждого контейнера. Параметры сохранятся в .env.</p>
+    <div class="build-pick">
+      <div class="build-pick-card">
+        <input id="srvDir" type="file" webkitdirectory directory multiple style="display:none">
+        <button class="b sec" data-pickdir="srvDir">📦 Папка с 1С (.run/.deb)…</button>
+        <span id="srvDirInfo" class="mut">Папка не выбрана</span>
+      </div>
+      <div class="build-pick-card">
+        <input id="pgDir" type="file" webkitdirectory directory multiple style="display:none">
+        <button class="b sec" data-pickdir="pgDir">🗄️ Папка с PostgreSQL (.deb)…</button>
+        <span id="pgDirInfo" class="mut">Папка не выбрана</span>
+      </div>
+    </div>
+    <h4 class="build-memory-title">Распределение оперативной памяти</h4>
+    <div class="build-memory-grid">
+      <div class="build-memory-card"><div class="build-memory-icon">▦</div><label for="buildMem">Сервер 1С</label><input id="buildMem" placeholder="например 8g"><small>SERVER_MEMORY_LIMIT · 0 — без лимита</small></div>
+      <div class="build-memory-card"><div class="build-memory-icon">▤</div><label for="buildPgMem">PostgreSQL</label><input id="buildPgMem" placeholder="например 4g"><small>POSTGRES_MEMORY_LIMIT · 0 — без лимита</small></div>
+      <div class="build-memory-card"><div class="build-memory-icon">▣</div><label for="buildClientMem">Клиентские пользователи</label><input id="buildClientMem" placeholder="например 2g"><small>CLIENT_MEMORY_LIMIT · 0 — без лимита</small></div>
+    </div>
+    <div class="build-note">Это верхние лимиты Docker, а не заранее зарезервированная память. Фактическое потребление зависит от нагрузки. Для пользователей ограничивается общий клиентский контейнер, а не каждый пользователь отдельно.</div>
+    <div class="build-actions"><button class="b sec" id="buildCancel">Отмена</button><button class="b" id="buildOk">Собрать образы</button></div>
+    <p class="mut" style="font-size:11px;margin:13px 0 0">Установщики загружаются в server/dist и postgres/dist. Если папки не выбраны, используются уже имеющиеся файлы.</p>
   </div>
-  <div class="row">
-    <input id="pgDir" type="file" webkitdirectory directory multiple style="display:none">
-    <button class="b sec" data-pickdir="pgDir">Папка с PostgreSQL (.deb)…</button>
-    <span id="pgDirInfo" class="mut">папка не выбрана</span>
-  </div>
-  <div class="row">
-    <input id="buildMem" placeholder="Память сервера: 0 — без лимита, 8g, 512m" style="min-width:300px">
-  </div>
-  <div class="row">
-    <button class="b" id="buildOk">Собрать</button>
-    <button class="b sec" id="buildCancel">Отмена</button>
-  </div>
-  <p class="mut">Папки выбираются обычным системным окном. Файлы <span class="mono">.run</span>/<span class="mono">.deb</span> загружаются
-    в <span class="mono">server/dist</span>/<span class="mono">postgres/dist</span>; уже лежащие там файлы того же размера не передаются.
-    Пустые папки — сборка из текущих <span class="mono">dist/</span>.</p>
 </dialog>
 
 <script>
@@ -485,7 +509,11 @@ async function loadMemory() {
 
 async function loadBuild() {
   const r = await api('/api/memory');
-  if (!r.error) $('buildMem').value = r.limit || '0';
+  if (!r.error) {
+    $('buildMem').value = r.limit || '0';
+    $('buildPgMem').value = r.postgres_limit || '0';
+    $('buildClientMem').value = r.client_limit || '0';
+  }
 }
 
 function dirInfo(inputId, infoId, rx) {
@@ -706,10 +734,16 @@ $('pgDir').onchange = () => dirInfo('pgDir', 'pgDirInfo', /\.deb$/i);
 $('buildCancel').onclick = () => $('dlgBuild').close();
 $('buildOk').onclick = async () => {
   const mem = $('buildMem').value.trim();
+  const pgMem = $('buildPgMem').value.trim();
+  const clientMem = $('buildClientMem').value.trim();
+  const validMem = /^(0|[0-9]{1,6}[bkmg]?)$/i;
+  for (const [label, value] of [['Сервер 1С',mem],['PostgreSQL',pgMem],['Клиентские пользователи',clientMem]]) {
+    if (!validMem.test(value)) { conLine('ОШИБКА: для «' + label + '» укажите 0 или число с единицей, например 8g или 512m.'); return; }
+  }
   $('dlgBuild').close();
   try { await uploadSelectedDist(); }
   catch (e) { conLine('ОШИБКА загрузки установщиков: ' + e.message); return; }
-  runAction({action: 'build', project: 'server', memory: mem});
+  runAction({action: 'build', project: 'server', memory: mem, postgres_memory: pgMem, client_memory: clientMem});
 };
 function uploadFileWithProgress(file, prefix = 'upload') {
   return new Promise((resolve, reject) => {
