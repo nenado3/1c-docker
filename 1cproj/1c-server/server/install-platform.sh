@@ -74,8 +74,8 @@ elif [ -n "$RUNFILE" ]; then
 
     # Перед запуском фиксируем состояние временной ФС и раздела установки.
     echo "== Диагностика места перед установкой =="
-    df -hT /tmp "$OPT_DIR" 2>&1 || true
-    df -i /tmp "$OPT_DIR" 2>&1 || true
+    df -hT /tmp /opt 2>&1 || true
+    df -i /tmp /opt 2>&1 || true
     echo "Параметры установщика: компоненты=${COMPONENTS:-(по умолчанию)}"
 
     # Не повторяем установку с другими компонентами после ошибки: setup-full
@@ -119,8 +119,8 @@ elif [ -n "$RUNFILE" ]; then
         rc=$?
         echo "Установщик завершился с кодом $rc"
         echo "== Состояние файловой системы после ошибки =="
-        df -hT /tmp "$OPT_DIR" 2>&1 || true
-        df -i /tmp "$OPT_DIR" 2>&1 || true
+        df -hT /tmp /opt 2>&1 || true
+        df -i /tmp /opt 2>&1 || true
         d=$(find_bin_dir)
         [ -z "$d" ] || { echo "Содержимое $d:"; ls -la "$d" | head -60; }
         if [ -f "$INSTALL_TRACE" ]; then
