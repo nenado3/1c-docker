@@ -94,6 +94,68 @@ def write_env_value(path, key, value):
         f.write("\n".join(lines) + "\n")
 
 
+
+# Настройки .env, доступные из веб-панели. Неизвестные ключи не принимаются.
+ENV_SETTINGS = {
+    "server": {
+        "ONEC_VERSION": "Версия платформы 1С", "POSTGRES_USER": "Пользователь PostgreSQL",
+        "POSTGRES_PASSWORD": "Пароль PostgreSQL", "IB_NAME": "Имя информационной базы по умолчанию",
+        "DB_NAME": "Имя базы PostgreSQL по умолчанию", "DB_USER": "Пользователь БД по умолчанию",
+        "SERVER_BASE_IMAGE": "Базовый образ сервера", "POSTGRES_BASE_IMAGE": "Базовый образ PostgreSQL",
+        "BACKUP_DIR": "Каталог резервных копий", "SERVER_MEMORY_LIMIT": "Лимит памяти сервера"
+    },
+    "client": {
+        "ONEC_VERSION": "Версия платформы 1С", "ONEC_RUN_COMPONENTS": "Компоненты установщика",
+        "CLIENT_UID": "UID пользователя клиента", "SERVER_IP": "IP-адрес сервера 1С",
+        "NETHASP_ADDRS": "Адреса NetHASP", "EXPORT_DIR": "Каталог выгрузок"
+    }
+}
+ENV_SECRET_KEYS = {"POSTGRES_PASSWORD"}
+
+
+def settings_snapshot():
+    result = {}
+    for section, keys in ENV_SETTINGS.items():
+        directory = cfg["server_dir"] if section == "server" else cfg["client_dir"]
+        values = read_env(directory)
+        result[section] = {key: {"label": label, "value": "" if key in ENV_SECRET_KEYS else values.get(key, ""),
+                                "configured": bool(values.get(key, "")) if key in ENV_SECRET_KEYS else None,
+                                "secret": key in ENV_SECRET_KEYS}
+                           for key, label in keys.items()}
+    return result
+
+
+def save_settings(body):
+    changed = []
+    for section, keys in ENV_SETTINGS.items():
+        values = body.get(section, {})
+        if not isinstance(values, dict):
+            raise ValueError("неверный формат настроек: " + section)
+        directory = cfg["server_dir"] if section == "server" else cfg["client_dir"]
+        if not os.path.isdir(directory):
+            raise ValueError("каталог проекта не найден: " + directory)
+        path = os.path.join(directory, ".env")
+        for key, raw in values.items():
+            if key not in keys:
+                raise ValueError("недопустимый параметр .env: " + str(key))
+            value = str(raw)
+            if key in ENV_SECRET_KEYS and value == "":
+                continue
+            if len(value) > 500 or any(ord(ch) < 32 for ch in value):
+                raise ValueError("недопустимое значение параметра " + key)
+            if any(ch in value for ch in ('"', "'", "\\", "#", "$")):
+                raise ValueError("параметр %s содержит символы, несовместимые с форматом .env: кавычки, #, $ и обратная косая черта не поддерживаются" % key)
+            if key == "SERVER_MEMORY_LIMIT" and not MEM_RE.match(value.lower()):
+                raise ValueError("SERVER_MEMORY_LIMIT: укажите 0 или значение, например 8g или 512m")
+            if key == "CLIENT_UID" and value and not value.isdigit():
+                raise ValueError("CLIENT_UID должен быть числом")
+            if key == "ONEC_VERSION" and value and not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+", value):
+                raise ValueError("ONEC_VERSION должен иметь формат 8.5.1.1522")
+            write_env_value(path, key, value)
+            changed.append(section + ":" + key)
+    return {"saved": changed}
+
+
 def data_dir(kind):
     if kind == "backups":
         # Для DT/CF используем строго каталог проекта 1c-server/backups,
@@ -353,6 +415,8 @@ def do_action(body):
 
 
 def api_get(path, q):
+    if path == "/api/settings":
+        return settings_snapshot()
     if path == "/api/status":
         return {"docker": bool(cfg["docker"]), "docker_cmd": " ".join(cfg["docker"] or []),
                 "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"]),
@@ -591,6 +655,8 @@ class H(BaseHTTPRequestHandler):
             if n > 100000:
                 return self._send(413, {"error": "слишком большой запрос"})
             body = json.loads(self.rfile.read(n) or b"{}")
+            if u.path == "/api/settings":
+                return self._send(200, save_settings(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
             if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory"):
