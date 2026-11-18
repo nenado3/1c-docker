@@ -50,7 +50,7 @@ case "$ACTION" in
       "$WEBINST" -delete -apache24 -wsdir "$NAME" -confpath "$APACHE_CONF"
       rm -rf -- "$WEB_ROOT/$NAME"
       apache2ctl configtest
-      apache2ctl -k graceful || apache2ctl -k start
+      apache_reload
       echo "Публикация '$NAME' удалена."
     fi
     ;;
