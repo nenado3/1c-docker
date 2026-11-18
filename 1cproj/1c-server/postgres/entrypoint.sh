@@ -3,7 +3,7 @@ set -e
 
 PGBIN=/usr/local/pgbin
 PGDATA="${PGDATA:-/var/lib/postgresql/data}"
-PASSWORD="${POSTGRES_PASSWORD:-change_me}"
+PASSWORD="${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}"
 PGUSER_NAME="${POSTGRES_USER:-postgres}"
 
 mkdir -p "$PGDATA"

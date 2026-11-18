@@ -1,0 +1,70 @@
+name: Static validation
+
+on:
+  push:
+    branches:
+      - "audit/**"
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci-only-validation-password
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Python syntax
+        run: python3 -m py_compile 1cproj/1c-manager/app.py
+
+      - name: Bash syntax
+        run: |
+          find 1cproj -type f \( -name '*.sh' -o -name '1c-xvfb' \) -print0 |
+            xargs -0 -r -n1 bash -n
+
+      - name: Verify Dockerfile COPY sources
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import shlex
+          files = [
+              Path("1cproj/1c-server/server/Dockerfile"),
+              Path("1cproj/1c-server/postgres/Dockerfile"),
+              Path("1cproj/1c-client/Dockerfile"),
+          ]
+          failed = False
+          for dockerfile in files:
+              context = dockerfile.parent
+              for number, line in enumerate(dockerfile.read_text().splitlines(), 1):
+                  stripped = line.strip()
+                  if not stripped.startswith("COPY "):
+                      continue
+                  try:
+                      parts = shlex.split(stripped)[1:]
+                  except ValueError as exc:
+                      print(f"{dockerfile}:{number}: invalid COPY syntax: {exc}")
+                      failed = True
+                      continue
+                  if len(parts) < 2:
+                      continue
+                  for source in parts[:-1]:
+                      if source.startswith("--") or source.startswith(("http://", "https://")):
+                          continue
+                      if not list(context.glob(source)):
+                          print(f"{dockerfile}:{number}: COPY source not found: {source}")
+                          failed = True
+          if failed:
+              raise SystemExit(1)
+          print("All local Dockerfile COPY sources exist.")
+          PY
+
+      - name: Validate server Compose configuration
+        run: docker compose -f 1cproj/1c-server/docker-compose.yml config --quiet
+
+      - name: Validate client Compose configuration
+        run: docker compose -f 1cproj/1c-client/docker-compose.yml config --quiet

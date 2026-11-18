@@ -35,11 +35,105 @@ label{display:block;margin:8px 0 2px;color:var(--mut);font-size:13px}
 dialog{border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);padding:18px 20px;min-width:340px}
 dialog::backdrop{background:rgba(0,0,0,.45)}
 .upload-progress{display:none;max-width:680px;margin:10px 0 14px}
+/* Современное оформление вкладки настроек */
+#t-settings{max-width:980px}
+.settings-hero{position:relative;overflow:hidden;padding:24px 26px;margin:0 0 20px;border:1px solid color-mix(in srgb,var(--acc) 24%,var(--line));border-radius:18px;background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 13%,var(--bg)),var(--card) 72%)}
+.settings-hero:after{content:"⚙";position:absolute;right:24px;top:4px;font-size:94px;line-height:1;color:var(--acc);opacity:.09;pointer-events:none}
+.settings-eyebrow{display:inline-flex;align-items:center;gap:7px;margin-bottom:8px;color:var(--acc);font-size:11px;font-weight:750;letter-spacing:.11em;text-transform:uppercase}
+.settings-hero h2{margin:0 0 7px;font-size:25px;letter-spacing:-.035em}
+.settings-hero p{max-width:680px;margin:0;color:var(--mut);font-size:14px;line-height:1.6}
+.settings-status{display:flex;align-items:center;gap:9px;padding:11px 14px;margin:0 0 16px;border:1px solid var(--line);border-radius:11px;background:var(--card);font-size:13px}
+.settings-status:before{content:"";width:8px;height:8px;flex:none;border-radius:50%;background:var(--ok);box-shadow:0 0 0 4px color-mix(in srgb,var(--ok) 13%,transparent)}
+.settings-layout{display:grid;grid-template-columns:1fr;gap:14px;align-items:start;margin:0 0 16px}
+.settings-card{min-width:0;overflow:hidden;margin:0;border:1px solid var(--line);border-radius:15px;background:var(--bg);box-shadow:0 3px 14px rgba(15,23,42,.035)}
+.settings-card-head{display:flex;align-items:center;gap:13px;padding:15px 17px;background:var(--card);cursor:pointer;list-style:none;user-select:none}
+.settings-card-head::-webkit-details-marker{display:none}
+.settings-card-head:after{content:"⌄";margin-left:auto;color:var(--mut);font-size:21px;transition:transform .18s}
+.settings-card[open]>.settings-card-head{border-bottom:1px solid var(--line)}
+.settings-card[open]>.settings-card-head:after{transform:rotate(180deg)}
+.settings-card-icon{display:grid;place-items:center;width:39px;height:39px;flex:none;border-radius:11px;background:color-mix(in srgb,var(--acc) 13%,var(--bg));color:var(--acc);font-size:19px}
+.settings-card-head h3{margin:0;font-size:15px;font-weight:700}
+.settings-card-head p{margin:2px 0 0;color:var(--mut);font-size:12px}
+.settings-card-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px;padding:19px 20px 21px}
+@media(max-width:520px){.settings-card-body{grid-template-columns:1fr}}
+.settings-field{min-width:0}
+.settings-field label{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 7px;color:var(--fg);font-size:12px;font-weight:650}
+.settings-field label code{padding:2px 6px;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--mut);font-size:10px;font-weight:500}
+.settings-field input{display:block;width:100%;min-width:0;height:42px;padding:9px 12px;border-radius:9px;background:var(--bg);transition:border-color .15s,box-shadow .15s}
+.settings-field input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 15%,transparent)}
+.settings-field .settings-field-hint{margin:5px 0 0;color:var(--mut);font-size:11px;line-height:1.4}
+.settings-actions{position:sticky;top:8px;bottom:auto;z-index:10;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 15px;margin:0 0 16px;border:1px solid var(--line);border-radius:13px;background:color-mix(in srgb,var(--bg) 96%,transparent);backdrop-filter:blur(12px);box-shadow:0 6px 24px rgba(15,23,42,.08)}
+.settings-actions-note{color:var(--mut);font-size:11px}
+.settings-actions .b{min-height:40px;padding:8px 16px;border-radius:9px}
+.settings-footnote{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 6%,var(--bg));color:var(--mut);font-size:12px;line-height:1.55}
+.settings-footnote strong{color:var(--fg)}
+/* Выбор каталога резервных копий */
+#dlgBackupPicker{width:min(620px,calc(100vw - 28px));max-width:620px;max-height:calc(100vh - 32px);padding:0;overflow:hidden;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
+#dlgBackupPicker .picker-head{padding:18px 21px;border-bottom:1px solid var(--line);background:var(--card)}
+#dlgBackupPicker .picker-head h3{margin:0;font-size:18px}
+#dlgBackupPicker .picker-body{padding:16px 20px}
+#dlgBackupPicker .picker-path{padding:9px 11px;margin:8px 0 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);font:12px ui-monospace,monospace;overflow-wrap:anywhere}
+#dlgBackupPicker .picker-list{height:min(42vh,360px);overflow:auto;border:1px solid var(--line);border-radius:9px}
+#dlgBackupPicker .picker-entry{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--fg);font:inherit;text-align:left;cursor:pointer}
+#dlgBackupPicker .picker-entry:last-child{border-bottom:0}
+#dlgBackupPicker .picker-entry:hover{background:var(--card)}
+#dlgBackupPicker .picker-actions{display:flex;justify-content:space-between;gap:8px;padding:14px 20px;border-top:1px solid var(--line)}
+#dlgBackupPicker .picker-actions .right{display:flex;gap:8px}
+.settings-field .backup-picker-row{display:flex;gap:8px;align-items:center}
+.settings-field .backup-picker-row input{flex:1;min-width:0}
+.settings-field .backup-picker-row button{flex:none;min-height:42px}
+/* Диалог ресурсов сборки */
+#dlgBuild{width:min(760px,calc(100vw - 28px));max-width:760px;max-height:calc(100vh - 30px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:19px;box-shadow:0 24px 80px rgba(0,0,0,.3)}
+#dlgBuild h3{margin:0;padding:22px 25px 18px;font-size:21px;border-bottom:1px solid var(--line);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 13%,var(--bg)),var(--bg))}
+#dlgBuild .build-body{padding:20px 24px 23px}
+#dlgBuild .build-intro{margin:0 0 18px;color:var(--mut);font-size:14px;line-height:1.55}
+#dlgBuild .build-pick{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:19px}
+#dlgBuild .build-pick-card{min-width:0;padding:13px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+#dlgBuild .build-pick-card .b{margin:0 0 8px}
+#dlgBuild .build-pick-card .mut{display:block;font-size:12px;overflow-wrap:anywhere}
+#dlgBuild .build-memory-title{margin:0 0 10px;font-size:14px;font-weight:750}
+#dlgBuild .build-memory-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+#dlgBuild .build-memory-card{min-width:0;padding:14px;border:1px solid var(--line);border-radius:13px;background:var(--bg)}
+#dlgBuild .build-memory-card .build-memory-icon{display:grid;place-items:center;width:34px;height:34px;margin-bottom:10px;border-radius:10px;background:color-mix(in srgb,var(--acc) 12%,var(--bg));color:var(--acc);font-size:17px}
+#dlgBuild .build-memory-card label{margin:0 0 7px;color:var(--fg);font-size:12px;font-weight:700}
+#dlgBuild .build-memory-card input{display:block;width:100%;min-width:0;height:41px;padding:8px 10px;border-radius:8px}
+#dlgBuild .build-memory-card small{display:block;margin-top:6px;color:var(--mut);font-size:10px;line-height:1.4}
+#dlgBuild .build-note{padding:11px 13px;margin:15px 0 0;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 6%,var(--bg));color:var(--mut);font-size:12px;line-height:1.5}
+#dlgBuild .build-actions{display:flex;justify-content:flex-end;gap:8px;padding-top:17px;margin-top:18px;border-top:1px solid var(--line)}
+#dlgBuild .build-actions button{min-height:40px;padding:8px 17px;border-radius:9px}
+@media(max-width:620px){#dlgBuild .build-body{padding:17px}#dlgBuild .build-pick,#dlgBuild .build-memory-grid{grid-template-columns:1fr}#dlgBuild .build-actions{flex-direction:column-reverse}#dlgBuild .build-actions button{width:100%}}
+@media(max-width:650px){.settings-hero{padding:20px}.settings-hero h2{font-size:21px}.settings-card-body{grid-template-columns:1fr;padding:16px}.settings-card-head{padding:14px 16px}.settings-actions{top:8px;bottom:auto;align-items:stretch;flex-direction:column}.settings-actions .row{margin:0}.settings-actions .b{flex:1}}
+
+/* Оформление окна импорта */
+#dlgImport{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 32px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:18px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
+#dlgImport h3{margin:0;padding:22px 26px 18px;font-size:20px;font-weight:700;letter-spacing:-.02em;border-bottom:1px solid var(--line);background:linear-gradient(135deg,color-mix(in srgb,var(--acc) 12%,var(--bg)),var(--bg))}
+#dlgImport .import-body{padding:20px 26px 24px}
+#dlgImport .import-intro{margin:0 0 18px;color:var(--mut);font-size:16px;line-height:1.55}
+#dlgImport .import-group{padding:15px 16px;margin:0 0 14px;border:1px solid var(--line);border-radius:12px;background:var(--card)}
+#dlgImport .import-group-title{display:flex;align-items:center;gap:9px;margin:0 0 12px;font-size:14px;font-weight:650;color:var(--fg)}
+#dlgImport .import-step{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:8px;background:var(--acc);color:var(--accfg);font-size:12px;font-weight:700}
+#dlgImport label{margin:10px 0 5px;color:var(--fg);font-size:13px;font-weight:550}
+#dlgImport input:not([type=checkbox]):not([type=file]),#dlgImport select{display:block;width:100%;min-width:0;min-height:40px;padding:8px 11px;border-radius:8px;background:var(--bg)}
+#dlgImport input[type=file]{display:block;width:100%;min-width:0;padding:14px;border:1px dashed var(--acc);border-radius:10px;background:var(--bg);cursor:pointer}
+#dlgImport input[type=checkbox]{min-width:0;accent-color:var(--acc);margin:0 7px 0 0;vertical-align:middle}
+#dlgImport .import-check{display:flex;align-items:center;gap:8px;margin:0 0 12px;color:var(--fg);font-weight:600}
+#dlgImport .import-hint{margin:10px 0 0;color:var(--mut);font-size:12px;line-height:1.5}
+#dlgImport .import-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+#dlgImport .import-actions{display:flex;justify-content:flex-end;gap:8px;margin:18px 0 0;padding-top:16px;border-top:1px solid var(--line)}
+#dlgImport .import-actions button{min-height:40px;padding:8px 16px;border-radius:9px}
+#dlgImport #importStatus{padding:0 2px;margin-top:10px;font-size:13px;overflow-wrap:anywhere}
+#dlgImport .upload-progress{max-width:none;margin:12px 0 0}
+#dlgImport .upload-progress-track{height:9px}
+@media(max-width:560px){#dlgImport{min-width:0}#dlgImport h3{padding:18px 18px 14px;font-size:18px}#dlgImport .import-body{padding:16px 18px 20px}#dlgImport .import-grid{grid-template-columns:1fr}#dlgImport .import-actions{flex-direction:column-reverse}#dlgImport .import-actions button{width:100%}}
+
 .upload-progress-track{height:16px;background:var(--line);border-radius:999px;overflow:hidden}
 .upload-progress-fill{height:100%;width:0;background:var(--acc);transition:width .12s ease}
 .upload-progress-meta{display:flex;justify-content:space-between;gap:12px;margin-top:5px;font-size:12px;color:var(--mut)}
-#console{position:fixed;left:0;right:0;bottom:0;height:240px;background:var(--con);color:var(--confg);border-top:2px solid var(--line);display:flex;flex-direction:column}
-#console .bar{display:flex;gap:10px;align-items:center;padding:6px 14px;font-size:13px;border-bottom:1px solid #1f2937}
+#console{position:fixed;left:0;right:0;bottom:0;height:240px;min-height:100px;max-height:80vh;background:var(--con);color:var(--confg);border-top:2px solid var(--line);display:flex;flex-direction:column;z-index:20}
+#console-resize{height:9px;flex:none;cursor:ns-resize;touch-action:none;display:grid;place-items:center;background:var(--con)}
+#console-resize:after{content:"";width:42px;height:3px;border-radius:3px;background:#64748b;opacity:.75}
+#console-resize:hover:after{background:var(--acc);opacity:1}
+#console .bar{display:flex;gap:10px;align-items:center;padding:6px 14px;font-size:13px;border-bottom:1px solid #1f2937;flex:none}
 #console pre{margin:0;padding:8px 14px;overflow:auto;flex:1;font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}
 .logs{background:var(--con);color:var(--confg);padding:10px;border-radius:8px;max-height:340px;overflow:auto;white-space:pre-wrap;font:12.5px/1.4 ui-monospace,Menlo,monospace}
 </style>
@@ -57,9 +151,15 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <button data-tab="files">Выгрузки</button>
   <button data-tab="client">Клиент и лицензии</button>
   <button data-tab="build">Сборка</button>
+  <button data-tab="settings">Настройки</button>
 </nav>
 <main>
   <div id="dockerWarn" class="warnbox" style="display:none"></div>
+    <div id="uploadStatus" class="mut" aria-live="polite"></div>
+    <div id="uploadProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки файла">
+      <div class="upload-progress-track"><div id="uploadProgressFill" class="upload-progress-fill"></div></div>
+      <div class="upload-progress-meta"><span id="uploadProgressLabel">Загрузка: 0%</span><span id="uploadProgressSize">0 / 0 МБ</span></div>
+    </div>
 
   <section id="t-containers" class="on">
     <div class="row">
@@ -86,31 +186,11 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-bases">
-    <div class="row">
-      <button class="b" id="newBase">Создать базу</button>
+    <div class="row" id="basesActions" style="flex-wrap:nowrap">
+      <button class="b" id="openImport">Создать/Загрузить базу 1С</button>
       <button class="b sec" id="refreshB">Обновить</button>
     </div>
     <div id="bErr" class="mut"></div>
-    <h2>Загрузить файл в Docker и импортировать в базу</h2>
-    <div class="row">
-      <select id="importBase" aria-label="Информационная база"><option value="">Сначала загрузите список баз</option></select>
-      <input id="importFile" type="file" accept=".dt,.cf,application/octet-stream">
-      <button class="b" id="uploadImport">Загрузить и импортировать</button>
-    </div>
-    <div class="row">
-      <input id="importUser" placeholder="Пользователь 1С (если требуется)">
-      <input id="importPwd" type="password" placeholder="Пароль 1С">
-    </div>
-    <div class="row">
-      <input id="importDbUser" placeholder="Пользователь PostgreSQL (по умолчанию из .env)">
-      <input id="importDbPwd" type="password" placeholder="Пароль PostgreSQL (по умолчанию из .env)">
-    </div>
-    <p class="mut">.dt полностью заменяет данные выбранной базы. В базе <b>без пользователей 1С</b> (только что создана) импорт идёт через конфигуратор без логина. Если пользователи есть — нужны «Пользователь 1С» и пароль (ibcmd, при отказе — конфигуратор). Пользователь/пароль PostgreSQL нужны для ibcmd: пустые поля — берутся из 1c-server/.env. Перед импортом .dt завершите сеансы пользователей. Максимальный размер файла — 8 ГБ.</p>
-    <div id="uploadStatus" class="mut" aria-live="polite"></div>
-    <div id="uploadProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки файла">
-      <div class="upload-progress-track"><div id="uploadProgressFill" class="upload-progress-fill"></div></div>
-      <div class="upload-progress-meta"><span id="uploadProgressLabel">Загрузка: 0%</span><span id="uploadProgressSize">0 / 0 МБ</span></div>
-    </div>
     <table><thead><tr><th>Имя</th><th>Идентификатор</th><th>Описание</th><th>Действия</th></tr></thead>
       <tbody id="bBody"><tr><td colspan="4" class="mut">Загрузка…</td></tr></tbody></table>
     <h2>Сеансы</h2>
@@ -119,7 +199,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-pg">
-    <div class="row"><button class="b sec" id="refreshP">Обновить</button></div>
+    <div class="row"><button class="b sec" id="refreshP">Обновить</button><button class="b" id="openPgRestore">Загрузить .dump и восстановить</button></div>
     <div id="pErr" class="mut"></div>
     <table><thead><tr><th>База PostgreSQL</th><th>Размер</th><th></th></tr></thead>
       <tbody id="pBody"><tr><td colspan="3" class="mut">Загрузка…</td></tr></tbody></table>
@@ -135,9 +215,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-client">
-    <div class="row">
+    <div class="row" style="flex-wrap:wrap">
       <button class="b" data-act="client-start">Запустить клиент 1С</button>
-      <button class="b sec" data-act="license-install">Перенести полученные лицензии на сервер</button>
+      <button class="b" data-act="license-install">Перенести полученные лицензии на сервер</button>
+      <button class="b" id="openServerLicenseDialog">Активировать лицензию на сервере</button>
     </div>
     <p class="mut">Окно клиента откроется на вашем рабочем столе. Для получения лицензии запустите клиент, получите её в окне 1С,
       затем нажмите «Перенести полученные лицензии». Сетевой ключ NetHASP настраивается в 1c-client/.env (NETHASP_ADDRS).</p>
@@ -159,14 +240,145 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <button class="b" data-act="update-client">Обновить клиент 1С</button>
     </div>
   </section>
+
+  <section id="t-settings">
+    <div class="settings-hero">
+      <div class="settings-eyebrow">⚙ ПАРАМЕТРЫ СИСТЕМЫ</div>
+      <h2>Настройки проекта</h2>
+      <p>Управляйте параметрами сервера 1С, PostgreSQL и клиентского приложения в одном месте. Все изменения сохраняются в соответствующие файлы .env.</p>
+    </div>
+    <div id="settingsStatus" class="settings-status" aria-live="polite">Загружаю настройки…</div>
+    <div id="settingsFields"></div>
+    <div class="settings-actions">
+      <span class="settings-actions-note">Изменения вступят в силу после применения конфигурации.</span>
+      <div class="row"><button class="b sec" id="reloadSettings">↻ Перечитать</button><button class="b" id="saveSettings">Сохранить настройки</button></div>
+    </div>
+    <div class="settings-footnote"><span>ⓘ</span><div><strong>Обратите внимание.</strong> После изменения каталога резервных копий обязательно пересоздайте контейнер <span class="mono">onec-server</span>, иначе он продолжит использовать старую папку. Для этого сохраните настройки и обновите/пересоздайте контейнер. Изменение версии 1С или базового образа может потребовать пересборки образов. Пароль PostgreSQL не отображается: пустое поле сохраняет прежнее значение.</div></div>
+  </section>
 </main>
 
+<dialog id="dlgServerLicense">
+  <h3 style="margin-top:0">Активация лицензии на сервере 1С</h3>
+  <p class="mut">Выберите готовый файл лицензии .lic. Он будет сохранён в папку licenses сервера, после чего контейнер 1С перезапустится.</p>
+  <label for="serverLicenseFile">Файл лицензии (.lic)</label>
+  <input id="serverLicenseFile" type="file" accept=".lic,application/octet-stream" style="display:block;width:100%;margin:8px 0 12px">
+  <div id="serverLicenseStatus" class="mut" aria-live="polite"></div>
+  <div class="row" style="justify-content:flex-end;margin-top:16px">
+    <button class="b sec" id="cancelServerLicense">Отмена</button>
+    <button class="b" id="activateServerLicense">Загрузить и активировать</button>
+  </div>
+</dialog>
+
+<dialog id="dlgBackupPicker" aria-labelledby="backupPickerTitle">
+  <div class="picker-head"><h3 id="backupPickerTitle">Выбор каталога резервных копий</h3></div>
+  <div class="picker-body">
+    <div class="mut" style="font-size:12px">Перейдите в нужную папку и нажмите «Выбрать этот каталог».</div>
+    <div id="backupPickerPath" class="picker-path">Загрузка…</div>
+    <div id="backupPickerList" class="picker-list"></div>
+    <div id="backupPickerStatus" class="mut" style="margin-top:8px;font-size:12px" aria-live="polite"></div>
+  </div>
+  <div class="picker-actions">
+    <button class="b sec" id="backupPickerUp">↑ На уровень выше</button>
+    <div class="right"><button class="b sec" id="backupPickerCancel">Отмена</button><button class="b" id="backupPickerSelect">Выбрать этот каталог</button></div>
+  </div>
+</dialog>
+
 <div id="console">
+  <div id="console-resize" role="separator" aria-label="Изменить высоту консоли" aria-orientation="horizontal" title="Перетащите, чтобы изменить высоту"></div>
   <div class="bar"><b>Консоль</b><span id="jobTitle" class="mut">нет задач</span><span id="jobState" class="badge"></span>
     <button class="b sec" id="clearCon" style="margin-left:auto">Очистить</button></div>
   <pre id="conOut"></pre>
 </div>
 
+<dialog id="dlgPgRestore">
+  <h3 style="margin-top:0">Восстановить PostgreSQL из .dump</h3>
+  <label>Файл PostgreSQL (.dump, формат pg_dump -Fc)</label>
+  <input id="pgRestoreFile" type="file" accept=".dump,application/octet-stream">
+  <label>Целевая база PostgreSQL</label>
+  <select id="pgRestoreDb"><option value="">Сначала загрузите список баз</option></select>
+  <label><input id="pgRestoreClean" type="checkbox"> Очистить существующие объекты перед восстановлением</label>
+  <p class="mut">Без отметки восстановление добавит объекты в целевую базу и может завершиться конфликтами. С очисткой существующие объекты будут удалены. Саму базу PostgreSQL панель не удаляет.</p>
+  <div id="pgRestoreStatus" class="mut" aria-live="polite"></div>
+  <div id="pgRestoreProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки дампа">
+    <div class="upload-progress-track"><div id="pgRestoreProgressFill" class="upload-progress-fill"></div></div>
+    <div class="upload-progress-meta"><span id="pgRestoreProgressLabel">Загрузка: 0%</span><span id="pgRestoreProgressSize">0 / 0 МБ</span></div>
+  </div>
+  <div class="row"><button class="b" id="pgRestoreOk">Загрузить и восстановить</button><button class="b sec" id="pgRestoreCancel">Отмена</button></div>
+</dialog>
+<dialog id="dlgImport" aria-labelledby="importDialogTitle">
+  <h3 id="importDialogTitle">Создать/Загрузить базу 1С</h3>
+  <div class="import-body">
+    <p class="import-intro">Выберите базу и архив. Файл будет передан в Docker, после чего панель запустит импорт.</p>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">1</span> Куда импортировать</div>
+      <label class="import-check"><input id="importNewBase" type="checkbox"> Создать новую информационную базу и отдельную БД PostgreSQL</label>
+      <div id="importNewBaseFields" hidden>
+        <div class="import-grid">
+          <div>
+            <label>Имя новой информационной базы 1С</label>
+            <input id="importNewIb" placeholder="например mybase2">
+          </div>
+          <div>
+            <label>Имя новой базы PostgreSQL <span class="mut">(пусто — как имя ИБ)</span></label>
+            <input id="importNewDbName" placeholder="например mybase2">
+          </div>
+        </div>
+      </div>
+      <div id="importExistingBaseFields">
+        <label>Существующая информационная база 1С</label>
+        <select id="importBase" aria-label="Информационная база"><option value="">Сначала загрузите список баз</option></select>
+      </div>
+    </div>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">2</span> Файл для импорта</div>
+      <label>Выберите архив .dt или файл конфигурации .cf</label>
+      <input id="importFile" type="file" accept=".dt,.cf,application/octet-stream">
+      <p class="import-hint">.dt — восстановление данных базы; .cf — обновление конфигурации.</p>
+    </div>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">3</span> Доступы (если требуются)</div>
+      <div class="import-grid">
+        <div>
+          <label>Пользователь 1С</label>
+          <input id="importUser" placeholder="Пользователь 1С">
+        </div>
+        <div>
+          <label>Пароль 1С</label>
+          <input id="importPwd" type="password" placeholder="Пароль 1С" autocomplete="new-password">
+        </div>
+        <div>
+          <label>Пользователь PostgreSQL</label>
+          <input id="importDbUser" placeholder="Пользователь PostgreSQL">
+        </div>
+        <div>
+          <label>Пароль PostgreSQL</label>
+          <input id="importDbPwd" type="password" placeholder="Пароль PostgreSQL" autocomplete="new-password">
+        </div>
+      </div>
+    </div>
+    <p class="import-hint">Важно: импорт .dt в существующую базу полностью заменяет её данные. Файл .cf обновляет конфигурацию.</p>
+    <div id="importStatus" class="mut" aria-live="polite"></div>
+    <div id="importProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки файла" style="display:none">
+      <div class="upload-progress-track"><div id="importProgressFill" class="upload-progress-fill"></div></div>
+      <div class="upload-progress-meta"><span id="importProgressLabel">Загрузка: 0%</span><span id="importProgressSize">0 / 0 МБ</span></div>
+    </div>
+    <div class="import-actions">
+      <button class="b sec" id="importCancel">Отмена</button>
+      <button class="b" id="uploadImport">Загрузить и импортировать</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="dlgDt">
+  <h3 style="margin-top:0">Создание базы из архива .dt</h3>
+  <label>Имя новой информационной базы 1С</label><input id="dtName" value="mybase" placeholder="например mybase">
+  <label>Имя отдельной базы PostgreSQL</label><input id="dtDbName" value="" placeholder="например mybase">
+  <label>Пользователь PostgreSQL <span class="mut">(пусто — из .env; свой пользователь должен существовать и иметь CREATEDB)</span></label><input id="dtDbUser" placeholder="postgres">
+  <label>Пароль PostgreSQL <span class="mut">(пусто — из .env)</span></label><input id="dtDbPwd" type="password" autocomplete="new-password">
+  <p class="mut">Подключение внутри Docker: postgres:5432. Для каждой новой базы создаётся отдельная БД PostgreSQL. Сервер и порт заданы конфигурацией Docker и здесь не меняются.</p>
+  <label>Файл резервной копии .dt</label><input id="dtFile" type="file" accept=".dt,application/octet-stream">
+  <p class="mut" id="dtDialogHint">Будет создана новая база PostgreSQL и зарегистрирована в кластере 1С. Существующие базы не перезаписываются.</p>
+  <div class="row"><button class="b" id="dtOk">Продолжить</button><button class="b sec" id="dtCancel">Отмена</button></div>
+</dialog>
 <dialog id="dlgCreate">
   <h3 style="margin-top:0">Создать информационную базу</h3>
   <label>Имя базы в кластере</label><input id="cName" value="mybase">
@@ -182,29 +394,41 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <label>Пароль</label><input id="dPwd" type="password">
   <div class="row"><button class="b" id="dOk">Выгрузить</button><button class="b sec" id="dCancel">Отмена</button></div>
 </dialog>
+<dialog id="dlgDrop">
+  <h3 style="margin-top:0">Удаление информационной базы</h3>
+  <label>База</label><input id="dropName" readonly>
+  <label>Пользователь 1С с правами администратора этой базы</label><input id="dropUser" autocomplete="username">
+  <label>Пароль пользователя 1С</label><input id="dropPwd" type="password" autocomplete="current-password">
+  <p class="mut">Учётные данные используются только для этой операции и не сохраняются в настройках панели.</p>
+  <div class="row"><button class="b red" id="dropOk">Продолжить</button><button class="b sec" id="dropCancel">Отмена</button></div>
+</dialog>
 
 <dialog id="dlgBuild">
-  <h3 style="margin-top:0">Создание образов сервера</h3>
-  <div class="row">
-    <input id="srvDir" type="file" webkitdirectory directory multiple style="display:none">
-    <button class="b sec" data-pickdir="srvDir">Папка с 1С (.run/.deb)…</button>
-    <span id="srvDirInfo" class="mut">папка не выбрана</span>
+  <h3>Сборка образов и распределение памяти</h3>
+  <div class="build-body">
+    <p class="build-intro">Выберите установочные файлы и задайте максимальный объём оперативной памяти для каждого контейнера. Параметры сохранятся в .env.</p>
+    <div class="build-pick">
+      <div class="build-pick-card">
+        <input id="srvDir" type="file" webkitdirectory directory multiple style="display:none">
+        <button class="b sec" data-pickdir="srvDir">📦 Папка с 1С (.run/.deb)…</button>
+        <span id="srvDirInfo" class="mut">Папка не выбрана</span>
+      </div>
+      <div class="build-pick-card">
+        <input id="pgDir" type="file" webkitdirectory directory multiple style="display:none">
+        <button class="b sec" data-pickdir="pgDir">🗄️ Папка с PostgreSQL (.deb)…</button>
+        <span id="pgDirInfo" class="mut">Папка не выбрана</span>
+      </div>
+    </div>
+    <h4 class="build-memory-title">Распределение оперативной памяти</h4>
+    <div class="build-memory-grid">
+      <div class="build-memory-card"><div class="build-memory-icon">▦</div><label for="buildMem">Сервер 1С</label><input id="buildMem" placeholder="например 8g"><small>SERVER_MEMORY_LIMIT · 0 — без лимита</small></div>
+      <div class="build-memory-card"><div class="build-memory-icon">▤</div><label for="buildPgMem">PostgreSQL</label><input id="buildPgMem" placeholder="например 4g"><small>POSTGRES_MEMORY_LIMIT · 0 — без лимита</small></div>
+      <div class="build-memory-card"><div class="build-memory-icon">▣</div><label for="buildClientMem">Клиентские пользователи</label><input id="buildClientMem" placeholder="например 2g"><small>CLIENT_MEMORY_LIMIT · 0 — без лимита</small></div>
+    </div>
+    <div class="build-note">Это верхние лимиты Docker, а не заранее зарезервированная память. Фактическое потребление зависит от нагрузки. Для пользователей ограничивается общий клиентский контейнер, а не каждый пользователь отдельно.</div>
+    <div class="build-actions"><button class="b sec" id="buildCancel">Отмена</button><button class="b" id="buildOk">Собрать образы</button></div>
+    <p class="mut" style="font-size:11px;margin:13px 0 0">Установщики загружаются в server/dist и postgres/dist. Если папки не выбраны, используются уже имеющиеся файлы.</p>
   </div>
-  <div class="row">
-    <input id="pgDir" type="file" webkitdirectory directory multiple style="display:none">
-    <button class="b sec" data-pickdir="pgDir">Папка с PostgreSQL (.deb)…</button>
-    <span id="pgDirInfo" class="mut">папка не выбрана</span>
-  </div>
-  <div class="row">
-    <input id="buildMem" placeholder="Память сервера: 0 — без лимита, 8g, 512m" style="min-width:300px">
-  </div>
-  <div class="row">
-    <button class="b" id="buildOk">Собрать</button>
-    <button class="b sec" id="buildCancel">Отмена</button>
-  </div>
-  <p class="mut">Папки выбираются обычным системным окном. Файлы <span class="mono">.run</span>/<span class="mono">.deb</span> загружаются
-    в <span class="mono">server/dist</span>/<span class="mono">postgres/dist</span>; уже лежащие там файлы того же размера не передаются.
-    Пустые папки — сборка из текущих <span class="mono">dist/</span>.</p>
 </dialog>
 
 <script>
@@ -213,7 +437,8 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtSize = n => n > 1048576 ? (n/1048576).toFixed(1)+' МБ' : n > 1024 ? (n/1024).toFixed(1)+' КБ' : n+' Б';
 const fmtDate = t => new Date(t*1000).toLocaleString('ru-RU');
-let state = {docker:false}, curTab = 'containers', logsFor = null, polling = null;
+let state = {docker:false}, curTab = 'containers', logsFor = null, polling = null, dtLaunchMode = 'base';
+let consoleHeadersCleared = false;
 
 async function api(path, body) {
   const opt = {headers: {'X-Token': TOKEN}};
@@ -226,6 +451,33 @@ async function api(path, body) {
   } catch (e) { return {error: 'Нет связи с панелью: ' + e.message}; }
 }
 
+function setupConsoleResize() {
+  const panel = $('console'), grip = $('console-resize');
+  const minHeight = 100, maxRatio = 0.8;
+  const applyHeight = value => {
+    const height = Math.max(minHeight, Math.min(Math.round(window.innerHeight * maxRatio), value));
+    panel.style.height = height + 'px';
+    document.body.style.paddingBottom = (height + 20) + 'px';
+  };
+  const saved = Number(localStorage.getItem('oneCConsoleHeight'));
+  applyHeight(saved >= minHeight ? saved : 240);
+  let dragging = false;
+  grip.addEventListener('pointerdown', event => {
+    dragging = true;
+    grip.setPointerCapture(event.pointerId);
+    event.preventDefault();
+  });
+  grip.addEventListener('pointermove', event => {
+    if (!dragging) return;
+    applyHeight(window.innerHeight - event.clientY);
+    localStorage.setItem('oneCConsoleHeight', String(Math.round(panel.getBoundingClientRect().height)));
+  });
+  const stop = () => { dragging = false; };
+  grip.addEventListener('pointerup', stop);
+  grip.addEventListener('pointercancel', stop);
+  window.addEventListener('resize', () => applyHeight(panel.getBoundingClientRect().height));
+}
+
 function conLine(t) { const o = $('conOut'); o.textContent += t + '\n'; o.scrollTop = o.scrollHeight; }
 
 async function runAction(body) {
@@ -235,17 +487,20 @@ async function runAction(body) {
 }
 
 function followJob(id) {
+  consoleHeadersCleared = false;
   if (polling) clearInterval(polling);
   let since = 0;
   $('conOut').textContent = '';
   const tick = async () => {
     const j = await api('/api/job?id=' + id + '&since=' + since);
     if (j.error) { conLine('ОШИБКА: ' + j.error); clearInterval(polling); return; }
-    $('jobTitle').textContent = j.title;
+    if (!consoleHeadersCleared) {
+      $('jobTitle').textContent = j.title;
+      const st = $('jobState');
+      st.textContent = j.status === 'running' ? 'выполняется…' : (j.status === 'done' ? 'готово' : 'ошибка (код ' + j.rc + ')');
+      st.className = 'badge ' + (j.status === 'running' ? 'warn' : j.status === 'done' ? 'ok' : 'bad');
+    }
     j.lines.forEach(conLine); since = j.next;
-    const st = $('jobState');
-    st.textContent = j.status === 'running' ? 'выполняется…' : (j.status === 'done' ? 'готово' : 'ошибка (код ' + j.rc + ')');
-    st.className = 'badge ' + (j.status === 'running' ? 'warn' : j.status === 'done' ? 'ok' : 'bad');
     $('console').style.borderTopColor = j.status === 'error' ? 'var(--bad)' : (j.status === 'done' ? 'var(--ok)' : 'var(--line)');
     if (j.status !== 'running') { clearInterval(polling); polling = null; loadTab(curTab); }
   };
@@ -301,6 +556,7 @@ async function loadPg() {
   $('pBody').innerHTML = items.length ? items.map(i => '<tr><td><b>' + esc(i.name) + '</b></td><td>' + esc(i.size) +
     '</td><td><button class="b sec" data-pgdump="' + esc(i.name) + '">Дамп PostgreSQL</button></td></tr>').join('')
     : '<tr><td colspan="3" class="mut">Баз нет</td></tr>';
+  $('pgRestoreDb').innerHTML = items.length ? '<option value="">Выберите целевую базу</option>' + items.map(i => '<option value="' + esc(i.name) + '">' + esc(i.name) + '</option>').join('') : '<option value="">Баз нет</option>';
 }
 
 function fileRows(list, kind) {
@@ -336,7 +592,11 @@ async function loadMemory() {
 
 async function loadBuild() {
   const r = await api('/api/memory');
-  if (!r.error) $('buildMem').value = r.limit || '0';
+  if (!r.error) {
+    $('buildMem').value = r.limit || '0';
+    $('buildPgMem').value = r.postgres_limit || '0';
+    $('buildClientMem').value = r.client_limit || '0';
+  }
 }
 
 function dirInfo(inputId, infoId, rx) {
@@ -391,12 +651,99 @@ async function uploadSelectedDist() {
   }
 }
 
+const settingsGroups = {server:'Сервер 1С и PostgreSQL',client:'Клиент 1С'};
+async function loadSettings() {
+  const r = await api('/api/settings');
+  if (r.error) { $('settingsStatus').textContent = 'Ошибка чтения .env: ' + r.error; return; }
+  let out = '<div class="settings-layout">';
+  const meta = {
+    server:{icon:'▦',title:'Сервер 1С и PostgreSQL',subtitle:'Параметры серверной части и хранилища данных'},
+    client:{icon:'▣',title:'Клиент 1С',subtitle:'Подключение клиентского приложения и лицензирование'}
+  };
+  for (const section of ['server','client']) {
+    out += '<details class="settings-card"><summary class="settings-card-head"><div class="settings-card-icon">' + meta[section].icon + '</div><div><h3>' + meta[section].title + '</h3><p>' + meta[section].subtitle + '</p></div></summary><div class="settings-card-body">';
+    for (const [key, item] of Object.entries(r[section] || {})) {
+      const type = item.secret ? 'password' : 'text';
+      const hint = item.secret ? (item.configured ? 'Пароль задан · пустое поле — оставить без изменений' : 'Пароль ещё не задан') : '';
+      const label = key === 'SERVER_MEMORY_LIMIT' ? 'Лимит оперативной памяти сервера 1С' :
+                    key === 'POSTGRES_MEMORY_LIMIT' ? 'Лимит оперативной памяти PostgreSQL' : item.label;
+      if (section === 'server' && key === 'BACKUP_DIR') {
+        out += '<div class="settings-field"><label for="env_server_BACKUP_DIR">' + esc(label) + '<code>' + esc(key) + '</code></label>' +
+          '<div class="backup-picker-row"><input id="env_server_BACKUP_DIR" data-env-section="server" data-env-key="BACKUP_DIR" type="text" value="' + esc(item.value || '') + '" placeholder="/home/user/backups">' +
+          '<button class="b sec" type="button" id="chooseBackupDir">Выбрать папку…</button></div>' +
+          '<p class="settings-field-hint">Папка на хосте, в которой будут храниться .dt и .cf. После изменения необходимо пересоздать контейнер onec-server, чтобы обновился подключённый каталог.</p></div>';
+      } else {
+        out += '<div class="settings-field"><label for="env_' + section + '_' + key + '">' + esc(label) + '<code>' + esc(key) + '</code></label>' +
+          '<input id="env_' + section + '_' + key + '" data-env-section="' + section + '" data-env-key="' + key + '" type="' + type + '" value="' + esc(item.value || '') + '" placeholder="' + esc(hint) + '">' +
+          (hint ? '<p class="settings-field-hint">' + esc(hint) + '</p>' : '') + '</div>';
+      }
+    }
+    out += '</div></details>';
+  }
+  out += '</div>';
+  $('settingsFields').innerHTML = out;
+  $('settingsStatus').textContent = '✓ Настройки загружены из файлов .env.';
+}
+let backupPickerCurrent = '';
+async function loadBackupPicker(path) {
+  $('backupPickerStatus').textContent = 'Читаю каталоги…';
+  const r = await api('/api/browse_dirs?path=' + encodeURIComponent(path || ''));
+  if (r.error) { $('backupPickerStatus').textContent = r.error; return; }
+  backupPickerCurrent = r.path;
+  $('backupPickerPath').textContent = r.path;
+  $('backupPickerUp').disabled = !r.parent;
+  $('backupPickerUp').dataset.parent = r.parent || '';
+  $('backupPickerList').innerHTML = r.dirs.length
+    ? r.dirs.map(d => '<button type="button" class="picker-entry" data-folder-path="' + esc(d.path) + '"><span>📁</span><span>' + esc(d.name) + '</span></button>').join('')
+    : '<div class="mut" style="padding:14px">Вложенных папок нет</div>';
+  $('backupPickerStatus').textContent = 'Папок: ' + r.dirs.length;
+}
+async function openBackupPicker() {
+  const current = $('env_server_BACKUP_DIR').value.trim();
+  await loadBackupPicker(current || '/home');
+  $('dlgBackupPicker').showModal();
+}
+$('backupPickerList').onclick = e => {
+  const entry = e.target.closest('[data-folder-path]');
+  if (entry) loadBackupPicker(entry.dataset.folderPath);
+};
+$('backupPickerUp').onclick = () => {
+  const parent = $('backupPickerUp').dataset.parent;
+  if (parent) loadBackupPicker(parent);
+};
+$('backupPickerSelect').onclick = () => {
+  $('env_server_BACKUP_DIR').value = backupPickerCurrent;
+  $('dlgBackupPicker').close();
+};
+$('backupPickerCancel').onclick = () => $('dlgBackupPicker').close();
+
+async function saveSettings() {
+  const payload = {server:{},client:{}};
+  document.querySelectorAll('#settingsFields [data-env-key]').forEach(el => { payload[el.dataset.envSection][el.dataset.envKey] = el.value; });
+  $('saveSettings').disabled = true;
+  $('settingsStatus').textContent = 'Сохраняю настройки…';
+  const r = await api('/api/settings', payload);
+  $('saveSettings').disabled = false;
+  if (r.error) { $('settingsStatus').textContent = 'Ошибка: ' + r.error; return; }
+  $('settingsStatus').textContent = 'Сохранено параметров: ' + (r.saved || []).length + '.';
+  if (r.backup_dir_changed) {
+    if (confirm('Каталог резервных копий изменён на:\\n' + r.backup_dir +
+        '\\n\\nЧтобы Docker подключил новую папку, необходимо пересоздать контейнер onec-server. PostgreSQL перезапускаться не будет.\\n\\nОбновить контейнер сервера сейчас?')) {
+      $('settingsStatus').textContent = 'Пересоздаю контейнер onec-server…';
+      await runAction({action:'recreate_server'});
+    } else {
+      $('settingsStatus').textContent = 'Настройки сохранены. Новый каталог будет подключён после пересоздания контейнера onec-server.';
+    }
+  }
+}
+
 function loadTab(t) {
   if (t === 'containers') { loadContainers().then(loadLogs); loadMemory(); }
   else if (t === 'bases') loadBases();
   else if (t === 'pg') loadPg();
   else if (t === 'files' || t === 'client') loadFiles();
   else if (t === 'build') loadBuild();
+  else if (t === 'settings') loadSettings();
 }
 
 async function init() {
@@ -431,15 +778,19 @@ document.addEventListener('click', async e => {
   }
   if (t.dataset.pickdir) { $(t.dataset.pickdir).click(); return; }
   if (t.dataset.act === 'build-server') { $('dlgBuild').showModal(); loadBuild(); return; }
+  if (t.dataset.act === 'server-up') { dtLaunchMode = 'startup'; $('dtDbName').value = ''; $('dtDbUser').value = ''; $('dtDbPwd').value = ''; $('dtDialogHint').textContent = 'Сначала запустятся PostgreSQL и сервер 1С, затем будет создана отдельная новая база PostgreSQL и восстановлен выбранный .dt. Существующие базы не перезаписываются.'; $('dtOk').textContent = 'Запустить сервер и восстановить .dt'; $('dlgDt').showModal(); return; }
   if (t.dataset.op) {
     if (t.dataset.op === 'logs') { logsFor = t.dataset.c; loadLogs(); return; }
     return runAction({action: 'container_op', name: t.dataset.c, op: t.dataset.op});
   }
   if (t.dataset.dump) { $('dName').value = t.dataset.dump; $('dUser').value = $('dPwd').value = ''; $('dlgDump').showModal(); return; }
   if (t.dataset.drop) {
-    if (!confirm('Удалить базу «' + t.dataset.name + '» из кластера?')) return;
-    const withDb = confirm('Удалить также базу данных в PostgreSQL (все данные будут потеряны)?\n\nОК: удалить данные, Отмена: оставить базу данных');
-    return runAction({action: 'infobase_drop', id: t.dataset.drop, drop_db: withDb});
+    $('dropName').value = t.dataset.name;
+    $('dropUser').value = '';
+    $('dropPwd').value = '';
+    $('dlgDrop').dataset.id = t.dataset.drop;
+    $('dlgDrop').showModal();
+    return;
   }
   if (t.dataset.kill) { if (confirm('Завершить сеанс?')) runAction({action: 'session_kill', id: t.dataset.kill}); return; }
   if (t.dataset.pgdump) return runAction({action: 'backup_pg', db: t.dataset.pgdump});
@@ -454,36 +805,132 @@ document.addEventListener('click', async e => {
   }
 });
 
+$('openPgRestore').onclick = async () => {
+  $('pgRestoreStatus').textContent = ''; $('pgRestoreFile').value = ''; $('pgRestoreClean').checked = false;
+  await loadPg(); $('dlgPgRestore').showModal();
+};
+$('pgRestoreCancel').onclick = () => $('dlgPgRestore').close();
+$('pgRestoreOk').onclick = async () => {
+  const file = $('pgRestoreFile').files[0], db = $('pgRestoreDb').value;
+  if (!file) { $('pgRestoreStatus').textContent = 'Выберите файл .dump.'; return; }
+  if (!/\.dump$/i.test(file.name)) { $('pgRestoreStatus').textContent = 'Поддерживается только .dump.'; return; }
+  if (!db) { $('pgRestoreStatus').textContent = 'Выберите целевую базу PostgreSQL.'; return; }
+  if (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024) { $('pgRestoreStatus').textContent = 'Размер файла должен быть от 1 байта до 8 ГБ.'; return; }
+  const clean = $('pgRestoreClean').checked;
+  const warning = clean ? 'ВНИМАНИЕ: существующие объекты базы «' + db + '» будут удалены перед восстановлением. Продолжить?' : 'Восстановить дамп в базу «' + db + '» без очистки? Возможны конфликты с уже существующими объектами.';
+  if (!confirm(warning)) return;
+  $('pgRestoreOk').disabled = true;
+  $('pgRestoreStatus').textContent = 'Загружаю ' + file.name + ' (' + fmtSize(file.size) + ')…';
+  try {
+    const result = await uploadPgDump(file);
+    $('pgRestoreStatus').textContent = 'Дамп загружен. Запускаю восстановление в ' + db + '…';
+    await runAction({action:'restore_pg_dump', filename:result.filename, db, clean});
+    $('dlgPgRestore').close();
+  } catch (e) { $('pgRestoreStatus').textContent = 'Ошибка: ' + e.message; }
+  finally { $('pgRestoreOk').disabled = false; }
+};
+function uploadPgDump(file) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    $('pgRestoreProgress').style.display = 'block';
+    const update = (loaded, total) => { const pct = total ? loaded / total * 100 : 0; $('pgRestoreProgressFill').style.width = pct + '%'; $('pgRestoreProgressLabel').textContent = 'Загрузка: ' + Math.round(pct) + '%'; $('pgRestoreProgressSize').textContent = fmtSize(loaded) + ' / ' + fmtSize(total); };
+    update(0, file.size);
+    xhr.open('POST', '/api/upload_pg_dump?name=' + encodeURIComponent(file.name));
+    xhr.setRequestHeader('X-Token', TOKEN); xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+    xhr.upload.onprogress = e => { if (e.lengthComputable) update(e.loaded, e.total); };
+    xhr.onload = () => { let r = {}; try { r = JSON.parse(xhr.responseText || '{}'); } catch (_) {} if (xhr.status >= 200 && xhr.status < 300 && !r.error) { update(file.size, file.size); resolve(r); } else reject(new Error(r.error || ('Ошибка загрузки HTTP ' + xhr.status))); };
+    xhr.onerror = () => reject(new Error('Сетевая ошибка при загрузке дампа'));
+    xhr.send(file);
+  });
+};
 $('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
+$('openServerLicenseDialog').onclick = () => {
+  $('serverLicenseStatus').textContent = '';
+  $('serverLicenseFile').value = '';
+  $('dlgServerLicense').showModal();
+};
+$('cancelServerLicense').onclick = () => $('dlgServerLicense').close();
+$('activateServerLicense').onclick = async () => {
+  const file = $('serverLicenseFile').files[0];
+  if (!file) { $('serverLicenseStatus').textContent = 'Сначала выберите файл лицензии .lic.'; return; }
+  if (!/\.lic$/i.test(file.name) || file.size <= 0 || file.size > 50 * 1024 * 1024) { $('serverLicenseStatus').textContent = 'Выберите непустой файл .lic размером не более 50 МБ.'; return; }
+  const button = $('activateServerLicense'); button.disabled = true;
+  $('serverLicenseStatus').textContent = 'Загружаю файл лицензии ' + file.name + '…';
+  try {
+    const result = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest(); xhr.open('POST', '/api/upload_license?name=' + encodeURIComponent(file.name));
+      xhr.setRequestHeader('X-Token', TOKEN); xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+      xhr.upload.onprogress = e => { if (e.lengthComputable) $('serverLicenseStatus').textContent = 'Загрузка лицензии: ' + Math.round(e.loaded / e.total * 100) + '%'; };
+      xhr.onload = () => { let r = {}; try { r = JSON.parse(xhr.responseText || '{}'); } catch (_) {} if (xhr.status >= 200 && xhr.status < 300 && !r.error) resolve(r); else reject(new Error(r.error || ('HTTP ' + xhr.status))); };
+      xhr.onerror = () => reject(new Error('Сетевая ошибка при загрузке лицензии')); xhr.send(file);
+    });
+    $('serverLicenseStatus').textContent = 'Файл загружен. Перезапускаю сервер 1С для применения лицензии…';
+    await runAction({action:'license_server_activate', filename:result.filename});
+    $('dlgServerLicense').close();
+    $('serverLicenseFile').value = ''; await loadFiles();
+  } catch (e) { $('serverLicenseStatus').textContent = 'Ошибка: ' + e.message; }
+  finally { button.disabled = false; }
+};
 $('logsRefresh').onclick = loadLogs; $('logsTail').onchange = loadLogs;
-$('clearCon').onclick = () => { $('conOut').textContent = ''; };
-$('newBase').onclick = () => $('dlgCreate').showModal();
-$('cCancel').onclick = () => $('dlgCreate').close(); $('dCancel').onclick = () => $('dlgDump').close();
-$('cOk').onclick = () => { $('dlgCreate').close();
-  runAction({action: 'infobase_create', name: $('cName').value, db_name: $('cDb').value, db_user: $('cUser').value, db_pwd: $('cPwd').value}); };
+$('clearCon').onclick = () => {
+  // Во время выполнения очищаем только вывод: заголовок и статус текущей задачи оставляем.
+  const taskRunning = Boolean(polling);
+  consoleHeadersCleared = taskRunning;
+  $('conOut').textContent = '';
+  if (!taskRunning) {
+    $('jobTitle').textContent = 'нет задач';
+    $('jobState').textContent = '';
+    $('jobState').className = 'badge';
+    $('console').style.borderTopColor = 'var(--line)';
+  }
+};
+$('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
+document.addEventListener('click', e => {
+  if (e.target.closest('#chooseBackupDir')) openBackupPicker();
+});
+$('openImport').onclick = () => { $('dlgImport').showModal(); };
+$('importCancel').onclick = () => $('dlgImport').close();
+$('dtCancel').onclick = () => $('dlgDt').close(); $('dCancel').onclick = () => $('dlgDump').close();
 $('dOk').onclick = () => { $('dlgDump').close();
   runAction({action: 'backup_dt', ib: $('dName').value, user: $('dUser').value, pwd: $('dPwd').value}); };
+$('dropCancel').onclick = () => { $('dropPwd').value = ''; $('dlgDrop').close(); };
+$('dropOk').onclick = () => {
+  const ibUser = $('dropUser').value.trim(), ibPwd = $('dropPwd').value;
+  if (!ibUser || !ibPwd) { conLine('ОШИБКА: укажите пользователя 1С и пароль.'); return; }
+  const id = $('dlgDrop').dataset.id, name = $('dropName').value;
+  if (!confirm('Удалить базу «' + name + '» из кластера?')) return;
+  const withDb = confirm('Удалить также базу данных в PostgreSQL (все данные будут потеряны)?\n\nОК: удалить данные, Отмена: оставить базу данных');
+  $('dlgDrop').close();
+  $('dropPwd').value = '';
+  runAction({action:'infobase_drop', id, ib_user:ibUser, ib_pwd:ibPwd, drop_db:withDb});
+};
 
 $('srvDir').onchange = () => dirInfo('srvDir', 'srvDirInfo', /\.(run|deb)$/i);
 $('pgDir').onchange = () => dirInfo('pgDir', 'pgDirInfo', /\.deb$/i);
 $('buildCancel').onclick = () => $('dlgBuild').close();
 $('buildOk').onclick = async () => {
   const mem = $('buildMem').value.trim();
+  const pgMem = $('buildPgMem').value.trim();
+  const clientMem = $('buildClientMem').value.trim();
+  const validMem = /^(0|[0-9]{1,6}[bkmg]?)$/i;
+  for (const [label, value] of [['Сервер 1С',mem],['PostgreSQL',pgMem],['Клиентские пользователи',clientMem]]) {
+    if (!validMem.test(value)) { conLine('ОШИБКА: для «' + label + '» укажите 0 или число с единицей, например 8g или 512m.'); return; }
+  }
   $('dlgBuild').close();
   try { await uploadSelectedDist(); }
   catch (e) { conLine('ОШИБКА загрузки установщиков: ' + e.message); return; }
-  runAction({action: 'build', project: 'server', memory: mem});
+  runAction({action: 'build', project: 'server', memory: mem, postgres_memory: pgMem, client_memory: clientMem});
 };
-function uploadFileWithProgress(file) {
+function uploadFileWithProgress(file, prefix = 'upload') {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
-    const progress = $('uploadProgress'), fill = $('uploadProgressFill');
+    const progress = $(prefix + 'Progress'), fill = $(prefix + 'ProgressFill');
     progress.style.display = 'block';
     const update = (loaded, total, percent) => {
       const pct = Math.max(0, Math.min(100, percent || 0));
       fill.style.width = pct + '%';
-      $('uploadProgressLabel').textContent = 'Загрузка: ' + Math.round(pct) + '%';
-      $('uploadProgressSize').textContent = fmtSize(loaded) + ' / ' + fmtSize(total);
+      $(prefix + 'ProgressLabel').textContent = 'Загрузка: ' + Math.round(pct) + '%';
+      $(prefix + 'ProgressSize').textContent = fmtSize(loaded) + ' / ' + fmtSize(total);
     };
     update(0, file.size, 0);
     xhr.open('POST', '/api/upload?name=' + encodeURIComponent(file.name));
@@ -506,25 +953,73 @@ function uploadFileWithProgress(file) {
   });
 }
 
-$('uploadImport').onclick = async () => {
-  const file = $('importFile').files[0], ib = $('importBase').value;
-  if (!file) { $('uploadStatus').textContent = 'Выберите файл .dt или .cf.'; return; }
-  if (!ib) { $('uploadStatus').textContent = 'Выберите информационную базу.'; return; }
-  if (!/\.(dt|cf)$/i.test(file.name)) { $('uploadStatus').textContent = 'Поддерживаются только .dt и .cf.'; return; }
-  if (file.size > 8 * 1024 * 1024 * 1024) { $('uploadStatus').textContent = 'Файл больше 8 ГБ.'; return; }
-  $('uploadImport').disabled = true;
-  $('uploadStatus').textContent = 'Загружаю ' + file.name + ' (' + fmtSize(file.size) + ')…';
+$('dtOk').onclick = async () => {
+  const file = $('dtFile').files[0], ib = $('dtName').value.trim();
+  const dbName = $('dtDbName').value.trim() || ib, dbUser = $('dtDbUser').value.trim(), dbPwd = $('dtDbPwd').value;
+  if (!/^[A-Za-z0-9_.-]{1,64}$/.test(ib)) { $('uploadStatus').textContent = 'Имя базы 1С: латинские буквы, цифры, точка, дефис или подчёркивание (до 64 символов).'; return; }
+  if (!/^[A-Za-z0-9_.-]{1,63}$/.test(dbName)) { $('uploadStatus').textContent = 'Имя базы PostgreSQL должно содержать 1–63 допустимых символа.'; return; }
+  if (dbUser && !/^[A-Za-z0-9_.-]{1,64}$/.test(dbUser)) { $('uploadStatus').textContent = 'Недопустимое имя пользователя PostgreSQL.'; return; }
+  if ((dbUser && !dbPwd) || (!dbUser && dbPwd)) { $('uploadStatus').textContent = 'Для отдельного пользователя PostgreSQL укажите и логин, и пароль; если используете .env, оставьте оба поля пустыми.'; return; }
+  if (dbPwd.length > 200) { $('uploadStatus').textContent = 'Пароль PostgreSQL слишком длинный.'; return; }
+  if (!file) { $('uploadStatus').textContent = 'Выберите файл .dt.'; return; }
+  if (!/\.dt$/i.test(file.name)) { $('uploadStatus').textContent = 'Поддерживается только файл .dt.'; return; }
+  if (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024) { $('uploadStatus').textContent = 'Размер .dt должен быть от 1 байта до 8 ГБ.'; return; }
+  $('dtOk').disabled = true;
+  $('dlgDt').close();
+  $('uploadStatus').textContent = 'Загружаю архив ' + file.name + ' (' + fmtSize(file.size) + ')…';
   try {
     const result = await uploadFileWithProgress(file);
-    $('uploadStatus').textContent = 'Файл загружен на сервер (100%). Запускаю импорт в базу ' + ib + '…';
-    await runAction({action:'import_file', ib, filename:result.filename,
-                     user:$('importUser').value, pwd:$('importPwd').value,
-                     db_user:$('importDbUser').value, db_pwd:$('importDbPwd').value});
-    $('importFile').value = '';
+    $('uploadStatus').textContent = 'Архив загружен. ' + (dtLaunchMode === 'startup' ? 'Запускаю сервер и восстанавливаю базу ' : 'Создаю базу ') + ib + '…';
+    if (dtLaunchMode === 'startup') {
+      await runAction({action:'start_server_with_dt', ib, filename:result.filename,
+                       db_name:dbName, db_user:dbUser, db_pwd:dbPwd});
+    } else {
+      await runAction({action:'import_file', ib, filename:result.filename, new_base:true,
+                       user:$('importUser').value, pwd:$('importPwd').value,
+                       db_name:dbName, db_user:dbUser, db_pwd:dbPwd});
+    }
+    $('dtFile').value = '';
   } catch (e) { $('uploadStatus').textContent = 'Ошибка: ' + e.message; }
+  finally { $('dtOk').disabled = false; }
+};
+
+$('importNewBase').onchange = () => {
+  const creating = $('importNewBase').checked;
+  $('importNewBaseFields').hidden = !creating;
+  $('importExistingBaseFields').hidden = creating;
+  $('importFile').setAttribute('accept', creating ? '.dt,application/octet-stream' : '.dt,.cf,application/octet-stream');
+};
+
+$('uploadImport').onclick = async () => {
+  const file = $('importFile').files[0];
+  const newBase = $('importNewBase').checked;
+  const ib = newBase ? $('importNewIb').value.trim() : $('importBase').value;
+  const dbName = $('importNewDbName').value.trim();
+  if (!file) { $('importStatus').textContent = 'Выберите файл .dt или .cf.'; return; }
+  if (!ib) { $('importStatus').textContent = newBase ? 'Укажите имя новой информационной базы.' : 'Выберите существующую информационную базу.'; return; }
+  if (!/^[A-Za-z0-9_.-]{1,64}$/.test(ib)) { $('importStatus').textContent = 'Имя ИБ: 1–64 символа, латиница, цифры, точка, дефис или подчёркивание.'; return; }
+  if (newBase && !/\.dt$/i.test(file.name)) { $('importStatus').textContent = 'Создать новую базу можно только из файла .dt.'; return; }
+  if (!/\.(dt|cf)$/i.test(file.name)) { $('importStatus').textContent = 'Поддерживаются только .dt или .cf.'; return; }
+  if (newBase && dbName && !/^[A-Za-z0-9_.-]{1,63}$/.test(dbName)) { $('importStatus').textContent = 'Имя PostgreSQL: 1–63 допустимых символа.'; return; }
+  const dbUser = $('importDbUser').value.trim(), dbPwd = $('importDbPwd').value;
+  if (newBase && (!!dbUser !== !!dbPwd)) { $('importStatus').textContent = 'Для отдельного пользователя PostgreSQL укажите и логин, и пароль; иначе оставьте оба поля пустыми для использования .env.'; return; }
+  if (file.size <= 0) { $('importStatus').textContent = 'Выбранный файл пуст.'; return; }
+  $('uploadImport').disabled = true;
+  $('importStatus').textContent = 'Загружаю ' + file.name + ' (' + fmtSize(file.size) + ')…';
+  try {
+    const result = await uploadFileWithProgress(file, 'import');
+    $('importStatus').textContent = 'Файл загружен (100%): ' + (result.path || result.filename) + '. Запускаю импорт в базу ' + ib + '…';
+    await runAction({action:'import_file', ib, filename:result.filename, new_base:newBase,
+                     db_name:newBase ? dbName : '',
+                     user:$('importUser').value, pwd:$('importPwd').value,
+                     db_user:dbUser, db_pwd:dbPwd});
+    $('importFile').value = '';
+    $('dlgImport').close();
+  } catch (e) { $('importStatus').textContent = 'Ошибка: ' + e.message; }
   finally { $('uploadImport').disabled = false; }
 };
 
+setupConsoleResize();
 init();
 </script>
 </body>

@@ -21,7 +21,7 @@ RAC = {
     "sessions": RAC_PRE + '$R session list --cluster=$C',
     "create": RAC_PRE + ('$R infobase create --cluster=$C --name="$1" --dbms=PostgreSQL --db-server=postgres '
                          '--db-name="$2" --db-user="$3" --db-pwd="$4" --locale=ru --create-database'),
-    "drop": RAC_PRE + '$R infobase drop --cluster=$C --infobase="$1" ${2:+"$2"}',
+    "drop": RAC_PRE + '$R infobase drop --cluster=$C --infobase="$1" --infobase-user="$2" --infobase-pwd="$3" ${4:+"$4"}',
     "kill": RAC_PRE + '$R session terminate --cluster=$C --session="$1"',
 }
 
@@ -94,8 +94,85 @@ def write_env_value(path, key, value):
         f.write("\n".join(lines) + "\n")
 
 
+
+# Настройки .env, доступные из веб-панели. Неизвестные ключи не принимаются.
+ENV_SETTINGS = {
+    "server": {
+        "ONEC_VERSION": "Версия платформы 1С", "POSTGRES_USER": "Пользователь PostgreSQL",
+        "POSTGRES_PASSWORD": "Пароль PostgreSQL", "IB_NAME": "Имя информационной базы по умолчанию",
+        "DB_NAME": "Имя базы PostgreSQL по умолчанию", "DB_USER": "Пользователь БД по умолчанию",
+        "SERVER_BASE_IMAGE": "Базовый образ сервера", "POSTGRES_BASE_IMAGE": "Базовый образ PostgreSQL",
+        "BACKUP_DIR": "Каталог резервных копий", "SERVER_MEMORY_LIMIT": "Лимит памяти сервера",
+        "POSTGRES_MEMORY_LIMIT": "Лимит памяти PostgreSQL"
+    },
+    "client": {
+        "ONEC_VERSION": "Версия платформы 1С", "ONEC_RUN_COMPONENTS": "Компоненты установщика",
+        "CLIENT_UID": "UID пользователя клиента", "SERVER_IP": "IP-адрес сервера 1С",
+        "NETHASP_ADDRS": "Адреса NetHASP", "EXPORT_DIR": "Каталог выгрузок",
+        "CLIENT_MEMORY_LIMIT": "Лимит памяти клиентского контейнера"
+    }
+}
+ENV_SECRET_KEYS = {"POSTGRES_PASSWORD"}
+
+
+def settings_snapshot():
+    result = {}
+    for section, keys in ENV_SETTINGS.items():
+        directory = cfg["server_dir"] if section == "server" else cfg["client_dir"]
+        values = read_env(directory)
+        result[section] = {key: {"label": label, "value": "" if key in ENV_SECRET_KEYS else values.get(key, ""),
+                                "configured": bool(values.get(key, "")) if key in ENV_SECRET_KEYS else None,
+                                "secret": key in ENV_SECRET_KEYS}
+                           for key, label in keys.items()}
+    return result
+
+
+def save_settings(body):
+    changed = []
+    old_backup_dir = os.path.realpath(data_dir("backups"))
+    for section, keys in ENV_SETTINGS.items():
+        values = body.get(section, {})
+        if not isinstance(values, dict):
+            raise ValueError("неверный формат настроек: " + section)
+        directory = cfg["server_dir"] if section == "server" else cfg["client_dir"]
+        if not os.path.isdir(directory):
+            raise ValueError("каталог проекта не найден: " + directory)
+        path = os.path.join(directory, ".env")
+        for key, raw in values.items():
+            if key not in keys:
+                raise ValueError("недопустимый параметр .env: " + str(key))
+            value = str(raw)
+            if key in ENV_SECRET_KEYS and value == "":
+                continue
+            if key == "BACKUP_DIR":
+                value = os.path.expanduser(value.strip())
+                if not value:
+                    raise ValueError("укажите каталог резервных копий")
+                if not os.path.isabs(value):
+                    value = os.path.abspath(os.path.join(directory, value))
+                if not os.path.isdir(value):
+                    raise ValueError("каталог резервных копий не существует или недоступен: " + value)
+            if len(value) > 500 or any(ord(ch) < 32 for ch in value):
+                raise ValueError("недопустимое значение параметра " + key)
+            if any(ch in value for ch in ('"', "'", "\\", "#", "$")):
+                raise ValueError("параметр %s содержит символы, несовместимые с форматом .env: кавычки, #, $ и обратная косая черта не поддерживаются" % key)
+            if key in ("SERVER_MEMORY_LIMIT", "POSTGRES_MEMORY_LIMIT", "CLIENT_MEMORY_LIMIT") and not MEM_RE.match(value.lower()):
+                raise ValueError("%s: укажите 0 или значение, например 8g или 512m" % key)
+            if key == "CLIENT_UID" and value and not value.isdigit():
+                raise ValueError("CLIENT_UID должен быть числом")
+            if key == "ONEC_VERSION" and value and not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+", value):
+                raise ValueError("ONEC_VERSION должен иметь формат 8.5.1.1522")
+            write_env_value(path, key, value)
+            changed.append(section + ":" + key)
+    new_backup_dir = os.path.realpath(data_dir("backups"))
+    return {"saved": changed, "backup_dir": new_backup_dir,
+            "backup_dir_changed": old_backup_dir != new_backup_dir}
+
+
 def data_dir(kind):
     if kind == "backups":
+        # Должен совпадать с BACKUP_DIR в docker-compose.yml и common.sh:
+        # этот каталог используется и веб-загрузкой, и контейнером onec-server.
         base, key, default = cfg["server_dir"], "BACKUP_DIR", "./backups"
     elif kind == "export":
         base, key, default = cfg["client_dir"], "EXPORT_DIR", "./export"
@@ -236,18 +313,28 @@ def do_action(body):
                     if len(v) > 400 or not os.path.isabs(v) or not os.path.isdir(v):
                         raise ValueError("папка для %s не найдена: %s" % (label, v))
                 args.append(v)
-            # память сервера задаётся сразу при создании образов: пишем в .env, применится при запуске
-            mem = str(body.get("memory", "")).strip().lower()
-            if mem:
-                if not MEM_RE.match(mem):
-                    raise ValueError("лимит памяти: 0 или число с суффиксом, например 8g, 512m")
-                write_env_value(os.path.join(project("server"), ".env"), "SERVER_MEMORY_LIMIT", mem)
+            # Лимиты контейнеров сохраняются в .env и применяются при запуске/пересоздании.
+            limits = (
+                ("memory", "SERVER_MEMORY_LIMIT", project("server")),
+                ("postgres_memory", "POSTGRES_MEMORY_LIMIT", project("server")),
+                ("client_memory", "CLIENT_MEMORY_LIMIT", project("client")),
+            )
+            for field, env_key, directory in limits:
+                value = str(body.get(field, "")).strip().lower()
+                if value:
+                    if not MEM_RE.match(value):
+                        raise ValueError("%s: укажите 0 или значение, например 8g, 512m" % env_key)
+                    write_env_value(os.path.join(directory, ".env"), env_key, value)
         return script_job("Сборка образов (%s)" % proj, proj, "build.sh", *args)
     if a == "update_image":
         proj = need(body, "project")
         if proj not in ("server", "client"):
             raise ValueError("недопустимый проект")
         return script_job("Обновление Docker-образа (%s)" % proj, proj, "update-image.sh")
+    if a == "recreate_server":
+        d = project("server")
+        return run_job("Пересоздание контейнера onec-server с новыми настройками",
+                       cfg["docker"] + ["compose", "up", "-d", "--force-recreate", "onec-server"], cwd=d)
     if a == "set_memory":
         val = need(body, "limit").lower()
         if not MEM_RE.match(val):
@@ -258,6 +345,25 @@ def do_action(body):
         return run_job(title, cfg["docker"] + ["compose", "up", "-d", "onec-server"], cwd=d)
     if a == "start_server":
         return script_job("Запуск сервера и создание базы", "server", "start.sh")
+    if a == "start_server_with_dt":
+        ib = need(body, "ib", NAME_RE)
+        filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.dt$", re.I), 190)
+        db_name = str(body.get("db_name") or ib).strip()
+        db_user = str(body.get("db_user") or "").strip()
+        db_pwd = str(body.get("db_pwd") or "")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]{1,63}", db_name):
+            raise ValueError("имя базы PostgreSQL должно содержать 1–63 допустимых символа")
+        if db_user and not NAME_RE.match(db_user):
+            raise ValueError("недопустимое имя пользователя PostgreSQL")
+        if bool(db_user) != bool(db_pwd):
+            raise ValueError("для отдельного пользователя PostgreSQL укажите и логин, и пароль; иначе оставьте оба поля пустыми для использования .env")
+        if len(db_pwd) > 200:
+            raise ValueError("слишком длинный пароль PostgreSQL")
+        uploaded_file = os.path.join(data_dir("backups"), "dt", filename)
+        if not os.path.isfile(uploaded_file) or os.path.getsize(uploaded_file) <= 0:
+            raise ValueError("Загруженный .dt не найден или пуст: %s" % uploaded_file)
+        return script_job("Запуск сервера и создание базы %s из .dt" % ib, "server",
+                          "start-with-dt.sh", ib, filename, uploaded_file, db_name, db_user, db_pwd)
     if a == "backup_dt":
         ib = need(body, "ib", NAME_RE)
         user, pwd = str(body.get("user", "")).strip(), str(body.get("pwd", ""))
@@ -272,22 +378,54 @@ def do_action(body):
         ib = need(body, "ib", NAME_RE)
         filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$", re.I), 190)
         kind = filename.rsplit(".", 1)[1].lower()
+        new_base = bool(body.get("new_base"))
         user, pwd = str(body.get("user", "")).strip(), str(body.get("pwd", ""))
         # реквизиты PostgreSQL можно задать в панели; пустые — берутся из .env
+        db_name = str(body.get("db_name") or ib).strip()
+        if new_base and not re.fullmatch(r"[A-Za-z0-9_.-]{1,63}", db_name):
+            raise ValueError("имя базы PostgreSQL должно содержать 1–63 допустимых символа")
         db_user = str(body.get("db_user", "")).strip()
         db_pwd = str(body.get("db_pwd", ""))
         if db_user and not NAME_RE.match(db_user):
             raise ValueError("недопустимое имя пользователя PostgreSQL")
+        if new_base and bool(db_user) != bool(db_pwd):
+            raise ValueError("для отдельного пользователя PostgreSQL укажите и логин, и пароль; иначе оставьте оба поля пустыми для использования .env")
         if len(db_pwd) > 200:
             raise ValueError("слишком длинный пароль PostgreSQL")
-        args = [ib, filename, kind, user, pwd, db_user, db_pwd]
-        return script_job("Импорт .%s в базу %s" % (kind, ib), "server", "import.sh", *args)
+        # Передаём import.sh тот же абсолютный путь, куда API загрузки реально сохранил файл.
+        # Это исключает расхождение BACKUP_DIR/cwd между веб-панелью и shell-скриптом.
+        uploaded_file = os.path.join(data_dir("backups"), kind, filename)
+        if not os.path.isfile(uploaded_file):
+            raise ValueError("Загрузка не найдена на диске: %s. Проверьте ответ загрузки и каталог BACKUP_DIR." % uploaded_file)
+        if os.path.getsize(uploaded_file) <= 0:
+            raise ValueError("Загруженный файл пустой: %s" % uploaded_file)
+        if new_base and kind != "dt":
+            raise ValueError("создание новой базы поддерживается только из файла .dt")
+        # Девятый аргумент включает строгий режим: только новая ИБ и новая БД PostgreSQL.
+        args = [ib, filename, kind, user, pwd, db_user, db_pwd, uploaded_file, "new" if new_base else "", db_name if new_base else ""]
+        title = "Создание базы %s из .dt" % ib if new_base else "Импорт .%s в базу %s" % (kind, ib)
+        return script_job(title, "server", "import.sh", *args)
     if a == "backup_pg":
         return script_job("Дамп PostgreSQL %s" % need(body, "db", NAME_RE), "server", "backup.sh", "--pg", need(body, "db", NAME_RE))
+    if a == "restore_pg_dump":
+        db = need(body, "db", NAME_RE)
+        filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.dump$", re.I), 190)
+        uploaded_file = os.path.join(data_dir("backups"), "pg", filename)
+        if not os.path.isfile(uploaded_file) or os.path.getsize(uploaded_file) <= 0:
+            raise ValueError("Загруженный .dump не найден или пуст")
+        clean = "yes" if body.get("clean") else "no"
+        title = "Восстановление PostgreSQL dump в %s%s" % (db, " с очисткой объектов" if clean == "yes" else "")
+        return script_job(title, "server", "restore-pg.sh", db, uploaded_file, clean)
     if a == "client_start":
         return script_job("Запуск клиента 1С", "client", "client.sh")
     if a == "license_install":
         return script_job("Перенос лицензий", "client", "license.sh", "install")
+    if a == "license_server_activate":
+        filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,176}\.lic$", re.I), 180)
+        license_file = os.path.join(data_dir("licenses"), filename)
+        if not os.path.isfile(license_file) or os.path.getsize(license_file) <= 0:
+            raise ValueError("Файл лицензии не найден или пуст: %s" % license_file)
+        return script_job("Активация лицензии на сервере: %s" % filename, "server", "license.sh", "activate", filename)
     if a == "infobase_create":
         n = need(body, "name", NAME_RE)
         db = str(body.get("db_name") or n).strip()
@@ -296,13 +434,40 @@ def do_action(body):
         return rac_job("Создание базы %s" % n, "create", n, db, need(body, "db_user", NAME_RE), need(body, "db_pwd"))
     if a == "infobase_drop":
         i = need(body, "id", UUID_RE)
-        return rac_job("Удаление базы %s" % i, "drop", i, "--drop-database" if body.get("drop_db") else "")
+        ib_user = need(body, "ib_user", maxlen=128)
+        ib_pwd = need(body, "ib_pwd", maxlen=256)
+        return rac_job("Удаление базы %s" % i, "drop", i, ib_user, ib_pwd,
+                       "--drop-database" if body.get("drop_db") else "")
     if a == "session_kill":
         return rac_job("Завершение сеанса", "kill", need(body, "id", UUID_RE))
     raise ValueError("неизвестное действие")
 
 
 def api_get(path, q):
+    if path == "/api/settings":
+        return settings_snapshot()
+    if path == "/api/browse_dirs":
+        requested = q.get("path", [os.path.expanduser("~")])[0]
+        if len(requested) > 1000 or any(ord(ch) < 32 for ch in requested):
+            raise ValueError("недопустимый путь к каталогу")
+        current = os.path.abspath(os.path.expanduser(requested or "~"))
+        if not os.path.isdir(current):
+            raise ValueError("каталог не найден или недоступен: " + current)
+        dirs = []
+        try:
+            entries = sorted(os.scandir(current), key=lambda e: e.name.lower())
+            for entry in entries:
+                if entry.name.startswith(".") or entry.is_symlink():
+                    continue
+                try:
+                    if entry.is_dir(follow_symlinks=False):
+                        dirs.append({"name": entry.name, "path": entry.path})
+                except OSError:
+                    continue
+        except OSError as e:
+            raise ValueError("не удалось прочитать каталог: " + str(e))
+        parent = os.path.dirname(current) if current != os.path.dirname(current) else None
+        return {"path": current, "parent": parent, "dirs": dirs}
     if path == "/api/status":
         return {"docker": bool(cfg["docker"]), "docker_cmd": " ".join(cfg["docker"] or []),
                 "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"]),
@@ -322,6 +487,9 @@ def api_get(path, q):
     if path == "/api/memory":
         env = read_env(cfg["server_dir"])
         limit = (env.get("SERVER_MEMORY_LIMIT") or "0").strip()
+        postgres_limit = (env.get("POSTGRES_MEMORY_LIMIT") or "0").strip()
+        client_env = read_env(cfg["client_dir"])
+        client_limit = (client_env.get("CLIENT_MEMORY_LIMIT") or "0").strip()
         usage, percent = "", ""
         try:
             r = dk("stats", "--no-stream", "--format", "{{.MemUsage}}|{{.MemPerc}}", "onec-server")
@@ -329,7 +497,8 @@ def api_get(path, q):
                 usage, percent = r.stdout.strip().split("|", 1)
         except Exception:
             pass
-        return {"limit": limit, "usage": usage, "percent": percent}
+        return {"limit": limit, "postgres_limit": postgres_limit, "client_limit": client_limit,
+                "usage": usage, "percent": percent}
     if path == "/api/dist":
         target = q.get("target", [""])[0]
         if target not in ("server", "postgres"):
@@ -412,8 +581,12 @@ class H(BaseHTTPRequestHandler):
                 # защита от выхода за пределы каталога — normpath + проверка префикса
                 if kind not in ("backups", "export") or not name or name.startswith(".") or "\x00" in name:
                     return self._send(400, {"error": "недопустимый запрос"})
-                base = os.path.abspath(data_dir(kind))
+                base = os.path.realpath(data_dir(kind))
                 p = os.path.normpath(os.path.join(base, name))
+                if not (p == base or p.startswith(base + os.sep)):
+                    return self._send(400, {"error": "недопустимый путь"})
+                # Не разрешаем обход каталога через символьные ссылки внутри backup/export.
+                p = os.path.realpath(p)
                 if not (p == base or p.startswith(base + os.sep)):
                     return self._send(400, {"error": "недопустимый путь"})
                 if not os.path.isfile(p):
@@ -445,33 +618,92 @@ class H(BaseHTTPRequestHandler):
         try:
             n = int(self.headers.get("Content-Length") or 0)
             if u.path == "/api/upload":
-                if n <= 0 or n > 8 * 1024 * 1024 * 1024:
-                    return self._send(413, {"error": "размер файла должен быть от 1 байта до 8 ГБ"})
+                if n <= 0:
+                    return self._send(400, {"error": "загружаемый файл пуст"})
                 filename = parse_qs(u.query).get("name", [""])[0]
                 filename = os.path.basename(filename).strip()
-                if (not filename or filename.startswith(".") or len(filename) > 180 or
-                        any(ord(c) < 32 for c in filename) or os.path.splitext(filename)[1].lower() not in (".dt", ".cf")):
+                if (not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.(dt|cf)", filename, re.I)
+                        or filename.startswith(".")):
                     return self._send(400, {"error": "разрешены только файлы .dt и .cf (имя до 180 символов)"})
                 ext = filename.rsplit(".", 1)[1].lower()
-                # файл сохраняем в backup с исходным именем без изменений (перезаписывает одноимённый)
+                # .dt и .cf хранятся раздельно. Сначала пишем во временный файл,
+                # затем атомарно заменяем целевой: оборванная загрузка не уничтожит старую копию.
                 safe_name = filename
-                dest_dir = data_dir("backups")
+                dest_dir = os.path.join(data_dir("backups"), ext)
                 os.makedirs(dest_dir, exist_ok=True)
                 dest = os.path.join(dest_dir, safe_name)
+                part = os.path.join(dest_dir, ".upload-" + secrets.token_hex(8) + ".part")
                 remaining = n
                 try:
-                    with open(dest, "wb") as f:
+                    with open(part, "xb") as f:
                         while remaining:
                             chunk = self.rfile.read(min(1024 * 1024, remaining))
                             if not chunk:
                                 raise ValueError("соединение прервано во время загрузки")
                             f.write(chunk); remaining -= len(chunk)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(part, dest)
                     os.chmod(dest, 0o666)
                 except Exception:
-                    try: os.unlink(dest)
+                    try: os.unlink(part)
                     except OSError: pass
                     raise
-                return self._send(200, {"filename": safe_name, "size": n})
+                return self._send(200, {"filename": safe_name, "size": n, "kind": ext, "path": dest, "backup_dir": data_dir("backups")})
+            if u.path == "/api/upload_license":
+                if n <= 0 or n > 50 * 1024 * 1024:
+                    return self._send(413, {"error": "размер файла лицензии должен быть от 1 байта до 50 МБ"})
+                filename = os.path.basename(parse_qs(u.query).get("name", [""])[0]).strip()
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.lic", filename, re.I) or filename.startswith("."):
+                    return self._send(400, {"error": "выберите файл лицензии с расширением .lic"})
+                dest_dir = data_dir("licenses")
+                os.makedirs(dest_dir, exist_ok=True)
+                dest = os.path.join(dest_dir, filename)
+                part = os.path.join(dest_dir, ".license-upload-" + secrets.token_hex(8) + ".part")
+                remaining = n
+                try:
+                    with open(part, "xb") as f:
+                        while remaining:
+                            chunk = self.rfile.read(min(1024 * 1024, remaining))
+                            if not chunk:
+                                raise ValueError("соединение прервано во время загрузки лицензии")
+                            f.write(chunk); remaining -= len(chunk)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(part, dest)
+                    os.chmod(dest, 0o666)
+                except Exception:
+                    try: os.unlink(part)
+                    except OSError: pass
+                    raise
+                return self._send(200, {"filename": filename, "size": n, "path": dest})
+            if u.path == "/api/upload_pg_dump":
+                if n <= 0 or n > 8 * 1024 * 1024 * 1024:
+                    return self._send(413, {"error": "размер файла должен быть от 1 байта до 8 ГБ"})
+                filename = os.path.basename(parse_qs(u.query).get("name", [""])[0]).strip()
+                if not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.dump", filename, re.I) or filename.startswith("."):
+                    return self._send(400, {"error": "разрешены только файлы .dump"})
+                dest_dir = os.path.join(data_dir("backups"), "pg")
+                os.makedirs(dest_dir, exist_ok=True)
+                dest = os.path.join(dest_dir, filename)
+                part = os.path.join(dest_dir, ".upload-" + secrets.token_hex(8) + ".part")
+                remaining = n
+                try:
+                    with open(part, "xb") as f:
+                        while remaining:
+                            chunk = self.rfile.read(min(1024 * 1024, remaining))
+                            if not chunk:
+                                raise ValueError("соединение прервано во время загрузки")
+                            f.write(chunk); remaining -= len(chunk)
+                        f.flush()
+                        os.fsync(f.fileno())
+                    os.replace(part, dest)
+                    os.chmod(dest, 0o666)
+                except Exception:
+                    try: os.unlink(part)
+                    except OSError: pass
+                    raise
+                return self._send(200, {"filename": filename, "size": n, "path": dest})
             if u.path == "/api/upload_dist":
                 target = parse_qs(u.query).get("target", [""])[0]
                 if target not in ("server", "postgres"):
@@ -486,7 +718,7 @@ class H(BaseHTTPRequestHandler):
                 d = os.path.join(project("server"), "server" if target == "server" else "postgres", "dist")
                 os.makedirs(d, exist_ok=True)
                 dest = os.path.join(d, filename)
-                part = dest + ".part"
+                part = os.path.join(d, ".dist-upload-" + secrets.token_hex(8) + ".part")
                 remaining = n
                 try:
                     with open(part, "wb") as f:
@@ -505,9 +737,11 @@ class H(BaseHTTPRequestHandler):
             if n > 100000:
                 return self._send(413, {"error": "слишком большой запрос"})
             body = json.loads(self.rfile.read(n) or b"{}")
+            if u.path == "/api/settings":
+                return self._send(200, save_settings(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
-            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "set_memory"):
+            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory", "recreate_server", "license_server_activate"):
                 return self._send(400, {"error": "Docker недоступен для этого пользователя"})
             return self._send(200, {"job": do_action(body)})
         except ValueError as e:
@@ -526,7 +760,12 @@ def main():
     a = ap.parse_args()
     cfg.update(server_dir=os.path.abspath(a.server_dir), client_dir=os.path.abspath(a.client_dir),
                token=a.token or secrets.token_urlsafe(16), docker=detect_docker())
-    srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
+    try:
+        srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
+    except OSError as e:
+        print("Не удалось запустить веб-панель на порту %d: %s" % (a.port, e), file=sys.stderr)
+        print("Возможно, другая копия панели уже работает. Остановите её или выберите другой порт через --port.", file=sys.stderr)
+        return 2
     url = "http://127.0.0.1:%d/?token=%s" % (a.port, cfg["token"])
     print("Менеджер 1С запущен. Откройте в браузере:\n  %s" % url)
     print("Docker: %s" % (" ".join(cfg["docker"]) if cfg["docker"] else "НЕДОСТУПЕН (см. подсказку в панели)"))
@@ -540,4 +779,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

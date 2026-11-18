@@ -3,6 +3,8 @@
 
 mkdir -p licenses && chmod 1777 licenses
 
+[ -n "${POSTGRES_PASSWORD:-}" ] || die "задайте уникальный POSTGRES_PASSWORD в .env до запуска PostgreSQL"
+
 echo "== Запуск postgres и сервера 1С"
 $DOCKER compose up -d || die "не удалось запустить контейнеры"
 
@@ -24,6 +26,9 @@ if [ -z "$CLUSTER_ID" ]; then
 fi
 echo "Кластер: $CLUSTER_ID"
 
+if [[ "${START_WITHOUT_BASE:-0}" == "1" ]]; then
+    echo "== Пропускаю создание пустой базы: будет восстановлен выбранный .dt"
+else
 echo "== Проверка информационной базы '$IB_NAME'"
 if RAC infobase summary list --cluster="$CLUSTER_ID" | grep -qE "^name +: +${IB_NAME}$"; then
     echo "База '$IB_NAME' уже есть, пропускаю создание"
@@ -33,13 +38,14 @@ else
         --cluster="$CLUSTER_ID" \
         --name="$IB_NAME" \
         --dbms=PostgreSQL \
-        --db-server=postgres \
+        --db-server="postgres port=5432" \
         --db-name="$DB_NAME" \
         --db-user="$DB_USER" \
         --db-pwd="$DB_PASS" \
         --locale=ru \
         --create-database \
         || die "не удалось создать базу (смотрите ошибку СУБД выше)"
+fi
 fi
 
 echo

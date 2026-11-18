@@ -1,222 +1,101 @@
-#!/bin/bash
-# Импорт .dt/.cf в информационную базу кластера 1С.
-#
-# Признак «база пустая» — отсутствие пользователей 1С (представление v8users), а не отсутствие
-# таблиц: при создании базы 1С сразу создаёт служебные таблицы. В пустой базе пользователей нет,
-# поэтому ibcmd аутентифицироваться не может («Идентификация пользователя не выполнена»),
-# и восстановление делает конфигуратор — он входит без логина.
-# Если пользователи есть: сначала ibcmd (быстро, без графики), при отказе — конфигуратор с логином.
-#
-# Использование: ./import.sh <база> <файл> [dt|cf] [пользователь 1С] [пароль 1С] [пользователь PostgreSQL] [пароль PostgreSQL]
-. "$(dirname "$0")/common.sh"
-set -u
-set -o pipefail
-
-die() { echo "ОШИБКА: $*" >&2; exit 1; }
-[ $# -ge 2 ] || die "использование: ./import.sh <база> <файл.dt|файл.cf> [dt|cf] [пользователь 1С] [пароль 1С] [пользователь PostgreSQL] [пароль PostgreSQL]"
-IB="$1"
-FILE="$2"
-KIND="${3:-}"
-USER_1C="${4:-}"
-PASS_1C="${5:-}"
-DB_USER_ARG="${6:-}"
-DB_PASS_ARG="${7:-}"
-[[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя базы"
-[[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$ ]] || die "недопустимое имя файла"
-[[ "$KIND" == "dt" || "$KIND" == "cf" ]] || die "тип файла должен быть dt или cf"
-
-# .env читается из каталога проекта (cwd задаётся менеджером).
-if [[ -f ./.env ]]; then
-    set -a
-    . ./.env
-    set +a
-fi
-BACKUP_DIR="${BACKUP_DIR:-./backups}"
-if [[ "$BACKUP_DIR" = /* ]]; then
-    HOST_FILE="$BACKUP_DIR/$FILE"
+#!/usr/bin/env bash
+# Import .dt/.cf directly into PostgreSQL using ibcmd; register/update the IB with RAC.
+set -Eeuo pipefail
+umask 0027
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+cd "$SCRIPT_DIR"
+. "$SCRIPT_DIR/common.sh"
+die(){ echo "ОШИБКА: $*" >&2; exit 1; }
+[[ $# -ge 3 ]] || die "использование: import.sh <ИБ> <файл> <dt|cf> [пользователь1С] [пароль1С] [пользовательБД] [парольБД] [абсолютный путь]"
+IB="$1"; FILE="$2"; KIND="${3,,}"; USER_1C="${4:-}"; PASS_1C="${5:-}"
+DB_USER_ARG="${6:-}"; DB_PASS_ARG="${7:-}"; UPLOAD_PATH="${8:-}"; NEW_BASE_ONLY="${9:-}"; DB_NAME_ARG="${10:-}"
+[[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя ИБ"
+[[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.(dt|cf)$ && "${FILE##*.}" == "$KIND" ]] || die "недопустимое имя/расширение файла"
+[[ "$KIND" == dt || "$KIND" == cf ]] || die "тип должен быть dt или cf"
+# Для новой ИБ нельзя подхватывать DB_NAME из .env: там может оставаться имя
+# старой базы (например mybase), из-за чего новая ИБ mybase2 подключится к ней.
+if [[ "$NEW_BASE_ONLY" == "new" ]]; then
+  DB="${DB_NAME_ARG:-$IB}"
 else
-    HOST_FILE="$(pwd)/$BACKUP_DIR/$FILE"
+  DB="${DB_NAME_ARG:-${DB_NAME:-$IB}}"
 fi
-[[ -s "$HOST_FILE" ]] || die "файл не найден на сервере: $HOST_FILE (проверьте BACKUP_DIR в .env)"
-
-# Имя базы PostgreSQL: у базы по умолчанию это DB_NAME из .env (её создаёт start.sh),
-# у остальных баз (созданы панелью) — совпадает с именем информационной базы.
-DB="$IB"
-if [ -n "${DB_NAME:-}" ] && [ "$IB" = "${IB_NAME:-$IB}" ]; then DB="$DB_NAME"; fi
-[[ "$DB" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя базы PostgreSQL: $DB"
-
-# Пользователь/пароль PostgreSQL можно передать из веб-панели (поля «Пользователь PostgreSQL»).
-# Если пользователь не задан — берутся DB_USER/DB_PASS из .env (common.sh).
-if [ -n "$DB_USER_ARG" ]; then
-    [[ "$DB_USER_ARG" =~ ^[A-Za-z0-9_.-]{1,64}$ ]] || die "недопустимое имя пользователя PostgreSQL"
-    DB_USER="$DB_USER_ARG"
-    DB_PASS="$DB_PASS_ARG"
+DB_USER="${DB_USER_ARG:-${DB_USER:-${POSTGRES_USER:-postgres}}}"
+DB_PASS="${DB_PASS_ARG:-${DB_PASS:-${POSTGRES_PASSWORD:-}}}"
+[[ "$DB" =~ ^[A-Za-z0-9_.-]{1,63}$ ]] || die "недопустимое имя БД PostgreSQL"
+[[ "$DB_USER" =~ ^[A-Za-z0-9_.-]{1,64}$ && -n "$DB_PASS" ]] || die "не заданы корректные реквизиты PostgreSQL в .env"
+BACKUP_ROOT="$(realpath -m -- "$BACKUP_DIR")"
+if [[ -n "$UPLOAD_PATH" ]]; then HOST_FILE="$UPLOAD_PATH"; else HOST_FILE="$BACKUP_ROOT/$KIND/$FILE"; [[ -s "$HOST_FILE" ]] || HOST_FILE="$BACKUP_ROOT/$FILE"; fi
+[[ -s "$HOST_FILE" ]] || die "файл не найден или пуст: $HOST_FILE"
+HOST_FILE="$(realpath -- "$HOST_FILE")"
+case "$HOST_FILE" in "$BACKUP_ROOT"/*) REL="${HOST_FILE#"$BACKUP_ROOT"/}";; *) die "файл должен находиться внутри BACKUP_DIR=$BACKUP_ROOT";; esac
+CONTAINER_FILE="/home/usr1cv8/backups/$REL"
+SIZE="$(stat -c %s "$HOST_FILE")"
+LOG_DIR="$BACKUP_ROOT/import-logs"; mkdir -p "$LOG_DIR"
+STAMP="$(date +%Y%m%d_%H%M%S)_$$"; LOG="$LOG_DIR/import_$STAMP.log"
+: > "$LOG"; chmod 600 "$LOG"
+log(){ echo "[$(date '+%F %T')] $*" | tee -a "$LOG"; }
+compose(){ $DOCKER compose "$@"; }
+log "Источник: $HOST_FILE ($(numfmt --to=iec "$SIZE")); контейнерный путь: $CONTAINER_FILE"
+log "ИБ=$IB; PostgreSQL=$DB на postgres:5432"
+exec 9>"/tmp/1c-import-$IB.lock"
+flock -n 9 || die "для ИБ '$IB' уже выполняется импорт"
+compose ps --status running --services | grep -qx postgres || die "postgres не запущен"
+compose ps --status running --services | grep -qx onec-server || die "onec-server не запущен"
+compose exec -T onec-server test -r "$CONTAINER_FILE" || die "onec-server не видит файл. Проверьте mount BACKUP_DIR"
+CSIZE="$(compose exec -T onec-server stat -c %s "$CONTAINER_FILE" | tr -d '\r')"
+[[ "$CSIZE" == "$SIZE" ]] || die "размер файла в контейнере $CSIZE, ожидался $SIZE"
+RAC=/opt/1cv8/current/rac; IBCMD=/opt/1cv8/current/ibcmd
+compose exec -T onec-server test -x "$RAC" || die "rac отсутствует в образе"
+compose exec -T onec-server test -x "$IBCMD" || die "ibcmd отсутствует в образе; нужна пересборка"
+CLUSTER="$(compose exec -T onec-server "$RAC" cluster list | awk '/^cluster[[:space:]]*:/ {print $3; exit}' | tr -d '\r')"
+[[ -n "$CLUSTER" ]] || die "RAC не вернул UUID кластера"
+find_ib(){ awk -v wanted="$IB" '
+function trim(s){sub(/^[ \t]+/,"",s);sub(/[ \t]+$/,"",s);gsub(/^"|"$/,"",s);return s}
+ /^infobase[ \t]*:/ {id=$3}
+ /^name[ \t]*:/ {n=trim(substr($0,index($0,":")+1));if(n==wanted){print id;exit}}
+'; }
+SUMMARY="$(compose exec -T onec-server "$RAC" infobase summary list --cluster="$CLUSTER")"
+IBID="$(printf '%s\n' "$SUMMARY" | find_ib | tr -d '\r')"
+if [[ "$NEW_BASE_ONLY" == "new" ]]; then
+  [[ -z "$IBID" ]] || die "информационная база '$IB' уже существует в кластере; выберите другое имя"
+  PG_EXISTS="$(compose exec -T postgres runuser -u postgres -- /usr/local/pgbin/psql -d postgres -Atc "SELECT 1 FROM pg_database WHERE datname='$DB'")"
+  [[ -z "$PG_EXISTS" ]] || die "база PostgreSQL '$DB' уже существует; выберите другое имя"
+  log "Создаю новую регистрацию 1С и PostgreSQL-базу '$DB' для восстановления архива .dt."
 fi
-
-$DOCKER compose ps --status running --services | grep -qx onec-server || die "контейнер onec-server не запущен: ./start.sh"
-PGBIN=/usr/local/pgbin
-
-# Пользователи 1С: представление v8users создаёт платформа. Нет представления/строк — база пустая.
-USERS=$($DOCKER compose exec -T postgres runuser -u postgres -- "$PGBIN/psql" -d "$DB" -tAc \
-    "SELECT count(*) FROM v8users" 2>/dev/null | tr -d '[:space:]')
-case "$USERS" in ''|*[!0-9]*) USERS=0;; esac
-
-# Передаём файл в контейнер onec-server через docker cp.
-# Основной путь — смонтированный backup-каталог /home/usr1cv8/backups (файл с исходным именем
-# остаётся виден в BACKUP_DIR на хосте и в веб-панели); /tmp используется как запасной вариант,
-# если bind-mount BACKUP_DIR в контейнере нет (веб-панель и compose могут иметь разные cwd).
-[ -r "$HOST_FILE" ] || die "файл на хосте недоступен для чтения: $HOST_FILE"
-FILE_SIZE=$(stat -c '%s' "$HOST_FILE")
-[ "$FILE_SIZE" -gt 0 ] || die "файл на хосте пустой: $HOST_FILE"
-
-REMOTE_DIR="/home/usr1cv8/backups"
-CONTAINER="onec-server"
-
-# Проверяем контейнер до работы с каталогами.
-$DOCKER inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -qx true \
-    || die "контейнер $CONTAINER не запущен; сначала запустите сервер 1С"
-
-if ! $DOCKER exec "$CONTAINER" test -d "$REMOTE_DIR" 2>/dev/null; then
-    # если смонтированного backup-каталога в контейнере нет — используем /tmp
-    REMOTE_DIR="/tmp/onec-import"
+if [[ -n "$IBID" && "$NEW_BASE_ONLY" != "new" ]]; then
+  [[ -n "$USER_1C" && -n "$PASS_1C" ]] || die "для изменения параметров существующей ИБ '$IB' укажите пользователя и пароль администратора 1С в веб-панели"
+  log "ИБ уже зарегистрирована (UUID $IBID). Обновляю параметры СУБД с авторизацией администратора ИБ."
+  compose exec -T onec-server "$RAC" infobase update --cluster="$CLUSTER" --infobase="$IBID" --infobase-user="$USER_1C" --infobase-pwd="$PASS_1C" --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" 2>&1 | tee -a "$LOG"
+else
+  log "Создаю регистрацию ИБ и PostgreSQL-базу '$DB'."
+  compose exec -T onec-server "$RAC" infobase create --cluster="$CLUSTER" --name="$IB" --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" --locale=ru --create-database 2>&1 | tee -a "$LOG"
+  if [[ "$NEW_BASE_ONLY" == "new" ]]; then
+    PG_CREATED="$(compose exec -T postgres runuser -u postgres -- /usr/local/pgbin/psql -d postgres -Atc "SELECT 1 FROM pg_database WHERE datname='$DB'")"
+    [[ "$PG_CREATED" == "1" ]] || die "RAC зарегистрировал ИБ, но PostgreSQL-база '$DB' не найдена после команды --create-database"
+    log "Проверка PostgreSQL: отдельная база '$DB' действительно создана."
+  fi
+  SUMMARY="$(compose exec -T onec-server "$RAC" infobase summary list --cluster="$CLUSTER")"
+  IBID="$(printf '%s\n' "$SUMMARY" | find_ib | tr -d '\r')"
+  [[ -n "$IBID" ]] || die "RAC не вернул UUID созданной ИБ"
 fi
-REMOTE="$REMOTE_DIR/$FILE"
-$DOCKER exec "$CONTAINER" mkdir -p "$REMOTE_DIR" \
-    || die "не удалось создать каталог $REMOTE_DIR в контейнере"
-
-# Сначала удаляем одноимённый остаток предыдущего прерванного импорта.
-$DOCKER exec "$CONTAINER" rm -f "$REMOTE" 2>/dev/null || true
-echo "Передача файла в контейнер $CONTAINER (размер: $(numfmt --to=iec "$FILE_SIZE"))..."
-$DOCKER cp "$HOST_FILE" "$CONTAINER:$REMOTE" \
-    || die "docker cp не смог передать файл в контейнер $CONTAINER"
-
-# Проверяем не только наличие, но и точное совпадение размера.
-REMOTE_SIZE=$($DOCKER exec "$CONTAINER" stat -c '%s' "$REMOTE" 2>/dev/null) \
-    || die "файл скопирован, но не найден внутри контейнера: $REMOTE"
-[[ "$REMOTE_SIZE" =~ ^[0-9]+$ ]] || die "не удалось определить размер файла в контейнере: $REMOTE"
-[ "$REMOTE_SIZE" -eq "$FILE_SIZE" ] \
-    || die "файл передан не полностью: на хосте $FILE_SIZE байт, в контейнере $REMOTE_SIZE байт"
-$DOCKER exec "$CONTAINER" test -r "$REMOTE" \
-    || die "файл существует, но недоступен для чтения в контейнере: $REMOTE"
-echo "Файл успешно передан и проверен: $REMOTE ($REMOTE_SIZE байт)"
-
-STAMP=$(date +%Y%m%d_%H%M%S)
-LOG="$(dirname "$REMOTE")/import_${STAMP}.log"
-ACTION=()
-CAUTH=()
-[[ -n "$USER_1C" ]] && CAUTH=(/N "$USER_1C" /P "$PASS_1C")
-
-# Запуск конфигуратора в контейнере: свой Xvfb, графическая сессия не нужна.
-designer_run() {
-    $DOCKER compose exec -T onec-server \
-        /usr/local/bin/1c-xvfb /opt/1cv8/current/1cv8 DESIGNER \
-        /S "onec-server:1541\\${IB}" "$@" "${ACTION[@]}" /Out "$LOG"
-}
-
-designer_try() {
-    $DOCKER compose exec -T onec-server test -x /opt/1cv8/current/1cv8 \
-        || die "в образе нет конфигуратора 1С (компонент client_full): пересоберите образ"
-    $DOCKER compose exec -T onec-server test -x /usr/local/bin/1c-xvfb \
-        || die "в образе нет /usr/local/bin/1c-xvfb: пересоберите образ сервера (./build.sh)"
-    local rc=0 pid secs=0
-    # конфигуратор не сообщает процент выполнения — показываем ход по времени
-    designer_run "$@" &
-    pid=$!
-    while kill -0 "$pid" 2>/dev/null; do
-        printf 'Операция 1С выполняется... %02d:%02d\n' "$((secs/60))" "$((secs%60))"
-        sleep 10; secs=$((secs+10))
-    done
-    wait "$pid" || rc=$?
-    echo "--- журнал конфигуратора ---"
-    $DOCKER compose exec -T onec-server cat "$LOG" 2>/dev/null || true
-    echo "----------------------------"
-    if [ $rc -ne 0 ]; then
-        $DOCKER compose exec -T onec-server cat /tmp/xvfb-1c.log 2>/dev/null || true
-    fi
-    return $rc
-}
-
-# Восстановление/загрузка конфигуратором с учётом наличия пользователей 1С.
-designer_restore() {
-    if [ "$USERS" -gt 0 ]; then
-        designer_try "${CAUTH[@]}"
-        return $?
-    fi
-    designer_try && return 0
-    if [ ${#CAUTH[@]} -gt 0 ]; then
-        echo "Повторяю с пользователем 1С '$USER_1C' ..."
-        designer_try "${CAUTH[@]}"
-        return $?
-    fi
-    return 1
-}
-
-ibcmd_dt() {
-    $DOCKER compose exec -T onec-server /opt/1cv8/current/ibcmd infobase \
-        --dbms=PostgreSQL "--db-server=postgres port=5432" "--db-name=$DB" \
-        "--db-user=$DB_USER" "--db-pwd=$DB_PASS" \
-        restore --force --session-terminate-message="Идёт загрузка базы" \
-        --user="$USER_1C" --password="$PASS_1C" "$REMOTE"
-}
-
-ibcmd_cf() {
-    local base=(/opt/1cv8/current/ibcmd infobase)
-    local db=(--dbms=PostgreSQL "--db-server=postgres port=5432" "--db-name=$DB"
-              "--db-user=$DB_USER" "--db-pwd=$DB_PASS")
-    $DOCKER compose exec -T onec-server "${base[@]}" config load "${db[@]}" \
-        --user="$USER_1C" --password="$PASS_1C" "$REMOTE" \
-        && $DOCKER compose exec -T onec-server "${base[@]}" config apply "${db[@]}" \
-            --user="$USER_1C" --password="$PASS_1C" --force --session-terminate=force
-}
-
-# ---------------- .dt ----------------
-if [[ "$KIND" == "dt" ]]; then
-    ACTION=(/RestoreIB "$REMOTE")
-    echo "Восстановление базы '$IB' (PostgreSQL: $DB, пользователь $DB_USER) из $FILE ..."
-    echo "ВНИМАНИЕ: текущие данные базы будут заменены содержимым .dt."
-
-    DONE=0
-    if [ "$USERS" -gt 0 ] && [ -n "$USER_1C" ] && $DOCKER compose exec -T onec-server test -x /opt/1cv8/current/ibcmd; then
-        echo "== Попытка через ibcmd (пользователь 1С: $USER_1C) ..."
-        ibcmd_dt && DONE=1
-    fi
-
-    if [ "$DONE" != "1" ]; then
-        if [ "$USERS" -eq 0 ]; then
-            echo "В базе нет пользователей 1С (новая база) — восстанавливаю конфигуратором без логина."
-        else
-            [ -n "$USER_1C" ] || die "в базе '$DB' есть пользователи 1С: укажите логин и пароль 1С (та же учётная запись, что в базе)"
-            echo "ibcmd не выполнил восстановление — повторяю конфигуратором."
-        fi
-        designer_restore || die "восстановление .dt не удалось"
-    fi
-    echo "Готово: база '$IB' восстановлена из '$FILE'."
-# файл в backup-каталоге оставляем с исходным именем (он нужен в BACKUP_DIR и на веб-панели);
-# удаляем только временный вариант из /tmp и журнал
-case "$REMOTE" in /tmp/*) $DOCKER exec onec-server rm -f "$REMOTE" ;; esac
-$DOCKER exec onec-server rm -f "$LOG" >/dev/null 2>&1 || true
-exit 0
+log "UUID ИБ: $IBID"
+log "Перезапускаю onec-server для сброса кэша кластера. Текущие сеансы сервера будут отключены."
+compose restart onec-server 2>&1 | tee -a "$LOG"
+READY=0
+for _ in $(seq 1 90); do
+  if compose exec -T onec-server "$RAC" cluster list >/dev/null 2>&1; then READY=1; break; fi
+  sleep 2
+done
+[[ "$READY" == 1 ]] || die "RAS не поднялся после перезапуска"
+AUTH=()
+if [[ -n "$USER_1C" ]]; then AUTH=(--user="$USER_1C" --password="$PASS_1C"); fi
+if [[ "$KIND" == dt ]]; then
+  log "ВНИМАНИЕ: восстановление .dt полностью заменит содержимое ИБ '$IB'. Запускаю ibcmd restore --force."
+  compose exec -T onec-server "$IBCMD" infobase --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" restore --force "${AUTH[@]}" "$CONTAINER_FILE" 2>&1 | tee -a "$LOG"
+else
+  log "Загружаю .cf через ibcmd infobase config load."
+  compose exec -T onec-server "$IBCMD" infobase --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" config load "${AUTH[@]}" "$CONTAINER_FILE" 2>&1 | tee -a "$LOG"
+  log "Применяю конфигурацию через ibcmd infobase config apply."
+  compose exec -T onec-server "$IBCMD" infobase --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" config apply "${AUTH[@]}" --force 2>&1 | tee -a "$LOG"
 fi
-
-# ---------------- .cf ----------------
-ACTION=(/LoadCfg "$REMOTE" /UpdateDBCfg)
-echo "Загрузка конфигурации из $FILE в базу '$IB' ..."
-DONE=0
-if [ "$USERS" -gt 0 ] && [ -n "$USER_1C" ] && $DOCKER compose exec -T onec-server test -x /opt/1cv8/current/ibcmd; then
-    echo "== Попытка через ibcmd ..."
-    ibcmd_cf && DONE=1
-fi
-
-if [ "$DONE" != "1" ]; then
-    if [ "$USERS" -eq 0 ]; then
-        echo "В базе нет пользователей 1С (новая база) — загружаю конфигуратором без логина."
-    else
-        [ -n "$USER_1C" ] || die "в базе '$DB' есть пользователи 1С: укажите логин и пароль 1С"
-        echo "ibcmd конфигурацию не применил — загружаю конфигуратором."
-    fi
-    designer_restore || die "загрузка конфигурации не удалась"
-fi
-echo "Готово: конфигурация из '$FILE' загружена."
-# файл в backup-каталоге оставляем с исходным именем; удаляем только временный вариант и журнал
-case "$REMOTE" in /tmp/*) $DOCKER exec onec-server rm -f "$REMOTE" ;; esac
-$DOCKER exec onec-server rm -f "$LOG" >/dev/null 2>&1 || true
+log "Операция ibcmd завершилась успешно."
