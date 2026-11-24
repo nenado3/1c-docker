@@ -14,7 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     APACHE_RUN_GROUP=grp1cv8
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        locales ca-certificates fontconfig apache2 \
+        locales ca-certificates fontconfig apache2 openssl \
         libfreetype6 libglib2.0-0t64 libgsf-1-114 \
         unixodbc imagemagick \
         libxslt1.1 libcups2t64 libkrb5-3 libsecret-1-0 \
@@ -34,7 +34,7 @@ RUN SYS_LIB="$(ldconfig -p | grep -m1 "libstdc++.so.6 " | sed -E "s/.*=>[[:space
     && test -n "$SYS_LIB" \
     && grep -aFq "GLIBCXX_3.4.30" "$SYS_LIB"
 
-RUN printf '#!/bin/sh\nexit 101\n' > /usr/sbin/policy-rc.d \
+RUN printf '#!/bin/sh\\nexit 101\\n' > /usr/sbin/policy-rc.d \
     && chmod +x /usr/sbin/policy-rc.d
 
 RUN groupadd -g 1001 grp1cv8 \
