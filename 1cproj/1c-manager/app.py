@@ -408,6 +408,18 @@ def do_action(body):
         return script_job(title, "server", "import.sh", *args)
     if a == "backup_pg":
         return script_job("Дамп PostgreSQL %s" % need(body, "db", NAME_RE), "server", "backup.sh", "--pg", need(body, "db", NAME_RE))
+    if a == "postgres_drop_db":
+        db = need(body, "db", NAME_RE)
+        if db.lower() in ("postgres", "template0", "template1"):
+            raise ValueError("системные базы PostgreSQL удалять нельзя")
+        # Сначала завершаем подключения, затем отдельной командой выполняем DROP DATABASE
+        # (эта команда не может выполняться внутри транзакции).
+        identifier = '"' + db.replace('"', '""') + '"'
+        terminate_sql = "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '%s' AND pid <> pg_backend_pid();" % db.replace("'", "''")
+        return run_job("Удаление базы PostgreSQL %s" % db,
+                       cfg["docker"] + ["exec", "onec-postgres", "runuser", "-u", "postgres", "--",
+                                        "/usr/local/pgbin/psql", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+                                        "-c", terminate_sql, "-c", "DROP DATABASE " + identifier])
     if a == "restore_pg_dump":
         db = need(body, "db", NAME_RE)
         filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.dump$", re.I), 190)
