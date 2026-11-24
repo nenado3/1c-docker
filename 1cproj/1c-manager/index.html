@@ -794,7 +794,7 @@ async function loadBackupSchedule() {
     const chosen = Array.from(document.querySelectorAll('[data-backup-base]:checked')).map(x => x.dataset.backupBase);
     $('backupBaseSummary').textContent = chosen.length ? 'Выбрано баз: ' + chosen.length + ' — ' + chosen.join(', ') : 'Выбрать базы 1С';
     const credentialsBox = $('backupCredentials');
-    credentialsBox.innerHTML = '<div class="mut">Учётные данные для выбранных баз. Если у базы нет пароля, оставьте поля пустыми. Сохранённые пароли не отображаются.</div>' +
+    credentialsBox.innerHTML = '<div class="mut">Для автоматического отключения пользователей укажите пользователя и пароль администратора каждой выбранной базы 1С. Эти данные нужны для временной блокировки новых сеансов и регламентных заданий. Сохранённые пароли не отображаются.</div>' +
       chosen.map(name => {
         const status = credentialStatus[name] || {};
         return '<div style="padding:10px;border:1px solid var(--border);border-radius:8px">' +
