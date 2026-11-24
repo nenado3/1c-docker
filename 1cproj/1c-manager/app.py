@@ -499,7 +499,7 @@ def load_backup_schedule():
         if isinstance(data, dict):
             clock_time = data.get("daily_time", "02:00")
             maximum = int(data.get("max_backups", 10))
-            if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", clock_time):
+            if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", clock_time):
                 clock_time = "02:00"
             if 1 <= maximum <= 1000:
                 backup_schedule.update(data)
@@ -525,7 +525,7 @@ def save_backup_schedule_request(body):
     enabled = body.get("enabled") is True
     monthly_enabled = body.get("monthly_enabled") is True
     clock_time = body.get("daily_time", "02:00")
-    if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", clock_time):
+    if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", clock_time):
         raise ValueError("Укажите корректное ежедневное время в формате ЧЧ:ММ")
     try:
         maximum = int(body.get("max_backups", 10))
@@ -563,7 +563,7 @@ def prune_regular_backups(base_name, maximum):
     directory = os.path.join(data_dir("backups"), "dt")
     if not os.path.isdir(directory):
         return
-    pattern = re.compile(r"^" + re.escape(base_name) + r"_\\d{8}_\\d{6}\\.dt$")
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\\.dt$")
     files = []
     for entry in os.scandir(directory):
         if entry.is_file(follow_symlinks=False) and pattern.fullmatch(entry.name):
@@ -580,7 +580,7 @@ def prune_regular_backups(base_name, maximum):
 def move_to_monthly(base_name):
     """Переносит созданный месячный .dt в отдельный каталог, не участвующий в ротации."""
     directory = os.path.join(data_dir("backups"), "dt")
-    pattern = re.compile(r"^" + re.escape(base_name) + r"_\\d{8}_\\d{6}\\.dt$")
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\\.dt$")
     candidates = []
     if os.path.isdir(directory):
         for entry in os.scandir(directory):
