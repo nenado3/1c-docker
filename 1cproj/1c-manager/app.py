@@ -456,7 +456,7 @@ def do_action(body):
 
 # ---------------- автоматические резервные копии ----------------
 backup_schedule_lock = threading.Lock()
-backup_schedule = {"enabled": False, "interval_hours": 24, "monthly_enabled": False, "max_backups": 10, "last_run": None, "next_run": None, "monthly_next_run": None, "last_result": "Расписание не настроено"}
+backup_schedule = {"enabled": False, "daily_time": "02:00", "monthly_enabled": False, "max_backups": 10, "last_run": None, "next_run": None, "monthly_next_run": None, "last_result": "Расписание не настроено"}
 backup_schedule_path = None
 backup_running = False
 
@@ -468,6 +468,16 @@ def save_backup_schedule():
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(backup_schedule, f, ensure_ascii=False, indent=2)
     os.replace(tmp, backup_schedule_path)
+
+
+def next_daily_backup(clock_time, now=None):
+    """Следующий ежедневный запуск по локальному времени сервера."""
+    now = now or datetime.now()
+    hour, minute = map(int, clock_time.split(":"))
+    candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if candidate <= now:
+        candidate += timedelta(days=1)
+    return candidate.timestamp()
 
 
 def next_monthly_backup(now=None):
@@ -487,13 +497,17 @@ def load_backup_schedule():
         with open(backup_schedule_path, encoding="utf-8") as f:
             data = json.load(f)
         if isinstance(data, dict):
-            hours = int(data.get("interval_hours", 24))
+            clock_time = data.get("daily_time", "02:00")
             maximum = int(data.get("max_backups", 10))
-            if 1 <= hours <= 720 and 1 <= maximum <= 1000:
+            if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", clock_time):
+                clock_time = "02:00"
+            if 1 <= maximum <= 1000:
                 backup_schedule.update(data)
-                backup_schedule["interval_hours"] = hours
+                backup_schedule["daily_time"] = clock_time
                 backup_schedule["max_backups"] = maximum
                 backup_schedule["monthly_enabled"] = data.get("monthly_enabled") is True
+                backup_schedule["next_run"] = (backup_schedule.get("next_run") or
+                    (next_daily_backup(clock_time) if backup_schedule.get("enabled") else None))
     except FileNotFoundError:
         pass
     except Exception as e:
@@ -510,13 +524,13 @@ def backup_schedule_snapshot():
 def save_backup_schedule_request(body):
     enabled = body.get("enabled") is True
     monthly_enabled = body.get("monthly_enabled") is True
+    clock_time = body.get("daily_time", "02:00")
+    if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", clock_time):
+        raise ValueError("Укажите корректное ежедневное время в формате ЧЧ:ММ")
     try:
-        hours = int(body.get("interval_hours", 24))
         maximum = int(body.get("max_backups", 10))
     except (TypeError, ValueError):
-        raise ValueError("Интервал и максимальное количество копий должны быть числами")
-    if hours < 1 or hours > 720:
-        raise ValueError("Интервал должен быть от 1 до 720 часов")
+        raise ValueError("Максимальное количество копий должно быть числом")
     if maximum < 1 or maximum > 1000:
         raise ValueError("Максимальное количество обычных бэкапов должно быть от 1 до 1000")
     selected = body.get("selected_bases", [])
@@ -529,22 +543,20 @@ def save_backup_schedule_request(body):
     with backup_schedule_lock:
         backup_schedule["selected_bases"] = selected
         backup_schedule["enabled"] = enabled
-        backup_schedule["interval_hours"] = hours
+        backup_schedule["daily_time"] = clock_time
         backup_schedule["monthly_enabled"] = monthly_enabled
         backup_schedule["max_backups"] = maximum
-        backup_schedule["next_run"] = time.time() + hours * 3600 if enabled else None
+        backup_schedule["next_run"] = next_daily_backup(clock_time) if enabled else None
         backup_schedule["monthly_next_run"] = next_monthly_backup() if monthly_enabled else None
         backup_schedule["last_result"] = ("Расписание сохранено. " +
-            ("Интервальные копии включены. " if enabled else "") +
-            ("Ежемесячная копия — 1-го числа в 02:00. " if monthly_enabled else "") or
-            "Автоматическое резервное копирование выключено")
+            ("Ежедневные копии — каждый день в %s. " % clock_time if enabled else "") +
+            ("Ежемесячная копия — 1-го числа в 02:00. " if monthly_enabled else ""))
         if not enabled and not monthly_enabled:
             backup_schedule["last_result"] = "Автоматическое резервное копирование выключено"
         save_backup_schedule()
         result = dict(backup_schedule)
         result["running"] = backup_running
         return result
-
 
 def prune_regular_backups(base_name, maximum):
     """Ограничивает число обычных .dt для базы; monthly/ не затрагивает."""
@@ -590,16 +602,16 @@ def automatic_backup_loop():
         time.sleep(15)
         now = time.time()
         with backup_schedule_lock:
-            interval_due = bool(backup_schedule.get("enabled") and backup_schedule.get("next_run")
-                               and now >= backup_schedule["next_run"])
+            daily_due = bool(backup_schedule.get("enabled") and backup_schedule.get("next_run")
+                             and now >= backup_schedule["next_run"])
             monthly_due = bool(backup_schedule.get("monthly_enabled") and backup_schedule.get("monthly_next_run")
                                and now >= backup_schedule["monthly_next_run"])
-            if (not interval_due and not monthly_due) or backup_running:
+            if (not daily_due and not monthly_due) or backup_running:
                 continue
             backup_running = True
             monthly_run = monthly_due
-            if interval_due:
-                backup_schedule["next_run"] = now + int(backup_schedule["interval_hours"]) * 3600
+            if daily_due:
+                backup_schedule["next_run"] = next_daily_backup(backup_schedule.get("daily_time", "02:00"))
             if monthly_due:
                 backup_schedule["monthly_next_run"] = next_monthly_backup()
             maximum = int(backup_schedule.get("max_backups", 10))
