@@ -590,15 +590,20 @@ async function loadBases() {
   }
 
   const published = new Set((web.published || []).map(x => String(x).toLowerCase()));
+  const webChecks = web.checks || {};
   $('bBody').innerHTML = items.length ? items.map(i => {
     const isPublished = published.has(String(i.name).toLowerCase());
+    const check = webChecks[i.name] || {};
     const webAction = web.error
       ? '<button class="b sec" disabled>Статус публикации неизвестен</button>'
       : (isPublished
         ? '<button class="b sec" data-webdel="' + esc(i.name) + '">Снять публикацию</button>'
         : '<button class="b" data-webpub="' + esc(i.name) + '">Опубликовать в браузере</button>');
     const webBadge = web.error ? '<span class="badge warn">Статус неизвестен</span>' :
-      (isPublished ? '<span class="badge ok">Опубликована</span>' : '<span class="badge">Не опубликована</span>');
+      (!isPublished ? '<span class="badge">Не опубликована</span>' :
+        (check.available ? '<span class="badge ok">Веб доступен</span>' :
+          '<span class="badge bad" title="' + esc(check.error || (check.http_code ? 'HTTP ' + check.http_code : 'Нет ответа')) + '">Веб недоступен' +
+          (check.http_code ? ' (HTTP ' + esc(check.http_code) + ')' : '') + '</span>'));
     return '<tr><td><b>' + esc(i.name) + '</b></td><td class="mono">' + esc(i.infobase) + '</td><td>' + esc(i.descr || '') +
       '</td><td>' + webBadge + ' ' + webAction +
       '<button class="b sec" data-dump="' + esc(i.name) + '">Выгрузить .dt</button>' +
