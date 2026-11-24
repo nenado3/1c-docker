@@ -420,6 +420,16 @@ def do_action(body):
         return script_job("Запуск клиента 1С", "client", "client.sh")
     if a == "license_install":
         return script_job("Перенос лицензий", "client", "license.sh", "install")
+    if a == "apache_op":
+        op = need(body, "op")
+        if op not in ("start", "stop", "restart", "status"):
+            raise ValueError("недопустимое действие Apache")
+        return run_job("Apache: " + op, cfg["docker"] + ["exec", "onec-server", "/usr/local/bin/manage-web.sh", op])
+    if a in ("web_publish", "web_delete"):
+        name = need(body, "name", NAME_RE)
+        op = "publish" if a == "web_publish" else "delete"
+        title = ("Публикация веб-клиента базы " if op == "publish" else "Удаление веб-публикации базы ") + name
+        return run_job(title, cfg["docker"] + ["exec", "onec-server", "/usr/local/bin/manage-web.sh", op, name])
     if a == "license_server_activate":
         filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,176}\.lic$", re.I), 180)
         license_file = os.path.join(data_dir("licenses"), filename)
@@ -472,6 +482,19 @@ def api_get(path, q):
         return {"docker": bool(cfg["docker"]), "docker_cmd": " ".join(cfg["docker"] or []),
                 "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"]),
                 "client_dir": cfg["client_dir"], "client_ok": os.path.isdir(cfg["client_dir"])}
+    if path == "/api/apache_status":
+        r = dk("exec", "onec-server", "bash", "-lc",
+               "if pgrep -x apache2 >/dev/null 2>&1; then echo running; else echo stopped; fi")
+        if r.returncode != 0:
+            return {"error": (r.stderr or r.stdout).strip() or "не удалось проверить Apache"}
+        return {"running": r.stdout.strip().splitlines()[-1:] == ["running"]}
+    if path == "/api/web_status":
+        r = dk("exec", "onec-server", "bash", "-lc",
+               "find /var/www/onec -mindepth 2 -maxdepth 2 -type f -name default.vrd -printf '%h\\n' 2>/dev/null")
+        if r.returncode != 0:
+            return {"error": (r.stderr or r.stdout).strip() or "не удалось проверить веб-публикации", "published": []}
+        names = [os.path.basename(x.strip()) for x in r.stdout.splitlines() if x.strip()]
+        return {"published": names}
     if path == "/api/containers":
         r = dk("ps", "-a", "--filter", "name=onec-", "--format", "{{json .}}")
         items = []
@@ -741,7 +764,7 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, save_settings(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
-            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory", "recreate_server", "license_server_activate"):
+            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
                 return self._send(400, {"error": "Docker недоступен для этого пользователя"})
             return self._send(200, {"job": do_action(body)})
         except ValueError as e:
