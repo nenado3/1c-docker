@@ -44,7 +44,7 @@ case "$ACTION" in
       chown -R usr1cv8:grp1cv8 "$WEB_ROOT/$NAME"
       apache2ctl configtest
       apache_reload
-      echo "Веб-клиент опубликован: http://<IP-сервера>/$NAME"
+      echo "Веб-клиент опубликован: https://<IP-сервера>/$NAME"
     else
       echo "Удаление публикации '$NAME'..."
       "$WEBINST" -delete -apache24 -wsdir "$NAME" -confpath "$APACHE_CONF"
