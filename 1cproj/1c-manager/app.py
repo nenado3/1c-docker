@@ -846,7 +846,21 @@ def api_get(path, q):
         if r.returncode != 0:
             return {"error": (r.stderr or r.stdout).strip() or "не удалось проверить веб-публикации", "published": []}
         names = [os.path.basename(x.strip()) for x in r.stdout.splitlines() if x.strip()]
-        return {"published": names}
+        checks = {}
+        for name in names:
+            # Проверяем не только наличие default.vrd, но и реальный HTTP-ответ веб-публикации.
+            url = "http://127.0.0.1/" + quote(name) + "/"
+            try:
+                probe = subprocess.run(["curl", "-L", "-sS", "-o", "/dev/null", "-w", "%{http_code}",
+                                        "--max-time", "4", url],
+                                       capture_output=True, text=True, errors="replace", timeout=5)
+                code = (probe.stdout or "").strip()
+                checks[name] = {"available": probe.returncode == 0 and code.startswith("2"),
+                                "http_code": code or None,
+                                "error": (probe.stderr or "").strip() or None}
+            except Exception as e:
+                checks[name] = {"available": False, "http_code": None, "error": str(e)}
+        return {"published": names, "checks": checks}
     if path == "/api/containers":
         r = dk("ps", "-a", "--filter", "name=onec-", "--format", "{{json .}}")
         items = []
