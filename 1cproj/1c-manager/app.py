@@ -2,6 +2,7 @@
 """Менеджер контейнеров 1С: локальная веб-панель (только стандартная библиотека Python).
 Слушает только 127.0.0.1, требует случайный токен, выполняет лишь заранее заданные действия."""
 import argparse, json, os, re, secrets, shutil, subprocess, sys, threading, time, webbrowser
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, quote
 
@@ -455,7 +456,7 @@ def do_action(body):
 
 # ---------------- автоматические резервные копии ----------------
 backup_schedule_lock = threading.Lock()
-backup_schedule = {"enabled": False, "interval_hours": 24, "last_run": None, "next_run": None, "last_result": "Расписание не настроено"}
+backup_schedule = {"enabled": False, "interval_hours": 24, "monthly_enabled": False, "max_backups": 10, "last_run": None, "next_run": None, "monthly_next_run": None, "last_result": "Расписание не настроено"}
 backup_schedule_path = None
 backup_running = False
 
@@ -469,6 +470,16 @@ def save_backup_schedule():
     os.replace(tmp, backup_schedule_path)
 
 
+def next_monthly_backup(now=None):
+    """Первое число следующего месяца в 02:00 по локальному времени сервера."""
+    now = now or datetime.now()
+    if now.month == 12:
+        first = datetime(now.year + 1, 1, 1, 2, 0, 0)
+    else:
+        first = datetime(now.year, now.month + 1, 1, 2, 0, 0)
+    return first.timestamp()
+
+
 def load_backup_schedule():
     global backup_schedule_path
     backup_schedule_path = os.path.join(cfg["server_dir"], ".backup-schedule.json")
@@ -477,9 +488,12 @@ def load_backup_schedule():
             data = json.load(f)
         if isinstance(data, dict):
             hours = int(data.get("interval_hours", 24))
-            if 1 <= hours <= 720:
+            maximum = int(data.get("max_backups", 10))
+            if 1 <= hours <= 720 and 1 <= maximum <= 1000:
                 backup_schedule.update(data)
                 backup_schedule["interval_hours"] = hours
+                backup_schedule["max_backups"] = maximum
+                backup_schedule["monthly_enabled"] = data.get("monthly_enabled") is True
     except FileNotFoundError:
         pass
     except Exception as e:
@@ -495,43 +509,100 @@ def backup_schedule_snapshot():
 
 def save_backup_schedule_request(body):
     enabled = body.get("enabled") is True
+    monthly_enabled = body.get("monthly_enabled") is True
     try:
         hours = int(body.get("interval_hours", 24))
+        maximum = int(body.get("max_backups", 10))
     except (TypeError, ValueError):
-        raise ValueError("Интервал должен быть числом часов")
+        raise ValueError("Интервал и максимальное количество копий должны быть числами")
     if hours < 1 or hours > 720:
         raise ValueError("Интервал должен быть от 1 до 720 часов")
+    if maximum < 1 or maximum > 1000:
+        raise ValueError("Максимальное количество обычных бэкапов должно быть от 1 до 1000")
     selected = body.get("selected_bases", [])
     if not isinstance(selected, list) or any(not isinstance(x, str) or not NAME_RE.fullmatch(x) for x in selected):
         raise ValueError("Некорректный список информационных баз")
     if len(selected) != len(set(selected)):
         raise ValueError("В списке баз есть повторения")
-    if enabled and not selected:
+    if (enabled or monthly_enabled) and not selected:
         raise ValueError("Выберите хотя бы одну базу для автоматического резервного копирования")
     with backup_schedule_lock:
         backup_schedule["selected_bases"] = selected
         backup_schedule["enabled"] = enabled
         backup_schedule["interval_hours"] = hours
+        backup_schedule["monthly_enabled"] = monthly_enabled
+        backup_schedule["max_backups"] = maximum
         backup_schedule["next_run"] = time.time() + hours * 3600 if enabled else None
-        backup_schedule["last_result"] = ("Расписание включено; первая копия будет создана через %d ч." % hours
-                                          if enabled else "Автоматическое резервное копирование выключено")
+        backup_schedule["monthly_next_run"] = next_monthly_backup() if monthly_enabled else None
+        backup_schedule["last_result"] = ("Расписание сохранено. " +
+            ("Интервальные копии включены. " if enabled else "") +
+            ("Ежемесячная копия — 1-го числа в 02:00. " if monthly_enabled else "") or
+            "Автоматическое резервное копирование выключено")
+        if not enabled and not monthly_enabled:
+            backup_schedule["last_result"] = "Автоматическое резервное копирование выключено"
         save_backup_schedule()
         result = dict(backup_schedule)
         result["running"] = backup_running
         return result
 
 
+def prune_regular_backups(base_name, maximum):
+    """Ограничивает число обычных .dt для базы; monthly/ не затрагивает."""
+    directory = os.path.join(data_dir("backups"), "dt")
+    if not os.path.isdir(directory):
+        return
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\\d{8}_\\d{6}\\.dt$")
+    files = []
+    for entry in os.scandir(directory):
+        if entry.is_file(follow_symlinks=False) and pattern.fullmatch(entry.name):
+            files.append((entry.stat().st_mtime, entry.path))
+    files.sort(reverse=True)
+    for _, path in files[maximum:]:
+        try:
+            os.remove(path)
+            print("Удалена старая обычная копия: " + path, flush=True)
+        except OSError as e:
+            print("Не удалось удалить старую копию %s: %s" % (path, e), flush=True)
+
+
+def move_to_monthly(base_name):
+    """Переносит созданный месячный .dt в отдельный каталог, не участвующий в ротации."""
+    directory = os.path.join(data_dir("backups"), "dt")
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\\d{8}_\\d{6}\\.dt$")
+    candidates = []
+    if os.path.isdir(directory):
+        for entry in os.scandir(directory):
+            if entry.is_file(follow_symlinks=False) and pattern.fullmatch(entry.name):
+                candidates.append((entry.stat().st_mtime, entry.path))
+    if not candidates:
+        raise RuntimeError("созданный файл месячной копии базы %s не найден" % base_name)
+    _, source = max(candidates)
+    target_dir = os.path.join(directory, "monthly")
+    os.makedirs(target_dir, exist_ok=True)
+    target = os.path.join(target_dir, os.path.basename(source))
+    shutil.move(source, target)
+    return target
+
+
 def automatic_backup_loop():
     global backup_running
     while True:
         time.sleep(15)
+        now = time.time()
         with backup_schedule_lock:
-            due = backup_schedule.get("enabled") and backup_schedule.get("next_run") and time.time() >= backup_schedule["next_run"]
-            if not due or backup_running:
+            interval_due = bool(backup_schedule.get("enabled") and backup_schedule.get("next_run")
+                               and now >= backup_schedule["next_run"])
+            monthly_due = bool(backup_schedule.get("monthly_enabled") and backup_schedule.get("monthly_next_run")
+                               and now >= backup_schedule["monthly_next_run"])
+            if (not interval_due and not monthly_due) or backup_running:
                 continue
             backup_running = True
-            hours = int(backup_schedule["interval_hours"])
-            backup_schedule["next_run"] = time.time() + hours * 3600
+            monthly_run = monthly_due
+            if interval_due:
+                backup_schedule["next_run"] = now + int(backup_schedule["interval_hours"]) * 3600
+            if monthly_due:
+                backup_schedule["monthly_next_run"] = next_monthly_backup()
+            maximum = int(backup_schedule.get("max_backups", 10))
             save_backup_schedule()
         result_lines = []
         try:
@@ -564,7 +635,12 @@ def automatic_backup_loop():
                     result_lines.append(proc.stderr[-2000:])
                 if proc.returncode:
                     raise RuntimeError("Ошибка резервного копирования базы %s" % name)
-            summary = "Успешно: " + ", ".join(bases)
+                if monthly_run:
+                    monthly_path = move_to_monthly(name)
+                    result_lines.append("[%s] Месячная копия сохранена: %s" % (name, monthly_path))
+                else:
+                    prune_regular_backups(name, maximum)
+            summary = ("Ежемесячная копия создана: " if monthly_run else "Успешно: ") + ", ".join(bases)
         except Exception as e:
             summary = "Ошибка автоматического бэкапа: " + str(e)
         finally:
@@ -574,7 +650,6 @@ def automatic_backup_loop():
                 backup_running = False
                 save_backup_schedule()
         print("\\n".join(result_lines[-30:]), flush=True)
-
 
 def api_get(path, q):
     if path == "/api/settings":
