@@ -501,7 +501,15 @@ def save_backup_schedule_request(body):
         raise ValueError("Интервал должен быть числом часов")
     if hours < 1 or hours > 720:
         raise ValueError("Интервал должен быть от 1 до 720 часов")
+    selected = body.get("selected_bases", [])
+    if not isinstance(selected, list) or any(not isinstance(x, str) or not NAME_RE.fullmatch(x) for x in selected):
+        raise ValueError("Некорректный список информационных баз")
+    if len(selected) != len(set(selected)):
+        raise ValueError("В списке баз есть повторения")
+    if enabled and not selected:
+        raise ValueError("Выберите хотя бы одну базу для автоматического резервного копирования")
     with backup_schedule_lock:
+        backup_schedule["selected_bases"] = selected
         backup_schedule["enabled"] = enabled
         backup_schedule["interval_hours"] = hours
         backup_schedule["next_run"] = time.time() + hours * 3600 if enabled else None
@@ -533,13 +541,16 @@ def automatic_backup_loop():
             result = subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=60)
             if result.returncode:
                 raise RuntimeError((result.stderr or result.stdout).strip() or "не удалось получить список баз 1С")
-            bases = []
+            available = []
             for item in parse_rac(result.stdout):
                 name = item.get("name") or item.get("Name")
                 if name and NAME_RE.fullmatch(name):
-                    bases.append(name)
+                    available.append(name)
+            with backup_schedule_lock:
+                requested_bases = list(backup_schedule.get("selected_bases") or [])
+            bases = [name for name in requested_bases if name in available]
             if not bases:
-                raise RuntimeError("Список баз пуст или RAC не вернул имена баз")
+                raise RuntimeError("Не выбраны доступные базы для резервного копирования")
             for name in bases:
                 backup_env = os.environ.copy()
                 backup_env["DOCKER"] = " ".join(cfg["docker"])
@@ -570,6 +581,16 @@ def api_get(path, q):
         return settings_snapshot()
     if path == "/api/backup_schedule":
         return backup_schedule_snapshot()
+    if path == "/api/backup_bases":
+        r = dk("exec", "onec-server", "bash", "-lc", RAC["infobases"])
+        if r.returncode:
+            raise ValueError((r.stderr or r.stdout).strip() or "не удалось получить список баз")
+        names = []
+        for item in parse_rac(r.stdout):
+            name = item.get("name") or item.get("Name")
+            if name and NAME_RE.fullmatch(name):
+                names.append(name)
+        return {"items": sorted(set(names), key=str.lower)}
     if path == "/api/browse_dirs":
         requested = q.get("path", [os.path.expanduser("~")])[0]
         if len(requested) > 1000 or any(ord(ch) < 32 for ch in requested):
