@@ -453,9 +453,119 @@ def do_action(body):
     raise ValueError("неизвестное действие")
 
 
+# ---------------- автоматические резервные копии ----------------
+backup_schedule_lock = threading.Lock()
+backup_schedule = {"enabled": False, "interval_hours": 24, "last_run": None, "next_run": None, "last_result": "Расписание не настроено"}
+backup_schedule_path = None
+backup_running = False
+
+
+def save_backup_schedule():
+    if not backup_schedule_path:
+        return
+    tmp = backup_schedule_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(backup_schedule, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, backup_schedule_path)
+
+
+def load_backup_schedule():
+    global backup_schedule_path
+    backup_schedule_path = os.path.join(cfg["server_dir"], ".backup-schedule.json")
+    try:
+        with open(backup_schedule_path, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            hours = int(data.get("interval_hours", 24))
+            if 1 <= hours <= 720:
+                backup_schedule.update(data)
+                backup_schedule["interval_hours"] = hours
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print("Не удалось прочитать расписание бэкапов: %s" % e, file=sys.stderr)
+
+
+def backup_schedule_snapshot():
+    with backup_schedule_lock:
+        result = dict(backup_schedule)
+        result["running"] = backup_running
+        return result
+
+
+def save_backup_schedule_request(body):
+    enabled = body.get("enabled") is True
+    try:
+        hours = int(body.get("interval_hours", 24))
+    except (TypeError, ValueError):
+        raise ValueError("Интервал должен быть числом часов")
+    if hours < 1 or hours > 720:
+        raise ValueError("Интервал должен быть от 1 до 720 часов")
+    with backup_schedule_lock:
+        backup_schedule["enabled"] = enabled
+        backup_schedule["interval_hours"] = hours
+        backup_schedule["next_run"] = time.time() + hours * 3600 if enabled else None
+        backup_schedule["last_result"] = ("Расписание включено; первая копия будет создана через %d ч." % hours
+                                          if enabled else "Автоматическое резервное копирование выключено")
+        save_backup_schedule()
+        return backup_schedule_snapshot()
+
+
+def automatic_backup_loop():
+    global backup_running
+    while True:
+        time.sleep(15)
+        with backup_schedule_lock:
+            due = backup_schedule.get("enabled") and backup_schedule.get("next_run") and time.time() >= backup_schedule["next_run"]
+            if not due or backup_running:
+                continue
+            backup_running = True
+            hours = int(backup_schedule["interval_hours"])
+            backup_schedule["next_run"] = time.time() + hours * 3600
+            save_backup_schedule()
+        result_lines = []
+        try:
+            if not cfg.get("docker"):
+                raise RuntimeError("Docker недоступен")
+            command = cfg["docker"] + ["exec", "onec-server", "bash", "-lc", RAC["infobases"]]
+            result = subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=60)
+            if result.returncode:
+                raise RuntimeError((result.stderr or result.stdout).strip() or "не удалось получить список баз 1С")
+            bases = []
+            for item in parse_rac(result.stdout):
+                name = item.get("name") or item.get("Name")
+                if name and NAME_RE.fullmatch(name):
+                    bases.append(name)
+            if not bases:
+                raise RuntimeError("Список баз пуст или RAC не вернул имена баз")
+            for name in bases:
+                proc = subprocess.run(["bash", os.path.join(cfg["server_dir"], "backup.sh"), name],
+                                      cwd=cfg["server_dir"], capture_output=True, text=True,
+                                      errors="replace", timeout=6 * 3600)
+                result_lines.append("[%s] %s" % (name, "OK" if proc.returncode == 0 else "ОШИБКА"))
+                if proc.stdout:
+                    result_lines.append(proc.stdout[-5000:])
+                if proc.stderr:
+                    result_lines.append(proc.stderr[-2000:])
+                if proc.returncode:
+                    raise RuntimeError("Ошибка резервного копирования базы %s" % name)
+            summary = "Успешно: " + ", ".join(bases)
+        except Exception as e:
+            summary = "Ошибка автоматического бэкапа: " + str(e)
+        finally:
+            with backup_schedule_lock:
+                backup_schedule["last_run"] = time.time()
+                backup_schedule["last_result"] = summary
+                backup_running = False
+                save_backup_schedule()
+        print("\\n".join(result_lines[-30:]), flush=True)
+
+
 def api_get(path, q):
     if path == "/api/settings":
         return settings_snapshot()
+    if path == "/api/backup_schedule":
+        return backup_schedule_snapshot()
     if path == "/api/browse_dirs":
         requested = q.get("path", [os.path.expanduser("~")])[0]
         if len(requested) > 1000 or any(ord(ch) < 32 for ch in requested):
@@ -762,6 +872,8 @@ class H(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(n) or b"{}")
             if u.path == "/api/settings":
                 return self._send(200, save_settings(body))
+            if u.path == "/api/backup_schedule":
+                return self._send(200, save_backup_schedule_request(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
             if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
@@ -783,6 +895,8 @@ def main():
     a = ap.parse_args()
     cfg.update(server_dir=os.path.abspath(a.server_dir), client_dir=os.path.abspath(a.client_dir),
                token=a.token or secrets.token_urlsafe(16), docker=detect_docker())
+    load_backup_schedule()
+    threading.Thread(target=automatic_backup_loop, daemon=True, name="automatic-backups").start()
     try:
         srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
     except OSError as e:
