@@ -188,8 +188,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <section id="t-bases">
     <div class="row" id="basesActions" style="flex-wrap:wrap">
       <button class="b" id="openImport">Создать/Загрузить базу 1С</button>
-      <button class="b sec" data-apache="start">Запустить Apache</button>
-      <button class="b sec" data-apache="stop">Остановить Apache</button>
+      <span id="apacheState" class="badge">Apache: проверка…</span>
+      <button class="b sec" id="apacheToggle" data-apache="start">Запустить Apache</button>
       <button class="b sec" data-apache="restart">Перезапустить Apache</button>
       <button class="b sec" id="refreshB">Обновить</button>
     </div>
@@ -538,18 +538,46 @@ async function loadLogs() {
 }
 
 async function loadBases() {
-  const r = await api('/api/infobases');
-  $('bErr').textContent = r.error ? 'Не удалось получить список: ' + r.error : '';
+  const [r, web, apache] = await Promise.all([
+    api('/api/infobases'), api('/api/web_status'), api('/api/apache_status')
+  ]);
+  $('bErr').textContent = r.error ? 'Не удалось получить список: ' + r.error :
+    (web.error ? 'Не удалось проверить публикации: ' + web.error : '');
   const items = r.items || [];
   $('importBase').innerHTML = items.length ? '<option value="">Выберите базу</option>' + items.map(i => '<option value="' + esc(i.name) + '">' + esc(i.name) + '</option>').join('') : '<option value="">Нет доступных баз</option>';
-  $('bBody').innerHTML = items.length ? items.map(i => '<tr><td><b>' + esc(i.name) + '</b></td><td class="mono">' + esc(i.infobase) + '</td><td>' + esc(i.descr || '') +
-    '</td><td><button class="b" data-webpub="' + esc(i.name) + '">Опубликовать в браузере</button>' +
-    '<button class="b sec" data-webdel="' + esc(i.name) + '">Снять публикацию</button>' +
-    '<button class="b sec" data-dump="' + esc(i.name) + '">Выгрузить .dt</button>' +
-    '<button class="b red" data-drop="' + esc(i.infobase) + '" data-name="' + esc(i.name) + '">Удалить</button></td></tr>').join('')
-    : '<tr><td colspan="4" class="mut">Баз нет</td></tr>';
-  const s = await api('/api/sessions');
-  const ss = s.items || [];
+
+  const apacheState = $('apacheState'), apacheToggle = $('apacheToggle');
+  if (apache.error) {
+    apacheState.textContent = 'Apache: статус неизвестен';
+    apacheState.className = 'badge warn';
+    apacheToggle.disabled = true;
+  } else {
+    const running = !!apache.running;
+    apacheState.textContent = running ? 'Apache запущен' : 'Apache остановлен';
+    apacheState.className = 'badge ' + (running ? 'ok' : 'bad');
+    apacheToggle.textContent = running ? 'Остановить Apache' : 'Запустить Apache';
+    apacheToggle.dataset.apache = running ? 'stop' : 'start';
+    apacheToggle.disabled = false;
+  }
+
+  const published = new Set((web.published || []).map(x => String(x).toLowerCase()));
+  $('bBody').innerHTML = items.length ? items.map(i => {
+    const isPublished = published.has(String(i.name).toLowerCase());
+    const webAction = web.error
+      ? '<button class="b sec" disabled>Статус публикации неизвестен</button>'
+      : (isPublished
+        ? '<button class="b sec" data-webdel="' + esc(i.name) + '">Снять публикацию</button>'
+        : '<button class="b" data-webpub="' + esc(i.name) + '">Опубликовать в браузере</button>');
+    const webBadge = web.error ? '<span class="badge warn">Статус неизвестен</span>' :
+      (isPublished ? '<span class="badge ok">Опубликована</span>' : '<span class="badge">Не опубликована</span>');
+    return '<tr><td><b>' + esc(i.name) + '</b></td><td class="mono">' + esc(i.infobase) + '</td><td>' + esc(i.descr || '') +
+      '</td><td>' + webBadge + ' ' + webAction +
+      '<button class="b sec" data-dump="' + esc(i.name) + '">Выгрузить .dt</button>' +
+      '<button class="b red" data-drop="' + esc(i.infobase) + '" data-name="' + esc(i.name) + '">Удалить</button></td></tr>';
+  }).join('') : '<tr><td colspan="4" class="mut">Баз нет</td></tr>';
+
+  const sess = await api('/api/sessions');
+  const ss = sess.items || [];
   $('sBody').innerHTML = ss.length ? ss.map(x => '<tr><td>' + esc(x['user-name']) + '</td><td class="mono">' + esc(x.infobase) + '</td><td>' + esc(x['app-id']) +
     '</td><td>' + esc(x['started-at']) + '</td><td><button class="b sec" data-kill="' + esc(x.session) + '">Завершить</button></td></tr>').join('')
     : '<tr><td colspan="5" class="mut">Активных сеансов нет</td></tr>';
