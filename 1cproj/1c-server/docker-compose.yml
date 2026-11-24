@@ -33,6 +33,10 @@ services:
     restart: unless-stopped
     mem_limit: ${SERVER_MEMORY_LIMIT:-0}
     stop_grace_period: 2m
+    environment:
+      HTTPS_CERT_FILE: ${HTTPS_CERT_FILE:-}
+      HTTPS_KEY_FILE: ${HTTPS_KEY_FILE:-}
+      HTTPS_CERT_SAN: ${HTTPS_CERT_SAN:-IP:192.168.239.130,IP:127.0.0.1,DNS:localhost,DNS:onec-server}
     ports:
       - "80:80"
       - "443:443"
@@ -46,6 +50,7 @@ services:
       - apache-web:/var/www/onec
       - ./licenses:/var/1C/licenses:z
       - ./server/nethasp.ini:/opt/1cv8/conf/nethasp.ini:ro,z
+      - ./certs:/etc/onec-certs:ro,z
       - ${BACKUP_DIR:-./backups}:/home/usr1cv8/backups:z
     depends_on:
       postgres:
