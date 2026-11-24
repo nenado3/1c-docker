@@ -253,6 +253,18 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     </div>
     <div id="settingsStatus" class="settings-status" aria-live="polite">Загружаю настройки…</div>
     <div id="settingsFields"></div>
+    <div class="settings-card" style="margin-top:16px;padding:18px">
+      <h3 style="margin:0 0 6px">Автоматическое резервное копирование</h3>
+      <p class="mut" style="margin:0 0 12px">Панель будет автоматически создавать полные архивы .dt всех информационных баз 1С по расписанию. Копии сохраняются в настроенном каталоге BACKUP_DIR/dt.</p>
+      <label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input id="backupScheduleEnabled" type="checkbox" style="min-width:auto"> Включить автоматические бэкапы</label>
+      <div class="row">
+        <label for="backupScheduleHours" style="margin:0">Интервал (часов)</label>
+        <input id="backupScheduleHours" type="number" min="1" max="720" step="1" value="24" style="width:110px;min-width:110px">
+        <button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button>
+        <button class="b sec" id="refreshBackupSchedule" type="button">Обновить статус</button>
+      </div>
+      <div id="backupScheduleStatus" class="mut" aria-live="polite">Загрузка расписания…</div>
+    </div>
     <div class="settings-actions">
       <span class="settings-actions-note">Изменения вступят в силу после применения конфигурации.</span>
       <div class="row"><button class="b sec" id="reloadSettings">↻ Перечитать</button><button class="b" id="saveSettings">Сохранить настройки</button></div>
@@ -717,6 +729,28 @@ async function loadSettings() {
   out += '</div>';
   $('settingsFields').innerHTML = out;
   $('settingsStatus').textContent = '✓ Настройки загружены из файлов .env.';
+  await loadBackupSchedule();
+}
+async function loadBackupSchedule() {
+  const r = await api('/api/backup_schedule');
+  if (r.error) { $('backupScheduleStatus').textContent = 'Ошибка: ' + r.error; return; }
+  $('backupScheduleEnabled').checked = !!r.enabled;
+  $('backupScheduleHours').value = r.interval_hours || 24;
+  const when = ts => ts ? new Date(ts * 1000).toLocaleString() : '—';
+  $('backupScheduleStatus').textContent = (r.running ? 'Сейчас выполняется резервное копирование. ' : '') +
+    (r.last_result || '') + ' Последний запуск: ' + when(r.last_run) +
+    '. Следующий запуск: ' + when(r.next_run) + '.';
+}
+async function saveBackupSchedule() {
+  const hours = Number($('backupScheduleHours').value);
+  if (!Number.isInteger(hours) || hours < 1 || hours > 720) {
+    $('backupScheduleStatus').textContent = 'Укажите интервал от 1 до 720 часов.'; return;
+  }
+  $('saveBackupSchedule').disabled = true;
+  const r = await api('/api/backup_schedule', {enabled:$('backupScheduleEnabled').checked, interval_hours:hours});
+  $('saveBackupSchedule').disabled = false;
+  if (r.error) { $('backupScheduleStatus').textContent = 'Ошибка: ' + r.error; return; }
+  await loadBackupSchedule();
 }
 let backupPickerCurrent = '';
 async function loadBackupPicker(path) {
@@ -931,6 +965,7 @@ $('clearCon').onclick = () => {
   }
 };
 $('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
+$('saveBackupSchedule').onclick = saveBackupSchedule; $('refreshBackupSchedule').onclick = loadBackupSchedule;
 document.addEventListener('click', e => {
   if (e.target.closest('#chooseBackupDir')) openBackupPicker();
 });
