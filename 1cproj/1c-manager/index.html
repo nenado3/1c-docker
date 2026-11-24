@@ -198,7 +198,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <table><thead><tr><th>Имя</th><th>Идентификатор</th><th>Описание</th><th>Действия</th></tr></thead>
       <tbody id="bBody"><tr><td colspan="4" class="mut">Загрузка…</td></tr></tbody></table>
     <h2>Сеансы</h2>
-    <table><thead><tr><th>Пользователь</th><th>База</th><th>Приложение</th><th>Начало</th><th></th></tr></thead>
+    <table><thead><tr><th>Пользователь</th><th>Приложение</th><th>Начало</th><th>Статус</th><th>Действия</th></tr></thead>
       <tbody id="sBody"><tr><td colspan="5" class="mut">Загрузка…</td></tr></tbody></table>
   </section>
 
@@ -606,9 +606,34 @@ async function loadBases() {
 
   const sess = await api('/api/sessions');
   const ss = sess.items || [];
-  $('sBody').innerHTML = ss.length ? ss.map(x => '<tr><td>' + esc(x['user-name']) + '</td><td class="mono">' + esc(x.infobase) + '</td><td>' + esc(x['app-id']) +
-    '</td><td>' + esc(x['started-at']) + '</td><td><button class="b sec" data-kill="' + esc(x.session) + '">Завершить</button></td></tr>').join('')
-    : '<tr><td colspan="5" class="mut">Активных сеансов нет</td></tr>';
+  const truthy = value => ['yes', 'true', '1', 'да'].includes(String(value || '').trim().toLowerCase());
+  const sessionStatus = x => {
+    if (truthy(x.hibernate) || truthy(x['hibernate-session'])) return {text:'Спящий', cls:'warn'};
+    if (truthy(x['blocked-by-ls']) || truthy(x['blocked-by-dbms'])) return {text:'Заблокирован', cls:'bad'};
+    return {text:'Активен', cls:'ok'};
+  };
+  if (!ss.length) {
+    $('sBody').innerHTML = '<tr><td colspan="5" class="mut">Активных сеансов нет</td></tr>';
+  } else {
+    const groups = new Map();
+    ss.forEach(x => {
+      const base = x.infobase || 'База не определена';
+      if (!groups.has(base)) groups.set(base, []);
+      groups.get(base).push(x);
+    });
+    $('sBody').innerHTML = [...groups.entries()]
+      .sort((a,b) => a[0].localeCompare(b[0], 'ru'))
+      .map(([base, rows]) =>
+        '<tr class="session-group"><td colspan="5"><b>' + esc(base) + '</b><span class="mut"> · ' + rows.length + ' ' +
+        (rows.length === 1 ? 'сеанс' : rows.length < 5 ? 'сеанса' : 'сеансов') + '</span></td></tr>' +
+        rows.map(x => {
+          const status = sessionStatus(x);
+          return '<tr><td>' + esc(x['user-name'] || '—') + '</td><td>' + esc(x['app-id'] || '—') +
+            '</td><td>' + esc(x['started-at'] || '—') + '</td><td><span class="badge ' + status.cls + '">' + status.text +
+            '</span></td><td><button class="b sec" data-kill="' + esc(x.session) + '">Завершить</button></td></tr>';
+        }).join('')
+      ).join('');
+  }
 }
 
 async function loadPg() {
