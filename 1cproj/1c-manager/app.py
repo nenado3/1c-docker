@@ -855,7 +855,8 @@ def api_get(path, q):
                                         "--max-time", "4", url],
                                        capture_output=True, text=True, errors="replace", timeout=5)
                 code = (probe.stdout or "").strip()
-                checks[name] = {"available": probe.returncode == 0 and code.startswith("2"),
+                checks[name] = {"available": probe.returncode == 0 and code[:1] in ("2", "3"),
+                                "redirect": probe.returncode == 0 and code[:1] == "3",
                                 "http_code": code or None,
                                 "error": (probe.stderr or "").strip() or None}
             except Exception as e:
