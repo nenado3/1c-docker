@@ -601,7 +601,9 @@ async function loadBases() {
         : '<button class="b" data-webpub="' + esc(i.name) + '">Опубликовать в браузере</button>');
     const webBadge = web.error ? '<span class="badge warn">Статус неизвестен</span>' :
       (!isPublished ? '<span class="badge">Не опубликована</span>' :
-        (check.available ? '<span class="badge ok">Веб доступен</span>' :
+        (check.available ? (check.redirect
+          ? '<span class="badge warn" title="Сервер перенаправляет запрос">Веб отвечает (HTTP ' + esc(check.http_code) + ')</span>'
+          : '<span class="badge ok">Веб доступен</span>') :
           '<span class="badge bad" title="' + esc(check.error || (check.http_code ? 'HTTP ' + check.http_code : 'Нет ответа')) + '">Веб недоступен' +
           (check.http_code ? ' (HTTP ' + esc(check.http_code) + ')' : '') + '</span>'));
     return '<tr><td><b>' + esc(i.name) + '</b></td><td class="mono">' + esc(i.infobase) + '</td><td>' + esc(i.descr || '') +
