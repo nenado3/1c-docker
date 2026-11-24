@@ -623,16 +623,21 @@ async function loadBases() {
     });
     $('sBody').innerHTML = [...groups.entries()]
       .sort((a,b) => a[0].localeCompare(b[0], 'ru'))
-      .map(([base, rows]) =>
-        '<tr class="session-group"><td colspan="5"><b>' + esc(base) + '</b><span class="mut"> · ' + rows.length + ' ' +
-        (rows.length === 1 ? 'сеанс' : rows.length < 5 ? 'сеанса' : 'сеансов') + '</span></td></tr>' +
+      .map(([base, rows]) => {
+        const isPublished = published.has(String(base).toLowerCase());
+        const webLink = isPublished
+          ? '<a class="b sec" href="http://' + encodeURIComponent(window.location.hostname) + '/' +
+            encodeURIComponent(base) + '/" target="_blank" rel="noopener noreferrer">Открыть веб</a>'
+          : '';
+        return '<tr class="session-group"><td colspan="5"><b>' + esc(base) + '</b><span class="mut"> · ' + rows.length + ' ' +
+        (rows.length === 1 ? 'сеанс' : rows.length < 5 ? 'сеанса' : 'сеансов') + '</span> ' + webLink + '</td></tr>' +
         rows.map(x => {
           const status = sessionStatus(x);
           return '<tr><td>' + esc(x['user-name'] || '—') + '</td><td>' + esc(x['app-id'] || '—') +
             '</td><td>' + esc(x['started-at'] || '—') + '</td><td><span class="badge ' + status.cls + '">' + status.text +
             '</span></td><td><button class="b sec" data-kill="' + esc(x.session) + '">Завершить</button></td></tr>';
-        }).join('')
-      ).join('');
+        }).join('');
+      }).join('');
   }
 }
 
