@@ -220,6 +220,9 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
           <summary id="backupBaseSummary" style="cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px">Выбрать базы 1С</summary>
           <div id="backupScheduleBases" style="display:flex;flex-direction:column;gap:9px;padding:12px;max-height:220px;overflow:auto;border:1px solid var(--border);border-top:0;border-radius:0 0 8px 8px"><span class="mut">Загрузка списка баз…</span></div>
         </details>
+        <div id="backupCredentials" style="display:flex;flex-direction:column;gap:10px;margin:12px 0;max-width:650px">
+          <div class="mut">Учётные данные для выбранных баз. Если у базы нет пароля, оставьте поля пустыми. Сохранённые пароли не отображаются.</div>
+        </div>
         <div class="row">
           <label for="backupDailyTime" style="margin:0">Ежедневно выгружать в</label>
           <input id="backupDailyTime" type="time" value="02:00" style="width:130px;min-width:130px">
@@ -753,10 +756,22 @@ async function loadBackupSchedule() {
   $('backupMaxCount').value = r.max_backups || 10;
   const selected = new Set(r.selected_bases || []);
   const bases = b.items || [];
+  const credentialStatus = r.credential_status || {};
   $('backupScheduleBases').innerHTML = bases.length ? bases.map(name => '<label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" data-backup-base="' + esc(name) + '" ' + (selected.has(name) ? 'checked' : '') + ' style="min-width:auto">' + esc(name) + '</label>').join('') : '<span class="mut">Информационные базы не найдены</span>';
   const updateBaseSummary = () => {
     const chosen = Array.from(document.querySelectorAll('[data-backup-base]:checked')).map(x => x.dataset.backupBase);
     $('backupBaseSummary').textContent = chosen.length ? 'Выбрано баз: ' + chosen.length + ' — ' + chosen.join(', ') : 'Выбрать базы 1С';
+    const credentialsBox = $('backupCredentials');
+    credentialsBox.innerHTML = '<div class="mut">Учётные данные для выбранных баз. Если у базы нет пароля, оставьте поля пустыми. Сохранённые пароли не отображаются.</div>' +
+      chosen.map(name => {
+        const status = credentialStatus[name] || {};
+        return '<div style="padding:10px;border:1px solid var(--border);border-radius:8px">' +
+          '<strong>' + esc(name) + '</strong>' +
+          '<div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap">' +
+          '<input type="text" autocomplete="off" data-backup-user="' + esc(name) + '" placeholder="Пользователь 1С" value="' + esc(status.username || '') + '" style="flex:1;min-width:160px">' +
+          '<input type="password" autocomplete="new-password" data-backup-pass="' + esc(name) + '" placeholder="' + (status.has_password ? 'Пароль сохранён — пусто = не менять' : 'Пароль 1С') + '" style="flex:1;min-width:160px">' +
+          '</div><label style="display:flex;align-items:center;gap:6px;margin-top:7px"><input type="checkbox" data-backup-clear="' + esc(name) + '" style="min-width:auto"> Удалить сохранённые учётные данные</label></div>';
+      }).join('');
   };
   $('backupScheduleBases').onchange = updateBaseSummary;
   updateBaseSummary();
@@ -773,9 +788,17 @@ async function saveBackupSchedule() {
     $('backupScheduleStatus').textContent = 'Максимальное количество обычных копий должно быть от 1 до 1000.'; return;
   }
   const selected_bases = Array.from(document.querySelectorAll('[data-backup-base]:checked')).map(x => x.dataset.backupBase);
+  const credentials = {};
+  selected_bases.forEach(name => {
+    const user = document.querySelector('[data-backup-user="' + CSS.escape(name) + '"]');
+    const pass = document.querySelector('[data-backup-pass="' + CSS.escape(name) + '"]');
+    const clear = document.querySelector('[data-backup-clear="' + CSS.escape(name) + '"]');
+    credentials[name] = {username:user ? user.value : '', password:pass ? pass.value : '', keep_existing:!!(clear && !clear.checked)};
+    if (clear && clear.checked) credentials[name] = {username:'', password:'', keep_existing:false};
+  });
   const r = await api('/api/backup_schedule', {enabled:$('backupScheduleEnabled').checked,
     monthly_enabled:$('backupMonthlyEnabled').checked, daily_time:$('backupDailyTime').value,
-    max_backups:maximum, selected_bases});
+    max_backups:maximum, selected_bases, credentials});
   $('saveBackupSchedule').disabled = false;
   if (r.error) { $('backupScheduleStatus').textContent = 'Ошибка: ' + r.error; return; }
   await loadBackupSchedule();
