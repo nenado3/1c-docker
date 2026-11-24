@@ -836,7 +836,7 @@ def api_get(path, q):
                 "client_dir": cfg["client_dir"], "client_ok": os.path.isdir(cfg["client_dir"])}
     if path == "/api/apache_status":
         r = dk("exec", "onec-server", "bash", "-lc",
-               "if pgrep -x apache2 >/dev/null 2>&1; then echo running; else echo stopped; fi")
+               "if pgrep -x apache2 >/dev/null 2>&1 || pgrep -x httpd >/dev/null 2>&1; then echo running; else echo stopped; fi")
         if r.returncode != 0:
             return {"error": (r.stderr or r.stdout).strip() or "не удалось проверить Apache"}
         return {"running": r.stdout.strip().splitlines()[-1:] == ["running"]}
