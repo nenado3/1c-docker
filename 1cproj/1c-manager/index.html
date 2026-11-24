@@ -223,6 +223,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <div class="row">
           <label for="backupScheduleHours" style="margin:0">Интервал (часов)</label>
           <input id="backupScheduleHours" type="number" min="1" max="720" step="1" value="24" style="width:110px;min-width:110px">
+          <label for="backupMaxCount" style="margin:0 0 0 10px">Макс. обычных копий</label>
+          <input id="backupMaxCount" type="number" min="1" max="1000" step="1" value="10" style="width:110px;min-width:110px">
+        </div>
+        <label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input id="backupMonthlyEnabled" type="checkbox" style="min-width:auto"> Дополнительно создавать копию в начале каждого месяца (1-го числа в 02:00)</label>
+        <p class="mut" style="margin:4px 0 12px">Месячные копии сохраняются отдельно в dt/monthly и никогда не удаляются автоматической ротацией. Лимит применяется только к обычным копиям.</p>
+        <div class="row">
           <button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button>
           <button class="b sec" id="refreshBackupSchedule" type="button">Обновить статус</button>
         </div>
@@ -742,7 +748,9 @@ async function loadBackupSchedule() {
   if (r.error) { $('backupScheduleStatus').textContent = 'Ошибка: ' + r.error; return; }
   if (b.error) { $('backupScheduleBases').textContent = 'Не удалось получить базы: ' + b.error; return; }
   $('backupScheduleEnabled').checked = !!r.enabled;
+  $('backupMonthlyEnabled').checked = !!r.monthly_enabled;
   $('backupScheduleHours').value = r.interval_hours || 24;
+  $('backupMaxCount').value = r.max_backups || 10;
   const selected = new Set(r.selected_bases || []);
   const bases = b.items || [];
   $('backupScheduleBases').innerHTML = bases.length ? bases.map(name => '<label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input type="checkbox" data-backup-base="' + esc(name) + '" ' + (selected.has(name) ? 'checked' : '') + ' style="min-width:auto">' + esc(name) + '</label>').join('') : '<span class="mut">Информационные базы не найдены</span>';
@@ -763,8 +771,13 @@ async function saveBackupSchedule() {
     $('backupScheduleStatus').textContent = 'Укажите интервал от 1 до 720 часов.'; return;
   }
   $('saveBackupSchedule').disabled = true;
+  const maximum = Number($('backupMaxCount').value);
+  if (!Number.isInteger(maximum) || maximum < 1 || maximum > 1000) {
+    $('backupScheduleStatus').textContent = 'Максимальное количество обычных копий должно быть от 1 до 1000.'; return;
+  }
   const selected_bases = Array.from(document.querySelectorAll('[data-backup-base]:checked')).map(x => x.dataset.backupBase);
-  const r = await api('/api/backup_schedule', {enabled:$('backupScheduleEnabled').checked, interval_hours:hours, selected_bases});
+  const r = await api('/api/backup_schedule', {enabled:$('backupScheduleEnabled').checked,
+    monthly_enabled:$('backupMonthlyEnabled').checked, interval_hours:hours, max_backups:maximum, selected_bases});
   $('saveBackupSchedule').disabled = false;
   if (r.error) { $('backupScheduleStatus').textContent = 'Ошибка: ' + r.error; return; }
   await loadBackupSchedule();
