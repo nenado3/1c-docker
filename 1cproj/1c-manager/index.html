@@ -763,7 +763,8 @@ async function loadBackupSchedule() {
   const when = ts => ts ? new Date(ts * 1000).toLocaleString() : '—';
   $('backupScheduleStatus').textContent = (r.running ? 'Сейчас выполняется резервное копирование. ' : '') +
     (r.last_result || '') + ' Последний запуск: ' + when(r.last_run) +
-    '. Следующий запуск: ' + when(r.next_run) + '.';
+    '. Следующая обычная копия: ' + when(r.next_run) +
+    '. Следующая месячная копия: ' + when(r.monthly_next_run) + '.';
 }
 async function saveBackupSchedule() {
   const hours = Number($('backupScheduleHours').value);
