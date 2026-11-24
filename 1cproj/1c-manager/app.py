@@ -682,8 +682,14 @@ def lock_infobase_for_backup(base_name, credential):
             ids = [item.get("session") for item in sessions if item.get("session")]
             if not ids:
                 print("[%s] Все пользовательские сеансы завершены" % base_name, flush=True)
+                # После завершения сеансов сразу разрешаем вход пользователей.
+                # Регламентные задания остаются запрещены до конца выгрузки .dt.
+                rac_call("infobase", "update", *common, *auth,
+                         "--sessions-deny=off", "--scheduled-jobs-deny=on",
+                         "--permission-code=" + permission_code)
+                print("[%s] Новые подключения разрешены; начинается выгрузка .dt" % base_name, flush=True)
                 return {"cluster": cluster, "infobase": infobase_id, "auth": auth,
-                        "locked": True}
+                        "locked": True, "sessions_reenabled": True}
             for session_id in ids:
                 rac_call("session", "terminate", "--cluster=" + cluster, "--session=" + session_id)
             print("[%s] Завершено сеансов: %d; ожидание отключения..." %
