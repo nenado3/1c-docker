@@ -636,6 +636,82 @@ def move_to_monthly(base_name):
     return target
 
 
+def rac_call(*args, timeout=60):
+    """Выполняет одну команду RAC внутри контейнера сервера 1С."""
+    command = cfg["docker"] + ["exec", "onec-server", "/opt/1cv8/current/rac"] + list(args)
+    result = subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=timeout)
+    if result.returncode:
+        raise RuntimeError((result.stderr or result.stdout).strip() or
+                           "ошибка RAC: " + " ".join(args[:2]))
+    return result.stdout
+
+
+def lock_infobase_for_backup(base_name, credential):
+    """Запрещает новые сеансы и регламентные задания, завершает текущие сеансы."""
+    username = (credential or {}).get("username", "").strip()
+    password = (credential or {}).get("password", "")
+    if not username or not password:
+        raise RuntimeError("для автоматического отключения пользователей базы %s "
+                           "укажите логин и пароль администратора 1С в настройках автобэкапа" % base_name)
+
+    clusters = parse_rac(rac_call("cluster", "list"))
+    cluster = next((x.get("cluster") for x in clusters if x.get("cluster")), None)
+    if not cluster:
+        raise RuntimeError("кластер 1С не найден")
+
+    bases = parse_rac(rac_call("infobase", "summary", "list", "--cluster=" + cluster))
+    info = next((x for x in bases if (x.get("name") or x.get("Name")) == base_name), None)
+    infobase_id = (info or {}).get("infobase")
+    if not infobase_id:
+        raise RuntimeError("не найден идентификатор информационной базы " + base_name)
+
+    permission_code = secrets.token_hex(8)
+    common = ["--cluster=" + cluster, "--infobase=" + infobase_id]
+    auth = ["--infobase-user=" + username, "--infobase-pwd=" + password]
+    locked = False
+    try:
+        rac_call("infobase", "update", *common, *auth,
+                 "--sessions-deny=on", "--scheduled-jobs-deny=on",
+                 "--denied-message=Выполняется автоматическое резервное копирование",
+                 "--permission-code=" + permission_code)
+        locked = True
+        print("[%s] Запрещены новые подключения и регламентные задания" % base_name, flush=True)
+
+        for attempt in range(30):
+            sessions = parse_rac(rac_call("session", "list", *common))
+            ids = [item.get("session") for item in sessions if item.get("session")]
+            if not ids:
+                print("[%s] Все пользовательские сеансы завершены" % base_name, flush=True)
+                return {"cluster": cluster, "infobase": infobase_id, "auth": auth,
+                        "locked": True}
+            for session_id in ids:
+                rac_call("session", "terminate", "--cluster=" + cluster, "--session=" + session_id)
+            print("[%s] Завершено сеансов: %d; ожидание отключения..." %
+                  (base_name, len(ids)), flush=True)
+            time.sleep(2)
+        raise RuntimeError("не удалось завершить все сеансы базы %s за 60 секунд" % base_name)
+    except Exception:
+        if locked:
+            try:
+                rac_call("infobase", "update", *common, *auth,
+                         "--sessions-deny=off", "--scheduled-jobs-deny=off")
+                print("[%s] Блокировка снята после ошибки подготовки" % base_name, flush=True)
+            except Exception as unlock_error:
+                print("[%s] КРИТИЧЕСКИ: не удалось снять блокировку: %s" %
+                      (base_name, unlock_error), flush=True)
+        raise
+
+
+def unlock_infobase_after_backup(base_name, lock_info):
+    if not lock_info or not lock_info.get("locked"):
+        return
+    rac_call("infobase", "update",
+             "--cluster=" + lock_info["cluster"],
+             "--infobase=" + lock_info["infobase"],
+             *lock_info["auth"], "--sessions-deny=off", "--scheduled-jobs-deny=off")
+    print("[%s] Подключения и регламентные задания снова разрешены" % base_name, flush=True)
+
+
 def automatic_backup_loop():
     global backup_running
     while True:
@@ -679,17 +755,22 @@ def automatic_backup_loop():
                 backup_env["DOCKER"] = " ".join(cfg["docker"])
                 with backup_schedule_lock:
                     credential = (backup_schedule.get("credentials") or {}).get(name, {})
-                proc = subprocess.run(["bash", os.path.join(cfg["server_dir"], "backup.sh"), name,
-                                       credential.get("username", ""), credential.get("password", "")],
-                                      cwd=cfg["server_dir"], env=backup_env, capture_output=True, text=True,
-                                      errors="replace", timeout=6 * 3600)
-                result_lines.append("[%s] %s" % (name, "OK" if proc.returncode == 0 else "ОШИБКА"))
-                if proc.stdout:
-                    result_lines.append(proc.stdout[-5000:])
-                if proc.stderr:
-                    result_lines.append(proc.stderr[-2000:])
-                if proc.returncode:
-                    raise RuntimeError("Ошибка резервного копирования базы %s" % name)
+                lock_info = lock_infobase_for_backup(name, credential)
+                proc = None
+                try:
+                    proc = subprocess.run(["bash", os.path.join(cfg["server_dir"], "backup.sh"), name,
+                                           credential.get("username", ""), credential.get("password", "")],
+                                          cwd=cfg["server_dir"], env=backup_env, capture_output=True, text=True,
+                                          errors="replace", timeout=6 * 3600)
+                    result_lines.append("[%s] %s" % (name, "OK" if proc.returncode == 0 else "ОШИБКА"))
+                    if proc.stdout:
+                        result_lines.append(proc.stdout[-5000:])
+                    if proc.stderr:
+                        result_lines.append(proc.stderr[-2000:])
+                    if proc.returncode:
+                        raise RuntimeError("Ошибка резервного копирования базы %s" % name)
+                finally:
+                    unlock_infobase_after_backup(name, lock_info)
                 if monthly_run:
                     monthly_path = move_to_monthly(name)
                     result_lines.append("[%s] Месячная копия сохранена: %s" % (name, monthly_path))
