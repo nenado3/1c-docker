@@ -1060,6 +1060,10 @@ $('clearCon').onclick = () => {
 };
 $('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
 $('saveBackupSchedule').onclick = saveBackupSchedule; $('refreshBackupSchedule').onclick = loadBackupSchedule;
+ // Проверяем доступность веб-публикаций каждые 10 секунд, пока открыта вкладка «Базы 1С».
+ setInterval(() => {
+   if (document.querySelector('[data-tab="bases"].on')) loadBases();
+ }, 10000);
 document.addEventListener('click', e => {
   if (e.target.closest('#chooseBackupDir')) openBackupPicker();
 });
