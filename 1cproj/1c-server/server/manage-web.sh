@@ -6,7 +6,7 @@ WEB_ROOT="/var/www/onec"
 ACTION="${1:-status}"
 NAME="${2:-}"
 fail() { echo "ОШИБКА: $*" >&2; exit 1; }
-apache_running() { pgrep -x apache2 >/dev/null 2>&1 || pgrep -x httpd >/dev/null 2>&1; }
+apache_running() { ps -eo comm=,stat= | awk '$1 == "apache2" || $1 == "httpd" { if ($2 !~ /^Z/) found=1 } END { exit !found }'; }
 apache_start() {
   apache2ctl configtest
   if apache_running; then
