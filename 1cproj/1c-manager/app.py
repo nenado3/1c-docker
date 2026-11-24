@@ -482,6 +482,19 @@ def api_get(path, q):
         return {"docker": bool(cfg["docker"]), "docker_cmd": " ".join(cfg["docker"] or []),
                 "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"]),
                 "client_dir": cfg["client_dir"], "client_ok": os.path.isdir(cfg["client_dir"])}
+    if path == "/api/apache_status":
+        r = dk("exec", "onec-server", "bash", "-lc",
+               "if pgrep -x apache2 >/dev/null 2>&1; then echo running; else echo stopped; fi")
+        if r.returncode != 0:
+            return {"error": (r.stderr or r.stdout).strip() or "не удалось проверить Apache"}
+        return {"running": r.stdout.strip().splitlines()[-1:] == ["running"]}
+    if path == "/api/web_status":
+        r = dk("exec", "onec-server", "bash", "-lc",
+               "find /var/www/onec -mindepth 2 -maxdepth 2 -type f -name default.vrd -printf '%h\\n' 2>/dev/null")
+        if r.returncode != 0:
+            return {"error": (r.stderr or r.stdout).strip() or "не удалось проверить веб-публикации", "published": []}
+        names = [os.path.basename(x.strip()) for x in r.stdout.splitlines() if x.strip()]
+        return {"published": names}
     if path == "/api/containers":
         r = dk("ps", "-a", "--filter", "name=onec-", "--format", "{{json .}}")
         items = []
