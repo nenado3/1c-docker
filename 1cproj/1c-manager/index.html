@@ -1113,7 +1113,7 @@ $('dtOk').onclick = async () => {
     }
     $('dtFile').value = '';
   } catch (e) { $('uploadStatus').textContent = 'Ошибка: ' + e.message; }
-  finally { $('dtOk').disabled = false; }
+  finally { $('dtOk').disabled = false; $('uploadProgress').style.display = 'none'; }
 };
 
 $('importNewBase').onchange = () => {
@@ -1149,7 +1149,7 @@ $('uploadImport').onclick = async () => {
     $('importFile').value = '';
     $('dlgImport').close();
   } catch (e) { $('importStatus').textContent = 'Ошибка: ' + e.message; }
-  finally { $('uploadImport').disabled = false; }
+  finally { $('uploadImport').disabled = false; $('uploadProgress').style.display = 'none'; }
 };
 
 setupConsoleResize();
