@@ -2,6 +2,7 @@
 """Менеджер контейнеров 1С: локальная веб-панель (только стандартная библиотека Python).
 Слушает только 127.0.0.1, требует случайный токен, выполняет лишь заранее заданные действия."""
 import argparse, json, os, re, secrets, shutil, subprocess, sys, threading, time, webbrowser
+from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs, quote
 
@@ -453,9 +454,261 @@ def do_action(body):
     raise ValueError("неизвестное действие")
 
 
+# ---------------- автоматические резервные копии ----------------
+backup_schedule_lock = threading.Lock()
+backup_schedule = {"enabled": False, "daily_time": "02:00", "monthly_enabled": False, "max_backups": 10, "last_run": None, "next_run": None, "monthly_next_run": None, "last_result": "Расписание не настроено"}
+backup_schedule_path = None
+backup_running = False
+
+
+def save_backup_schedule():
+    if not backup_schedule_path:
+        return
+    tmp = backup_schedule_path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(backup_schedule, f, ensure_ascii=False, indent=2)
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, backup_schedule_path)
+
+
+def next_daily_backup(clock_time, now=None):
+    """Следующий ежедневный запуск по локальному времени сервера."""
+    now = now or datetime.now()
+    hour, minute = map(int, clock_time.split(":"))
+    candidate = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if candidate <= now:
+        candidate += timedelta(days=1)
+    return candidate.timestamp()
+
+
+def next_monthly_backup(now=None):
+    """Первое число следующего месяца в 02:00 по локальному времени сервера."""
+    now = now or datetime.now()
+    if now.month == 12:
+        first = datetime(now.year + 1, 1, 1, 2, 0, 0)
+    else:
+        first = datetime(now.year, now.month + 1, 1, 2, 0, 0)
+    return first.timestamp()
+
+
+def load_backup_schedule():
+    global backup_schedule_path
+    backup_schedule_path = os.path.join(cfg["server_dir"], ".backup-schedule.json")
+    try:
+        with open(backup_schedule_path, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            clock_time = data.get("daily_time", "02:00")
+            maximum = int(data.get("max_backups", 10))
+            if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", clock_time):
+                clock_time = "02:00"
+            if 1 <= maximum <= 1000:
+                backup_schedule.update(data)
+                backup_schedule["daily_time"] = clock_time
+                backup_schedule["max_backups"] = maximum
+                backup_schedule["monthly_enabled"] = data.get("monthly_enabled") is True
+                backup_schedule["next_run"] = (backup_schedule.get("next_run") or
+                    (next_daily_backup(clock_time) if backup_schedule.get("enabled") else None))
+    except FileNotFoundError:
+        pass
+    except Exception as e:
+        print("Не удалось прочитать расписание бэкапов: %s" % e, file=sys.stderr)
+
+
+def backup_schedule_snapshot():
+    with backup_schedule_lock:
+        result = dict(backup_schedule)
+        credentials = result.pop("credentials", {}) or {}
+        result["credential_status"] = {
+            name: {"username": item.get("username", ""), "has_password": bool(item.get("password"))}
+            for name, item in credentials.items() if isinstance(item, dict)
+        }
+        result["running"] = backup_running
+        return result
+
+
+def save_backup_schedule_request(body):
+    enabled = body.get("enabled") is True
+    monthly_enabled = body.get("monthly_enabled") is True
+    clock_time = body.get("daily_time", "02:00")
+    if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", clock_time):
+        raise ValueError("Укажите корректное ежедневное время в формате ЧЧ:ММ")
+    try:
+        maximum = int(body.get("max_backups", 10))
+    except (TypeError, ValueError):
+        raise ValueError("Максимальное количество копий должно быть числом")
+    if maximum < 1 or maximum > 1000:
+        raise ValueError("Максимальное количество обычных бэкапов должно быть от 1 до 1000")
+    selected = body.get("selected_bases", [])
+    if not isinstance(selected, list) or any(not isinstance(x, str) or not NAME_RE.fullmatch(x) for x in selected):
+        raise ValueError("Некорректный список информационных баз")
+    if len(selected) != len(set(selected)):
+        raise ValueError("В списке баз есть повторения")
+    if (enabled or monthly_enabled) and not selected:
+        raise ValueError("Выберите хотя бы одну базу для автоматического резервного копирования")
+    raw_credentials = body.get("credentials", {})
+    if not isinstance(raw_credentials, dict):
+        raise ValueError("Некорректные учётные данные баз")
+    with backup_schedule_lock:
+        credentials = dict(backup_schedule.get("credentials") or {})
+        for base_name in selected:
+            item = raw_credentials.get(base_name, {})
+            if not isinstance(item, dict):
+                raise ValueError("Некорректные учётные данные базы " + base_name)
+            username = item.get("username", "")
+            password = item.get("password", "")
+            if not isinstance(username, str) or len(username) > 256 or not isinstance(password, str) or len(password) > 1024:
+                raise ValueError("Логин или пароль слишком длинный")
+            username = username.strip()
+            if password:
+                credentials[base_name] = {"username": username, "password": password}
+            elif username:
+                previous = credentials.get(base_name, {})
+                credentials[base_name] = {"username": username, "password": previous.get("password", "")}
+            elif base_name in credentials and not item.get("keep_existing", False):
+                credentials.pop(base_name, None)
+        backup_schedule["credentials"] = credentials
+        backup_schedule["selected_bases"] = selected
+        backup_schedule["enabled"] = enabled
+        backup_schedule["daily_time"] = clock_time
+        backup_schedule["monthly_enabled"] = monthly_enabled
+        backup_schedule["max_backups"] = maximum
+        backup_schedule["next_run"] = next_daily_backup(clock_time) if enabled else None
+        backup_schedule["monthly_next_run"] = next_monthly_backup() if monthly_enabled else None
+        backup_schedule["last_result"] = ("Расписание сохранено. " +
+            ("Ежедневные копии — каждый день в %s. " % clock_time if enabled else "") +
+            ("Ежемесячная копия — 1-го числа в 02:00. " if monthly_enabled else ""))
+        if not enabled and not monthly_enabled:
+            backup_schedule["last_result"] = "Автоматическое резервное копирование выключено"
+        save_backup_schedule()
+        result = dict(backup_schedule)
+        result["running"] = backup_running
+        return result
+
+def prune_regular_backups(base_name, maximum):
+    """Ограничивает число обычных .dt для базы; monthly/ не затрагивает."""
+    directory = os.path.join(data_dir("backups"), "dt")
+    if not os.path.isdir(directory):
+        return
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\\.dt$")
+    files = []
+    for entry in os.scandir(directory):
+        if entry.is_file(follow_symlinks=False) and pattern.fullmatch(entry.name):
+            files.append((entry.stat().st_mtime, entry.path))
+    files.sort(reverse=True)
+    for _, path in files[maximum:]:
+        try:
+            os.remove(path)
+            print("Удалена старая обычная копия: " + path, flush=True)
+        except OSError as e:
+            print("Не удалось удалить старую копию %s: %s" % (path, e), flush=True)
+
+
+def move_to_monthly(base_name):
+    """Переносит созданный месячный .dt в отдельный каталог, не участвующий в ротации."""
+    directory = os.path.join(data_dir("backups"), "dt")
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\\.dt$")
+    candidates = []
+    if os.path.isdir(directory):
+        for entry in os.scandir(directory):
+            if entry.is_file(follow_symlinks=False) and pattern.fullmatch(entry.name):
+                candidates.append((entry.stat().st_mtime, entry.path))
+    if not candidates:
+        raise RuntimeError("созданный файл месячной копии базы %s не найден" % base_name)
+    _, source = max(candidates)
+    target_dir = os.path.join(directory, "monthly")
+    os.makedirs(target_dir, exist_ok=True)
+    target = os.path.join(target_dir, os.path.basename(source))
+    shutil.move(source, target)
+    return target
+
+
+def automatic_backup_loop():
+    global backup_running
+    while True:
+        time.sleep(15)
+        now = time.time()
+        with backup_schedule_lock:
+            daily_due = bool(backup_schedule.get("enabled") and backup_schedule.get("next_run")
+                             and now >= backup_schedule["next_run"])
+            monthly_due = bool(backup_schedule.get("monthly_enabled") and backup_schedule.get("monthly_next_run")
+                               and now >= backup_schedule["monthly_next_run"])
+            if (not daily_due and not monthly_due) or backup_running:
+                continue
+            backup_running = True
+            monthly_run = monthly_due
+            if daily_due:
+                backup_schedule["next_run"] = next_daily_backup(backup_schedule.get("daily_time", "02:00"))
+            if monthly_due:
+                backup_schedule["monthly_next_run"] = next_monthly_backup()
+            maximum = int(backup_schedule.get("max_backups", 10))
+            save_backup_schedule()
+        result_lines = []
+        try:
+            if not cfg.get("docker"):
+                raise RuntimeError("Docker недоступен")
+            command = cfg["docker"] + ["exec", "onec-server", "bash", "-lc", RAC["infobases"]]
+            result = subprocess.run(command, capture_output=True, text=True, errors="replace", timeout=60)
+            if result.returncode:
+                raise RuntimeError((result.stderr or result.stdout).strip() or "не удалось получить список баз 1С")
+            available = []
+            for item in parse_rac(result.stdout):
+                name = item.get("name") or item.get("Name")
+                if name and NAME_RE.fullmatch(name):
+                    available.append(name)
+            with backup_schedule_lock:
+                requested_bases = list(backup_schedule.get("selected_bases") or [])
+            bases = [name for name in requested_bases if name in available]
+            if not bases:
+                raise RuntimeError("Не выбраны доступные базы для резервного копирования")
+            for name in bases:
+                backup_env = os.environ.copy()
+                backup_env["DOCKER"] = " ".join(cfg["docker"])
+                with backup_schedule_lock:
+                    credential = (backup_schedule.get("credentials") or {}).get(name, {})
+                proc = subprocess.run(["bash", os.path.join(cfg["server_dir"], "backup.sh"), name,
+                                       credential.get("username", ""), credential.get("password", "")],
+                                      cwd=cfg["server_dir"], env=backup_env, capture_output=True, text=True,
+                                      errors="replace", timeout=6 * 3600)
+                result_lines.append("[%s] %s" % (name, "OK" if proc.returncode == 0 else "ОШИБКА"))
+                if proc.stdout:
+                    result_lines.append(proc.stdout[-5000:])
+                if proc.stderr:
+                    result_lines.append(proc.stderr[-2000:])
+                if proc.returncode:
+                    raise RuntimeError("Ошибка резервного копирования базы %s" % name)
+                if monthly_run:
+                    monthly_path = move_to_monthly(name)
+                    result_lines.append("[%s] Месячная копия сохранена: %s" % (name, monthly_path))
+                else:
+                    prune_regular_backups(name, maximum)
+            summary = ("Ежемесячная копия создана: " if monthly_run else "Успешно: ") + ", ".join(bases)
+        except Exception as e:
+            summary = "Ошибка автоматического бэкапа: " + str(e)
+        finally:
+            with backup_schedule_lock:
+                backup_schedule["last_run"] = time.time()
+                backup_schedule["last_result"] = summary
+                backup_running = False
+                save_backup_schedule()
+        print("\\n".join(result_lines[-30:]), flush=True)
+
 def api_get(path, q):
     if path == "/api/settings":
         return settings_snapshot()
+    if path == "/api/backup_schedule":
+        return backup_schedule_snapshot()
+    if path == "/api/backup_bases":
+        r = dk("exec", "onec-server", "bash", "-lc", RAC["infobases"])
+        if r.returncode:
+            raise ValueError((r.stderr or r.stdout).strip() or "не удалось получить список баз")
+        names = []
+        for item in parse_rac(r.stdout):
+            name = item.get("name") or item.get("Name")
+            if name and NAME_RE.fullmatch(name):
+                names.append(name)
+        return {"items": sorted(set(names), key=str.lower)}
     if path == "/api/browse_dirs":
         requested = q.get("path", [os.path.expanduser("~")])[0]
         if len(requested) > 1000 or any(ord(ch) < 32 for ch in requested):
@@ -762,6 +1015,8 @@ class H(BaseHTTPRequestHandler):
             body = json.loads(self.rfile.read(n) or b"{}")
             if u.path == "/api/settings":
                 return self._send(200, save_settings(body))
+            if u.path == "/api/backup_schedule":
+                return self._send(200, save_backup_schedule_request(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
             if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
@@ -783,6 +1038,8 @@ def main():
     a = ap.parse_args()
     cfg.update(server_dir=os.path.abspath(a.server_dir), client_dir=os.path.abspath(a.client_dir),
                token=a.token or secrets.token_urlsafe(16), docker=detect_docker())
+    load_backup_schedule()
+    threading.Thread(target=automatic_backup_loop, daemon=True, name="automatic-backups").start()
     try:
         srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
     except OSError as e:

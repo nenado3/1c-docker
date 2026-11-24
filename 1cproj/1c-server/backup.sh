@@ -62,7 +62,8 @@ fi
 
 STAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_KIND_DIR="${BACKUP_DIR%/}/$KIND"
-mkdir -p "$BACKUP_KIND_DIR" || die "не удалось создать каталог $BACKUP_KIND_DIR"
+LOG_DIR="${BACKUP_DIR%/}/logs"
+mkdir -p "$BACKUP_KIND_DIR" "$LOG_DIR" || die "не удалось создать каталоги резервных копий или журналов"
 FILE="${IB}_${STAMP}.${KIND}"
 LOGF="backup_${STAMP}.log"
 
@@ -77,13 +78,13 @@ IB="$1"; U="$2"; P="$3"; OUT="$4"; LOG="$5"; OP="$6"
 AUTH=(); [ -n "$U" ] && AUTH=(/N "$U" /P "$P")
 /usr/local/bin/1c-xvfb /opt/1cv8/current/1cv8 DESIGNER /S "onec-server:1541\\${IB}" "${AUTH[@]}" \
     /DisableStartupDialogs /DisableStartupMessages "$OP" "$OUT" /Out "$LOG"
-' _ "$IB" "$IB_USER" "$IB_PASS" "/home/usr1cv8/backups/$KIND/$FILE" "/home/usr1cv8/backups/$KIND/$LOGF" "$OP" || RC=$?
+' _ "$IB" "$IB_USER" "$IB_PASS" "/home/usr1cv8/backups/$KIND/$FILE" "/home/usr1cv8/backups/logs/$LOGF" "$OP" || RC=$?
 
 echo "--- журнал конфигуратора ---"
-cat "${BACKUP_KIND_DIR}/$LOGF" 2>/dev/null || echo "(журнал пуст)"
+cat "${LOG_DIR}/$LOGF" 2>/dev/null || echo "(журнал пуст)"
 echo "----------------------------"
 
-$DOCKER compose exec -T onec-server chmod a+rw "/home/usr1cv8/backups/$KIND/$FILE" "/home/usr1cv8/backups/$KIND/$LOGF" 2>/dev/null || true
+$DOCKER compose exec -T onec-server chmod a+rw "/home/usr1cv8/backups/$KIND/$FILE" "/home/usr1cv8/backups/logs/$LOGF" 2>/dev/null || true
 if [ $RC -eq 0 ] && [ -s "${BACKUP_KIND_DIR}/$FILE" ]; then
     ls -lh "${BACKUP_KIND_DIR}/$FILE"
     echo "Готово: $(cd "$BACKUP_KIND_DIR" && pwd)/$FILE"

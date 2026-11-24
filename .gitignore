@@ -21,3 +21,7 @@ __pycache__/
 # Local 1C installer packages are supplied by the operator
 **/dist/*.deb
 **/dist/*.run
+
+# Local automatic backup scheduler state
+**/.backup-schedule.json
+**/.backup-schedule.json.tmp
