@@ -215,14 +215,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <details class="settings-card" style="margin:0 0 14px;padding:0">
       <summary style="cursor:pointer;padding:18px;font-weight:600">Автоматическое резервное копирование</summary>
       <div style="padding:0 18px 18px">
-        <p class="mut" style="margin:0 0 12px">Выберите базы 1С и время ежедневной выгрузки. Панель будет создавать полные архивы .dt выбранных баз в каталоге BACKUP_DIR/dt.</p>
+        <p class="mut" style="margin:0 0 12px">Выберите базы 1С и время ежедневной выгрузки. Перед каждой копией панель временно запрещает новые подключения и регламентные задания, завершает текущие сеансы пользователей, создаёт .dt и затем автоматически открывает базу снова. На время выгрузки пользователи не смогут войти в выбранную базу.</p>
         <label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input id="backupScheduleEnabled" type="checkbox" style="min-width:auto"> Включить автоматические бэкапы</label>
         <details id="backupBaseDropdown" style="margin:12px 0;max-width:520px">
           <summary id="backupBaseSummary" style="cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px">Выбрать базы 1С</summary>
           <div id="backupScheduleBases" style="display:flex;flex-direction:column;gap:9px;padding:12px;max-height:220px;overflow:auto;border:1px solid var(--border);border-top:0;border-radius:0 0 8px 8px"><span class="mut">Загрузка списка баз…</span></div>
         </details>
         <div id="backupCredentials" style="display:flex;flex-direction:column;gap:10px;margin:12px 0;max-width:650px">
-          <div class="mut">Учётные данные для выбранных баз. Если у базы нет пароля, оставьте поля пустыми. Сохранённые пароли не отображаются.</div>
+          <div class="mut">Для автоматического отключения пользователей укажите пользователя и пароль администратора каждой выбранной базы 1С. Эти данные нужны для временной блокировки новых сеансов и регламентных заданий. Сохранённые пароли не отображаются.</div>
         </div>
         <div class="row">
           <label for="backupDailyTime" style="margin:0">Ежедневно выгружать в</label>
