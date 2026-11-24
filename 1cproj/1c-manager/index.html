@@ -214,15 +214,15 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <details class="settings-card" style="margin:0 0 14px;padding:0">
       <summary style="cursor:pointer;padding:18px;font-weight:600">Автоматическое резервное копирование</summary>
       <div style="padding:0 18px 18px">
-        <p class="mut" style="margin:0 0 12px">Выберите базы 1С и интервал. Панель будет создавать полные архивы .dt выбранных баз в каталоге BACKUP_DIR/dt.</p>
+        <p class="mut" style="margin:0 0 12px">Выберите базы 1С и время ежедневной выгрузки. Панель будет создавать полные архивы .dt выбранных баз в каталоге BACKUP_DIR/dt.</p>
         <label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input id="backupScheduleEnabled" type="checkbox" style="min-width:auto"> Включить автоматические бэкапы</label>
         <details id="backupBaseDropdown" style="margin:12px 0;max-width:520px">
           <summary id="backupBaseSummary" style="cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px">Выбрать базы 1С</summary>
           <div id="backupScheduleBases" style="display:flex;flex-direction:column;gap:9px;padding:12px;max-height:220px;overflow:auto;border:1px solid var(--border);border-top:0;border-radius:0 0 8px 8px"><span class="mut">Загрузка списка баз…</span></div>
         </details>
         <div class="row">
-          <label for="backupScheduleHours" style="margin:0">Интервал (часов)</label>
-          <input id="backupScheduleHours" type="number" min="1" max="720" step="1" value="24" style="width:110px;min-width:110px">
+          <label for="backupDailyTime" style="margin:0">Ежедневно выгружать в</label>
+          <input id="backupDailyTime" type="time" value="02:00" style="width:130px;min-width:130px">
           <label for="backupMaxCount" style="margin:0 0 0 10px">Макс. обычных копий</label>
           <input id="backupMaxCount" type="number" min="1" max="1000" step="1" value="10" style="width:110px;min-width:110px">
         </div>
@@ -749,7 +749,7 @@ async function loadBackupSchedule() {
   if (b.error) { $('backupScheduleBases').textContent = 'Не удалось получить базы: ' + b.error; return; }
   $('backupScheduleEnabled').checked = !!r.enabled;
   $('backupMonthlyEnabled').checked = !!r.monthly_enabled;
-  $('backupScheduleHours').value = r.interval_hours || 24;
+  $('backupDailyTime').value = r.daily_time || '02:00';
   $('backupMaxCount').value = r.max_backups || 10;
   const selected = new Set(r.selected_bases || []);
   const bases = b.items || [];
@@ -763,14 +763,10 @@ async function loadBackupSchedule() {
   const when = ts => ts ? new Date(ts * 1000).toLocaleString() : '—';
   $('backupScheduleStatus').textContent = (r.running ? 'Сейчас выполняется резервное копирование. ' : '') +
     (r.last_result || '') + ' Последний запуск: ' + when(r.last_run) +
-    '. Следующая обычная копия: ' + when(r.next_run) +
+    '. Следующая ежедневная копия: ' + when(r.next_run) +
     '. Следующая месячная копия: ' + when(r.monthly_next_run) + '.';
 }
 async function saveBackupSchedule() {
-  const hours = Number($('backupScheduleHours').value);
-  if (!Number.isInteger(hours) || hours < 1 || hours > 720) {
-    $('backupScheduleStatus').textContent = 'Укажите интервал от 1 до 720 часов.'; return;
-  }
   $('saveBackupSchedule').disabled = true;
   const maximum = Number($('backupMaxCount').value);
   if (!Number.isInteger(maximum) || maximum < 1 || maximum > 1000) {
@@ -778,7 +774,8 @@ async function saveBackupSchedule() {
   }
   const selected_bases = Array.from(document.querySelectorAll('[data-backup-base]:checked')).map(x => x.dataset.backupBase);
   const r = await api('/api/backup_schedule', {enabled:$('backupScheduleEnabled').checked,
-    monthly_enabled:$('backupMonthlyEnabled').checked, interval_hours:hours, max_backups:maximum, selected_bases});
+    monthly_enabled:$('backupMonthlyEnabled').checked, daily_time:$('backupDailyTime').value,
+    max_backups:maximum, selected_bases});
   $('saveBackupSchedule').disabled = false;
   if (r.error) { $('backupScheduleStatus').textContent = 'Ошибка: ' + r.error; return; }
   await loadBackupSchedule();
