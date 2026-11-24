@@ -210,6 +210,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-files">
+    <div class="row"><button class="b sec" id="refreshF">Обновить</button></div>
     <details class="settings-card" style="margin:0 0 14px;padding:0">
       <summary style="cursor:pointer;padding:18px;font-weight:600">Автоматическое резервное копирование</summary>
       <div style="padding:0 18px 18px">
@@ -228,7 +229,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <div id="backupScheduleStatus" class="mut" aria-live="polite">Загрузка расписания…</div>
       </div>
     </details>
-    <div class="row"><button class="b sec" id="refreshF">Обновить</button></div>
     <h2>Выгрузки сервера (backup) <span class="mut mono" id="dirBackups"></span></h2>
     <table><thead><tr><th>Файл / папка</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fBackups"></tbody></table>
     <h2>Выгрузки клиента (export) <span class="mut mono" id="dirExport"></span></h2>
