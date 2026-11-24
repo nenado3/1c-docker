@@ -210,6 +210,19 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-files">
+    <div class="settings-card" style="margin:0 0 18px;padding:18px">
+      <h2 style="margin:0 0 6px">Автоматическое резервное копирование</h2>
+      <p class="mut" style="margin:0 0 12px">Выберите базы 1С и интервал. Панель будет создавать полные архивы .dt выбранных баз в каталоге BACKUP_DIR/dt.</p>
+      <label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input id="backupScheduleEnabled" type="checkbox" style="min-width:auto"> Включить автоматические бэкапы</label>
+      <div id="backupScheduleBases" style="display:flex;flex-wrap:wrap;gap:12px;margin:12px 0"><span class="mut">Загрузка списка баз…</span></div>
+      <div class="row">
+        <label for="backupScheduleHours" style="margin:0">Интервал (часов)</label>
+        <input id="backupScheduleHours" type="number" min="1" max="720" step="1" value="24" style="width:110px;min-width:110px">
+        <button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button>
+        <button class="b sec" id="refreshBackupSchedule" type="button">Обновить статус</button>
+      </div>
+      <div id="backupScheduleStatus" class="mut" aria-live="polite">Загрузка расписания…</div>
+    </div>
     <div class="row"><button class="b sec" id="refreshF">Обновить</button></div>
     <h2>Выгрузки сервера (backup) <span class="mut mono" id="dirBackups"></span></h2>
     <table><thead><tr><th>Файл / папка</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fBackups"></tbody></table>
@@ -253,18 +266,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     </div>
     <div id="settingsStatus" class="settings-status" aria-live="polite">Загружаю настройки…</div>
     <div id="settingsFields"></div>
-    <div class="settings-card" style="margin-top:16px;padding:18px">
-      <h3 style="margin:0 0 6px">Автоматическое резервное копирование</h3>
-      <p class="mut" style="margin:0 0 12px">Панель будет автоматически создавать полные архивы .dt всех информационных баз 1С по расписанию. Копии сохраняются в настроенном каталоге BACKUP_DIR/dt.</p>
-      <label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input id="backupScheduleEnabled" type="checkbox" style="min-width:auto"> Включить автоматические бэкапы</label>
-      <div class="row">
-        <label for="backupScheduleHours" style="margin:0">Интервал (часов)</label>
-        <input id="backupScheduleHours" type="number" min="1" max="720" step="1" value="24" style="width:110px;min-width:110px">
-        <button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button>
-        <button class="b sec" id="refreshBackupSchedule" type="button">Обновить статус</button>
-      </div>
-      <div id="backupScheduleStatus" class="mut" aria-live="polite">Загрузка расписания…</div>
-    </div>
+
     <div class="settings-actions">
       <span class="settings-actions-note">Изменения вступят в силу после применения конфигурации.</span>
       <div class="row"><button class="b sec" id="reloadSettings">↻ Перечитать</button><button class="b" id="saveSettings">Сохранить настройки</button></div>
