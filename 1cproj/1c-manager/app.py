@@ -465,8 +465,10 @@ def save_backup_schedule():
     if not backup_schedule_path:
         return
     tmp = backup_schedule_path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(backup_schedule, f, ensure_ascii=False, indent=2)
+    os.chmod(tmp, 0o600)
     os.replace(tmp, backup_schedule_path)
 
 
@@ -517,6 +519,11 @@ def load_backup_schedule():
 def backup_schedule_snapshot():
     with backup_schedule_lock:
         result = dict(backup_schedule)
+        credentials = result.pop("credentials", {}) or {}
+        result["credential_status"] = {
+            name: {"username": item.get("username", ""), "has_password": bool(item.get("password"))}
+            for name, item in credentials.items() if isinstance(item, dict)
+        }
         result["running"] = backup_running
         return result
 
@@ -540,7 +547,28 @@ def save_backup_schedule_request(body):
         raise ValueError("В списке баз есть повторения")
     if (enabled or monthly_enabled) and not selected:
         raise ValueError("Выберите хотя бы одну базу для автоматического резервного копирования")
+    raw_credentials = body.get("credentials", {})
+    if not isinstance(raw_credentials, dict):
+        raise ValueError("Некорректные учётные данные баз")
     with backup_schedule_lock:
+        credentials = dict(backup_schedule.get("credentials") or {})
+        for base_name in selected:
+            item = raw_credentials.get(base_name, {})
+            if not isinstance(item, dict):
+                raise ValueError("Некорректные учётные данные базы " + base_name)
+            username = item.get("username", "")
+            password = item.get("password", "")
+            if not isinstance(username, str) or len(username) > 256 or not isinstance(password, str) or len(password) > 1024:
+                raise ValueError("Логин или пароль слишком длинный")
+            username = username.strip()
+            if password:
+                credentials[base_name] = {"username": username, "password": password}
+            elif username:
+                previous = credentials.get(base_name, {})
+                credentials[base_name] = {"username": username, "password": previous.get("password", "")}
+            elif base_name in credentials and not item.get("keep_existing", False):
+                credentials.pop(base_name, None)
+        backup_schedule["credentials"] = credentials
         backup_schedule["selected_bases"] = selected
         backup_schedule["enabled"] = enabled
         backup_schedule["daily_time"] = clock_time
@@ -637,7 +665,10 @@ def automatic_backup_loop():
             for name in bases:
                 backup_env = os.environ.copy()
                 backup_env["DOCKER"] = " ".join(cfg["docker"])
-                proc = subprocess.run(["bash", os.path.join(cfg["server_dir"], "backup.sh"), name],
+                with backup_schedule_lock:
+                    credential = (backup_schedule.get("credentials") or {}).get(name, {})
+                proc = subprocess.run(["bash", os.path.join(cfg["server_dir"], "backup.sh"), name,
+                                       credential.get("username", ""), credential.get("password", "")],
                                       cwd=cfg["server_dir"], env=backup_env, capture_output=True, text=True,
                                       errors="replace", timeout=6 * 3600)
                 result_lines.append("[%s] %s" % (name, "OK" if proc.returncode == 0 else "ОШИБКА"))
