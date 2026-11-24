@@ -508,7 +508,9 @@ def save_backup_schedule_request(body):
         backup_schedule["last_result"] = ("Расписание включено; первая копия будет создана через %d ч." % hours
                                           if enabled else "Автоматическое резервное копирование выключено")
         save_backup_schedule()
-        return backup_schedule_snapshot()
+        result = dict(backup_schedule)
+        result["running"] = backup_running
+        return result
 
 
 def automatic_backup_loop():
@@ -539,8 +541,10 @@ def automatic_backup_loop():
             if not bases:
                 raise RuntimeError("Список баз пуст или RAC не вернул имена баз")
             for name in bases:
+                backup_env = os.environ.copy()
+                backup_env["DOCKER"] = " ".join(cfg["docker"])
                 proc = subprocess.run(["bash", os.path.join(cfg["server_dir"], "backup.sh"), name],
-                                      cwd=cfg["server_dir"], capture_output=True, text=True,
+                                      cwd=cfg["server_dir"], env=backup_env, capture_output=True, text=True,
                                       errors="replace", timeout=6 * 3600)
                 result_lines.append("[%s] %s" % (name, "OK" if proc.returncode == 0 else "ОШИБКА"))
                 if proc.stdout:
