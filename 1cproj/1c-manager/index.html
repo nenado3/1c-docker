@@ -731,13 +731,16 @@ async function loadSettings() {
   out += '</div>';
   $('settingsFields').innerHTML = out;
   $('settingsStatus').textContent = '✓ Настройки загружены из файлов .env.';
-  await loadBackupSchedule();
 }
 async function loadBackupSchedule() {
-  const r = await api('/api/backup_schedule');
+  const [r, b] = await Promise.all([api('/api/backup_schedule'), api('/api/backup_bases')]);
   if (r.error) { $('backupScheduleStatus').textContent = 'Ошибка: ' + r.error; return; }
+  if (b.error) { $('backupScheduleBases').textContent = 'Не удалось получить базы: ' + b.error; return; }
   $('backupScheduleEnabled').checked = !!r.enabled;
   $('backupScheduleHours').value = r.interval_hours || 24;
+  const selected = new Set(r.selected_bases || []);
+  const bases = b.items || [];
+  $('backupScheduleBases').innerHTML = bases.length ? bases.map(name => '<label style="display:flex;align-items:center;gap:6px;color:var(--fg)"><input type="checkbox" data-backup-base="' + esc(name) + '" ' + (selected.has(name) ? 'checked' : '') + ' style="min-width:auto">' + esc(name) + '</label>').join('') : '<span class="mut">Информационные базы не найдены</span>';
   const when = ts => ts ? new Date(ts * 1000).toLocaleString() : '—';
   $('backupScheduleStatus').textContent = (r.running ? 'Сейчас выполняется резервное копирование. ' : '') +
     (r.last_result || '') + ' Последний запуск: ' + when(r.last_run) +
@@ -749,7 +752,8 @@ async function saveBackupSchedule() {
     $('backupScheduleStatus').textContent = 'Укажите интервал от 1 до 720 часов.'; return;
   }
   $('saveBackupSchedule').disabled = true;
-  const r = await api('/api/backup_schedule', {enabled:$('backupScheduleEnabled').checked, interval_hours:hours});
+  const selected_bases = Array.from(document.querySelectorAll('[data-backup-base]:checked')).map(x => x.dataset.backupBase);
+  const r = await api('/api/backup_schedule', {enabled:$('backupScheduleEnabled').checked, interval_hours:hours, selected_bases});
   $('saveBackupSchedule').disabled = false;
   if (r.error) { $('backupScheduleStatus').textContent = 'Ошибка: ' + r.error; return; }
   await loadBackupSchedule();
@@ -811,7 +815,8 @@ function loadTab(t) {
   if (t === 'containers') { loadContainers().then(loadLogs); loadMemory(); }
   else if (t === 'bases') loadBases();
   else if (t === 'pg') loadPg();
-  else if (t === 'files' || t === 'client') loadFiles();
+  else if (t === 'files') { loadFiles(); loadBackupSchedule(); }
+  else if (t === 'client') loadFiles();
   else if (t === 'build') loadBuild();
   else if (t === 'settings') loadSettings();
 }
