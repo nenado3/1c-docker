@@ -34,7 +34,7 @@ RUN SYS_LIB="$(ldconfig -p | grep -m1 "libstdc++.so.6 " | sed -E "s/.*=>[[:space
     && test -n "$SYS_LIB" \
     && grep -aFq "GLIBCXX_3.4.30" "$SYS_LIB"
 
-RUN printf '#!/bin/sh\\nexit 101\\n' > /usr/sbin/policy-rc.d \
+RUN printf '%s\n' '#!/bin/sh' 'exit 101' > /usr/sbin/policy-rc.d \
     && chmod +x /usr/sbin/policy-rc.d
 
 RUN groupadd -g 1001 grp1cv8 \
@@ -43,7 +43,7 @@ RUN groupadd -g 1001 grp1cv8 \
     && chown -R usr1cv8:grp1cv8 /home/usr1cv8 /var/log/1C /var/www/onec \
     && sed -i 's/^export APACHE_RUN_USER=.*/export APACHE_RUN_USER=usr1cv8/' /etc/apache2/envvars \
     && sed -i 's/^export APACHE_RUN_GROUP=.*/export APACHE_RUN_GROUP=grp1cv8/' /etc/apache2/envvars \
-    && printf 'ServerName localhost\\n' > /etc/apache2/conf-available/servername.conf \
+    && printf '%s\n' 'ServerName localhost' > /etc/apache2/conf-available/servername.conf \
     && a2enconf servername
 
 ARG ONEC_RUN_COMPONENTS=server,server_admin,client_full,ws,ru

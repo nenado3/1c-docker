@@ -21,6 +21,10 @@ mkdir -p /var/www/onec /var/run/apache2 /var/lock/apache2 /etc/apache2/ssl
 chown -R usr1cv8:grp1cv8 /var/www/onec
 
 a2enmod ssl rewrite headers >/dev/null
+a2dissite 000-default >/dev/null
+# Persistent apache-config volumes can hide defaults from a newer image.
+printf 'ServerName localhost\n' > /etc/apache2/conf-available/servername.conf
+a2enconf servername >/dev/null
 CERT_FILE="${HTTPS_CERT_FILE:-/etc/apache2/ssl/onec.crt}"
 KEY_FILE="${HTTPS_KEY_FILE:-/etc/apache2/ssl/onec.key}"
 
@@ -35,7 +39,10 @@ else
         openssl req -x509 -nodes -newkey rsa:3072 -sha256 -days 825 \
             -keyout "$KEY_FILE" -out "$CERT_FILE" \
             -subj "/CN=onec-server" \
-            -addext "subjectAltName=${HTTPS_CERT_SAN:-IP:192.168.239.130,IP:127.0.0.1,DNS:localhost,DNS:onec-server}"
+            -addext "basicConstraints=critical,CA:FALSE" \
+            -addext "keyUsage=critical,digitalSignature,keyEncipherment" \
+            -addext "extendedKeyUsage=serverAuth" \
+            -addext "subjectAltName=${HTTPS_CERT_SAN:-IP:192.168.239.130,IP:192.168.1.144,IP:127.0.0.1,DNS:localhost,DNS:onec-server,DNS:DESKTOP-MKJ07U7}"
         chmod 600 "$KEY_FILE"
         chmod 644 "$CERT_FILE"
     fi
@@ -45,7 +52,9 @@ cat > /etc/apache2/conf-available/onec-https.conf <<APACHE_TLS
 <VirtualHost *:80>
     ServerName localhost
     RewriteEngine On
-    RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L,NE]
+    RewriteCond %{HTTP_HOST} ^(\[[0-9a-fA-F:]+\]|[A-Za-z0-9.-]+)(?::[0-9]+)?$
+    RewriteRule ^ https://%1%{REQUEST_URI} [R=301,L,NE]
+    RewriteRule ^ - [R=400,L]
 </VirtualHost>
 
 <VirtualHost *:443>
@@ -64,6 +73,9 @@ APACHE_TLS
 
 a2enconf onec-https >/dev/null
 apache2ctl configtest
+if [[ "${1:-}" == "--configure-apache-only" ]]; then
+    exit 0
+fi
 apache2ctl -k start
 
 # RAS доступен только на localhost хоста через проброс 127.0.0.1:1545.

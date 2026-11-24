@@ -36,7 +36,7 @@ services:
     environment:
       HTTPS_CERT_FILE: ${HTTPS_CERT_FILE:-}
       HTTPS_KEY_FILE: ${HTTPS_KEY_FILE:-}
-      HTTPS_CERT_SAN: ${HTTPS_CERT_SAN:-IP:192.168.239.130,IP:127.0.0.1,DNS:localhost,DNS:onec-server}
+      HTTPS_CERT_SAN: ${HTTPS_CERT_SAN:-IP:192.168.239.130,IP:192.168.1.144,IP:127.0.0.1,DNS:localhost,DNS:onec-server,DNS:DESKTOP-MKJ07U7}
     ports:
       - "80:80"
       - "443:443"
