@@ -203,7 +203,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <button class="b" data-act="server-up">Запустить сервер (postgres + 1С)</button>
       <button class="b sec" data-act="server-stop">Остановить сервер</button>
       <button class="b sec" data-act="client-up">Запустить клиентский контейнер</button>
-      <button class="b sec" id="refreshC">Обновить</button>
     </div>
     <h2>Память сервера 1С</h2>
     <div class="row">
@@ -229,7 +228,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <span id="apacheState" class="badge">Apache: проверка…</span>
       <button class="b sec" id="apacheToggle" data-apache="start">Запустить Apache</button>
       <button class="b sec" data-apache="restart">Перезапустить Apache</button>
-      <button class="b sec" id="refreshB">Обновить</button>
     </div>
     <p class="mut">Публикация веб-клиента выполняется для выбранной базы. После публикации откройте <span class="mono">http://IP-СЕРВЕРА/имя-базы</span>. Порты 80 и 443 обслуживаются контейнером onec-server.</p>
     <div id="bErr" class="mut"></div>
@@ -241,7 +239,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-pg">
-    <div class="row"><button class="b sec" id="refreshP">Обновить</button><button class="b" id="openPgRestore">Загрузить .dump и восстановить</button></div>
+    <div class="row"><button class="b" id="openPgRestore">Загрузить .dump и восстановить</button></div>
     <div id="pErr" class="mut"></div>
     <p class="mut">Удаление базы PostgreSQL необратимо. Если она используется информационной базой 1С, сначала убедитесь, что удаляете правильную базу.</p>
     <table><thead><tr><th>База PostgreSQL</th><th>Размер</th><th>Действия</th></tr></thead>
@@ -249,7 +247,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-files">
-    <div class="row"><button class="b sec" id="refreshF">Обновить</button></div>
     <details class="settings-card" style="margin:0 0 14px;padding:0">
       <summary style="cursor:pointer;padding:18px;font-weight:600">Автоматическое резервное копирование</summary>
       <div style="padding:0 18px 18px">
@@ -272,7 +269,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
         <p class="mut" style="margin:4px 0 12px">Месячные копии сохраняются отдельно в dt/monthly и никогда не удаляются автоматической ротацией. Лимит применяется только к обычным копиям.</p>
         <div class="row">
           <button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button>
-          <button class="b sec" id="refreshBackupSchedule" type="button">Обновить статус</button>
         </div>
         <div id="backupScheduleStatus" class="mut" aria-live="polite">Загрузка расписания…</div>
       </div>
@@ -1089,7 +1085,6 @@ function uploadPgDump(file, db) {
     xhr.send(file);
   });
 };
-$('refreshC').onclick = () => loadTab('containers'); $('refreshB').onclick = loadBases; $('refreshP').onclick = loadPg; $('refreshF').onclick = loadFiles;
 $('openServerLicenseDialog').onclick = () => {
   $('serverLicenseStatus').textContent = '';
   $('serverLicenseFile').value = '';
@@ -1131,11 +1126,17 @@ $('clearCon').onclick = () => {
   }
 };
 $('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
-$('saveBackupSchedule').onclick = saveBackupSchedule; $('refreshBackupSchedule').onclick = loadBackupSchedule;
- // Проверяем доступность веб-публикаций каждые 10 секунд, пока открыта вкладка «Базы 1С».
+$('saveBackupSchedule').onclick = saveBackupSchedule;
+ // Автоматически обновляем данные активной вкладки без ручных кнопок.
+ // Не обновляем во время фоновой задачи, открытого диалога или скрытой страницы,
+ // чтобы не сбрасывать введённые данные и не мешать работе пользователя.
  setInterval(() => {
-   if (document.querySelector('[data-tab="bases"].on')) loadBases();
- }, 10000);
+   if (document.hidden || polling || document.querySelector('dialog[open]')) return;
+   const active = document.querySelector('#tabs button.on');
+   if (!active) return;
+   const tab = active.dataset.tab;
+   if (['containers', 'bases', 'pg', 'files', 'client'].includes(tab)) loadTab(tab);
+ }, 15000);
 document.addEventListener('click', e => {
   if (e.target.closest('#chooseBackupDir')) openBackupPicker();
 });
