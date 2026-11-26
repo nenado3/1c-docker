@@ -1073,6 +1073,8 @@ def api_get(path, q):
         return settings_snapshot()
     if path == "/api/backup_schedule":
         return backup_schedule_snapshot()
+    if path == "/api/update_schedule":
+        return update_schedule_snapshot()
     if path == "/api/backup_bases":
         r = dk("exec", "onec-server", "bash", "-lc", RAC["infobases"])
         if r.returncode:
@@ -1514,6 +1516,8 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, save_settings(body))
             if u.path == "/api/backup_schedule":
                 return self._send(200, save_backup_schedule_request(body))
+            if u.path == "/api/update_schedule":
+                return self._send(200, save_update_schedule_request(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
             if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "postgres_create_admin", "postgres_update_role", "postgres_drop_db", "backup_pg", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
@@ -1535,8 +1539,10 @@ def main():
     cfg.update(server_dir=os.path.abspath(a.server_dir),
                token=a.token or secrets.token_urlsafe(16), docker=detect_docker())
     load_backup_schedule()
+    load_update_schedule()
     migrate_legacy_backups()
     threading.Thread(target=automatic_backup_loop, daemon=True, name="automatic-backups").start()
+    threading.Thread(target=automatic_update_loop, daemon=True, name="automatic-updates").start()
     try:
         srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
     except OSError as e:
