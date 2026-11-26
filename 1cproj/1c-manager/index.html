@@ -407,6 +407,7 @@ input[type="checkbox"],input[type="radio"]{
   <button data-tab="containers" class="on">Контейнеры</button>
   <button data-tab="bases">Базы 1С</button>
   <button data-tab="pg">PostgreSQL</button>
+  <button data-tab="automation">Автоматизация</button>
   <button data-tab="files">Выгрузки</button>
   <button data-tab="build">Сборка</button>
   <button data-tab="settings">Настройки</button>
@@ -453,6 +454,35 @@ input[type="checkbox"],input[type="radio"]{
     <div id="bErr" class="mut"></div>
     <table><thead><tr><th>Имя</th><th>Идентификатор</th><th>Описание</th><th>Действия</th></tr></thead>
       <tbody id="bBody"><tr><td colspan="4" class="mut">Загрузка…</td></tr></tbody></table>
+
+    <h2>Сеансы</h2>
+    <table><thead><tr><th>Пользователь</th><th>Приложение</th><th>Начало</th><th>Статус</th><th>Действия</th></tr></thead>
+      <tbody id="sBody"><tr><td colspan="5" class="mut">Загрузка…</td></tr></tbody></table>
+  </section>
+
+  <section id="t-pg">
+    <div class="row">
+      <button class="b" id="openPgRestore">Загрузить .dump и восстановить</button>
+      <button class="b sec" id="openPgAdmin">Добавить администратора PostgreSQL</button>
+    </div>
+    <div id="pErr" class="mut"></div>
+    <p class="mut">Удаление базы PostgreSQL необратимо. Если она используется информационной базой 1С, сначала убедитесь, что удаляете правильную базу.</p>
+    <table><thead><tr><th>База PostgreSQL</th><th>Размер</th><th>Действия</th></tr></thead>
+      <tbody id="pBody"><tr><td colspan="3" class="mut">Загрузка…</td></tr></tbody></table>
+    <details class="settings-card pg-roles-card" style="margin-top:16px">
+      <summary style="cursor:pointer;padding:14px 16px;font-weight:600">Пользователи и права PostgreSQL</summary>
+      <div style="padding:0 16px 16px">
+        <p class="mut">Показаны атрибуты ролей PostgreSQL и членство в других ролях. Пароли пользователей PostgreSQL не отображаются.</p>
+        <div id="pgRolesError" class="mut" role="status"></div>
+        <table><thead><tr><th>Пользователь / роль</th><th>Вход</th><th>Администратор</th><th>Создание БД</th><th>Управление ролями</th><th>Репликация</th><th>Обход RLS</th><th>Членство в ролях</th><th>Действия</th></tr></thead>
+          <tbody id="pgRolesBody"><tr><td colspan="9" class="mut">Загрузка…</td></tr></tbody></table>
+      </div>
+    </details>
+  </section>
+
+  <section id="t-automation">
+    <h2>Автоматизация</h2>
+    <p class="mut">Настройка регулярного обновления и резервного копирования информационных баз 1С.</p>
     <div class="weekly-update-launch" style="margin-top:16px">
       <button class="b sec" id="openWeeklyUpdate" type="button">↻ Автоматическое обновление базы 1С</button>
     </div>
@@ -484,32 +514,6 @@ input[type="checkbox"],input[type="radio"]{
         <div id="weeklyUpdateStatus" aria-live="polite" class="backupScheduleStatus">Загрузка расписания…</div>
       </div>
     </dialog>
-    <h2>Сеансы</h2>
-    <table><thead><tr><th>Пользователь</th><th>Приложение</th><th>Начало</th><th>Статус</th><th>Действия</th></tr></thead>
-      <tbody id="sBody"><tr><td colspan="5" class="mut">Загрузка…</td></tr></tbody></table>
-  </section>
-
-  <section id="t-pg">
-    <div class="row">
-      <button class="b" id="openPgRestore">Загрузить .dump и восстановить</button>
-      <button class="b sec" id="openPgAdmin">Добавить администратора PostgreSQL</button>
-    </div>
-    <div id="pErr" class="mut"></div>
-    <p class="mut">Удаление базы PostgreSQL необратимо. Если она используется информационной базой 1С, сначала убедитесь, что удаляете правильную базу.</p>
-    <table><thead><tr><th>База PostgreSQL</th><th>Размер</th><th>Действия</th></tr></thead>
-      <tbody id="pBody"><tr><td colspan="3" class="mut">Загрузка…</td></tr></tbody></table>
-    <details class="settings-card pg-roles-card" style="margin-top:16px">
-      <summary style="cursor:pointer;padding:14px 16px;font-weight:600">Пользователи и права PostgreSQL</summary>
-      <div style="padding:0 16px 16px">
-        <p class="mut">Показаны атрибуты ролей PostgreSQL и членство в других ролях. Пароли пользователей PostgreSQL не отображаются.</p>
-        <div id="pgRolesError" class="mut" role="status"></div>
-        <table><thead><tr><th>Пользователь / роль</th><th>Вход</th><th>Администратор</th><th>Создание БД</th><th>Управление ролями</th><th>Репликация</th><th>Обход RLS</th><th>Членство в ролях</th><th>Действия</th></tr></thead>
-          <tbody id="pgRolesBody"><tr><td colspan="9" class="mut">Загрузка…</td></tr></tbody></table>
-      </div>
-    </details>
-  </section>
-
-  <section id="t-files">
     <details class="settings-card backup-card">
       <summary class="backup-summary">
         <span class="backup-summary-icon" aria-hidden="true">▤</span>
@@ -524,6 +528,10 @@ input[type="checkbox"],input[type="radio"]{
             <summary id="backupBaseSummary">Выбрать базы 1С</summary>
             <div id="backupScheduleBases" style="display:flex;flex-direction:column;gap:9px;padding:12px;max-height:220px;overflow:auto;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px"><span class="mut">Загрузка списка баз…</span></div>
           </details>
+  </section>
+
+  <section id="t-files">
+
         </div>
         <div id="backupCredentials">
           <div>Для автоматического отключения пользователей укажите пользователя и пароль администратора каждой выбранной базы 1С. Эти данные нужны для временной блокировки новых сеансов и регламентных заданий. Сохранённые пароли не отображаются.</div>
@@ -1309,7 +1317,8 @@ function loadTab(t) {
   if (t === 'containers') { loadContainers().then(loadLogs); loadMemory(); }
   else if (t === 'bases') loadBases();
   else if (t === 'pg') loadPg();
-  else if (t === 'files') { loadFiles(); loadBackupSchedule(); }
+  else if (t === 'automation') { loadBackupSchedule(); loadWeeklyUpdateSchedule(); }
+  else if (t === 'files') loadFiles();
   else if (t === 'build') loadBuild();
   else if (t === 'settings') loadSettings();
 }
