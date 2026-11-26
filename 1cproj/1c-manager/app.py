@@ -457,6 +457,29 @@ def do_action(body):
                        cfg["docker"] + ["exec", "onec-postgres", "runuser", "-u", "postgres", "--",
                                         "/usr/local/pgbin/psql", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
                                         "-c", sql])
+    if a == "postgres_update_role":
+        username = need(body, "username", NAME_RE)
+        if username == "postgres" or username.startswith("pg_"):
+            raise ValueError("системные роли PostgreSQL изменять через веб-панель нельзя")
+        flags = ("login", "superuser", "createdb", "createrole", "inherit", "replication", "bypassrls")
+        values = {}
+        for flag in flags:
+            value = body.get(flag)
+            if not isinstance(value, bool):
+                raise ValueError("некорректное значение права: %s" % flag)
+            values[flag] = value
+        role_ident = '"' + username.replace('"', '""') + '"'
+        clauses = []
+        for flag, sql_name in (("login", "LOGIN"), ("superuser", "SUPERUSER"),
+                               ("createdb", "CREATEDB"), ("createrole", "CREATEROLE"),
+                               ("inherit", "INHERIT"), ("replication", "REPLICATION"),
+                               ("bypassrls", "BYPASSRLS")):
+            clauses.append((" " if values[flag] else " NO") + sql_name)
+        sql = "ALTER ROLE " + role_ident + " WITH" + "".join(clauses)
+        return run_job("Изменение прав PostgreSQL: %s" % username,
+                       cfg["docker"] + ["exec", "onec-postgres", "runuser", "-u", "postgres", "--",
+                                        "/usr/local/pgbin/psql", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+                                        "-c", sql])
     if a == "postgres_drop_db":
         db = need(body, "db", NAME_RE)
         if db.lower() in ("postgres", "template0", "template1"):
@@ -1353,7 +1376,7 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, save_backup_schedule_request(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
-            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "postgres_create_admin", "postgres_drop_db", "backup_pg", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
+            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "postgres_create_admin", "postgres_update_role", "postgres_drop_db", "backup_pg", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
                 return self._send(400, {"error": "Docker недоступен для этого пользователя"})
             return self._send(200, {"job": do_action(body)})
         except ValueError as e:
