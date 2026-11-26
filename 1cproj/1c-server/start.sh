@@ -48,6 +48,12 @@ else
 fi
 fi
 
+if [[ "${START_WITHOUT_BASE:-0}" != "1" ]]; then
+    [[ "$IB_NAME" =~ ^[A-Za-z0-9_.-]{1,64}$ && "$IB_NAME" != "." && "$IB_NAME" != ".." ]] || die "недопустимое имя информационной базы в .env"
+    [[ "$DB_NAME" =~ ^[A-Za-z0-9_.-]{1,63}$ && "$DB_NAME" != "." && "$DB_NAME" != ".." ]] || die "недопустимое имя PostgreSQL-базы в .env"
+    mkdir -p "$BACKUP_DIR/$IB_NAME/dt" "$BACKUP_DIR/$IB_NAME/cf" "$BACKUP_DIR/$IB_NAME/logs" "$BACKUP_DIR/$DB_NAME/pg"
+fi
+
 echo
 echo "Сервер готов. Сеть для клиента: onec-net"
 echo "В клиенте: кластер onec-server:1541, база $IB_NAME"
