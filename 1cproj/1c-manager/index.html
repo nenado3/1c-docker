@@ -239,7 +239,10 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-pg">
-    <div class="row"><button class="b" id="openPgRestore">Загрузить .dump и восстановить</button></div>
+    <div class="row">
+      <button class="b" id="openPgRestore">Загрузить .dump и восстановить</button>
+      <button class="b sec" id="openPgAdmin">Добавить администратора PostgreSQL</button>
+    </div>
     <div id="pErr" class="mut"></div>
     <p class="mut">Удаление базы PostgreSQL необратимо. Если она используется информационной базой 1С, сначала убедитесь, что удаляете правильную базу.</p>
     <table><thead><tr><th>База PostgreSQL</th><th>Размер</th><th>Действия</th></tr></thead>
@@ -357,6 +360,16 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <pre id="conOut"></pre>
 </div>
 
+<dialog id="dlgPgAdmin">
+  <h3 style="margin-top:0">Новый администратор PostgreSQL</h3>
+  <label>Имя пользователя</label>
+  <input id="pgAdminUser" autocomplete="username" maxlength="64" placeholder="например pg_admin">
+  <label>Пароль (не менее 12 символов)</label>
+  <input id="pgAdminPwd" type="password" autocomplete="new-password" minlength="12" maxlength="128">
+  <p class="mut">Пользователь получит роль SUPERUSER — полный доступ ко всем базам, ролям и настройкам PostgreSQL. Используйте отдельный сложный пароль и не применяйте эту учётную запись для обычной работы приложений.</p>
+  <div id="pgAdminStatus" class="mut" aria-live="polite"></div>
+  <div class="row"><button class="b" id="pgAdminCreate">Создать администратора</button><button class="b sec" id="pgAdminCancel">Отмена</button></div>
+</dialog>
 <dialog id="dlgPgRestore">
   <h3 style="margin-top:0">Восстановить PostgreSQL из .dump</h3>
   <label>Файл PostgreSQL (.dump, формат pg_dump -Fc)</label>
@@ -1046,6 +1059,39 @@ document.addEventListener('click', async e => {
     return runAction(body);
   }
 });
+
+$('openPgAdmin').onclick = () => {
+  $('pgAdminUser').value = '';
+  $('pgAdminPwd').value = '';
+  $('pgAdminStatus').textContent = '';
+  $('pgAdminCreate').disabled = false;
+  $('dlgPgAdmin').showModal();
+};
+$('pgAdminCancel').onclick = () => $('dlgPgAdmin').close();
+$('pgAdminCreate').onclick = async () => {
+  const username = $('pgAdminUser').value.trim();
+  const password = $('pgAdminPwd').value;
+  if (!/^(?!\\.{1,2}$)[A-Za-z0-9_.-]{1,64}$/.test(username)) {
+    $('pgAdminStatus').textContent = 'Имя: латинские буквы, цифры, точка, дефис или подчёркивание (до 64 символов).';
+    return;
+  }
+  if (password.length < 12 || password.length > 128 || password.includes('\\0')) {
+    $('pgAdminStatus').textContent = 'Пароль должен содержать от 12 до 128 символов.';
+    return;
+  }
+  if (!confirm('Создать пользователя «' + username + '» с полными правами SUPERUSER? Он получит доступ ко всем базам и ролям PostgreSQL.')) return;
+  $('pgAdminCreate').disabled = true;
+  $('pgAdminStatus').textContent = 'Создаю администратора PostgreSQL…';
+  try {
+    await runAction({action:'postgres_create_admin', username, password});
+    $('pgAdminStatus').textContent = 'Команда создания передана. Результат смотри в консоли.';
+    $('pgAdminPwd').value = '';
+  } catch (e) {
+    $('pgAdminStatus').textContent = 'Ошибка: ' + e.message;
+  } finally {
+    $('pgAdminCreate').disabled = false;
+  }
+};
 
 $('openPgRestore').onclick = async () => {
   $('pgRestoreStatus').textContent = ''; $('pgRestoreFile').value = ''; $('pgRestoreClean').checked = false;
