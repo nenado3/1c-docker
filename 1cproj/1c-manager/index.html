@@ -528,10 +528,6 @@ input[type="checkbox"],input[type="radio"]{
             <summary id="backupBaseSummary">Выбрать базы 1С</summary>
             <div id="backupScheduleBases" style="display:flex;flex-direction:column;gap:9px;padding:12px;max-height:220px;overflow:auto;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px"><span class="mut">Загрузка списка баз…</span></div>
           </details>
-  </section>
-
-  <section id="t-files">
-
         </div>
         <div id="backupCredentials">
           <div>Для автоматического отключения пользователей укажите пользователя и пароль администратора каждой выбранной базы 1С. Эти данные нужны для временной блокировки новых сеансов и регламентных заданий. Сохранённые пароли не отображаются.</div>
@@ -553,7 +549,15 @@ input[type="checkbox"],input[type="radio"]{
     <h2>Выгрузки сервера (backup) <span class="mut mono" id="dirBackups"></span></h2>
     <table><thead><tr><th>Файл / папка</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fBackups"></tbody></table>
     <p class="mut">Папки резервных копий показываются целиком, со всеми вложенными каталогами; файлы выгрузок (.dt/.cf) можно скачать по ссылке.</p>
+
   </section>
+
+  <section id="t-files">
+
+    <h2>Выгрузки сервера (backup) <span class="mut mono" id="dirBackups"></span></h2>
+    <table><thead><tr><th>Файл / папка</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fBackups"></tbody></table>
+    <p class="mut">Папки резервных копий показываются целиком, со всеми вложенными каталогами; файлы выгрузок (.dt/.cf) можно скачать по ссылке.</p>
+
 
   <section id="t-build">
     <p class="mut">Сборка образов из .deb / .run. Ход выполнения виден в консоли внизу.</p>
