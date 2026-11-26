@@ -169,24 +169,53 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #dlgUpdate .import-actions{position:sticky;bottom:-1px;z-index:2;justify-content:space-between;gap:10px;margin:18px -27px -25px;padding:14px 27px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(12px)}
 #dlgUpdate .import-actions button{min-height:42px;padding:9px 18px;border-radius:10px;font-weight:650}
 
-/* Адаптивность блока автоматических резервных копий */
+/* Карточка автоматического резервного копирования */
 #t-files{min-width:0}
-#t-files>.settings-card{width:100%;max-width:100%;min-width:0}
-#t-files>.settings-card>div{min-width:0;max-width:100%}
-#backupBaseDropdown{width:100%;max-width:520px;min-width:0}
-#backupBaseSummary{white-space:normal;overflow-wrap:anywhere}
-#backupCredentials{width:100%;min-width:0;max-width:650px}
-#backupCredentials>div{min-width:0;max-width:100%;overflow-wrap:anywhere}
-#backupCredentials .row{width:100%;min-width:0}
-#backupCredentials .row input{box-sizing:border-box;width:calc(50% - 4px);max-width:100%;min-width:0;flex:1 1 220px}
-#backupScheduleStatus{display:block;width:100%;max-width:100%;min-width:0;margin-top:10px;line-height:1.55;white-space:normal;overflow-wrap:anywhere;word-break:normal}
-#t-files .row{min-width:0;max-width:100%}
-#t-files input[type=time],#t-files input[type=number]{max-width:100%}
-@media(max-width:560px){
-  #t-files .row{align-items:flex-start}
-  #t-files .row label{flex:1 1 100%}
-  #t-files .row input{flex:1 1 100%;width:100%;min-width:0}
-  #backupCredentials .row input{flex:1 1 100%;width:100%}
+#t-files>.backup-card{width:100%;max-width:100%;min-width:0;margin:0 0 18px;padding:0;overflow:hidden;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:0 5px 22px rgba(20,45,90,.06)}
+#t-files>.backup-card>.backup-summary{display:flex;align-items:center;gap:14px;padding:17px 22px;cursor:pointer;list-style:none;background:color-mix(in srgb,var(--acc) 8%,var(--card));color:var(--fg);font-size:18px;font-weight:700}
+#t-files>.backup-card>.backup-summary::-webkit-details-marker{display:none}
+#t-files>.backup-card>.backup-summary:after{content:"⌄";margin-left:auto;color:var(--mut);font-size:22px;transition:transform .18s ease}
+#t-files>.backup-card[open]>.backup-summary:after{transform:rotate(180deg)}
+.backup-summary-icon{display:grid;place-items:center;flex:0 0 38px;width:38px;height:38px;border-radius:11px;background:var(--acc);color:var(--accfg);font-size:21px}
+.backup-content{min-width:0;padding:20px 24px 22px}
+.backup-intro{margin:0 0 17px;color:var(--mut);font-size:14px;line-height:1.55}
+.backup-enable{display:flex;align-items:center;gap:10px;margin:0 0 18px;padding-bottom:17px;border-bottom:1px solid var(--line);color:var(--fg);font-weight:650}
+.backup-enable input,.backup-monthly input{min-width:0;accent-color:var(--acc);width:17px;height:17px;margin:0}
+.backup-base-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin:0 0 15px}
+.backup-base-row>label{margin:0;color:var(--fg);font-weight:600}
+#backupBaseDropdown{width:min(100%,380px);max-width:100%;min-width:0;margin:0}
+#backupBaseSummary{display:flex;align-items:center;justify-content:space-between;gap:10px;min-height:44px;padding:10px 13px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);white-space:normal;overflow-wrap:anywhere}
+#backupScheduleBases{background:var(--bg);border-color:var(--line)!important}
+#backupCredentials{display:flex;flex-direction:column;gap:10px;width:100%;min-width:0;max-width:100%;margin:0 0 18px}
+#backupCredentials>div:first-child{padding:13px 15px;border:1px solid color-mix(in srgb,var(--acc) 28%,var(--line));border-radius:11px;background:color-mix(in srgb,var(--acc) 7%,var(--card));color:var(--mut);font-size:13px;line-height:1.55}
+#backupCredentials>div:not(:first-child){min-width:0;max-width:100%;padding:13px 14px!important;border:1px solid var(--line)!important;border-radius:11px;background:var(--bg)}
+#backupCredentials>div>strong{color:var(--fg);font-size:14px}
+#backupCredentials .row{display:flex;gap:10px;width:100%;min-width:0;max-width:100%}
+#backupCredentials .row input{box-sizing:border-box;width:calc(50% - 5px);max-width:100%;min-width:0;min-height:42px;flex:1 1 220px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--fg)}
+#backupCredentials label{color:var(--mut);font-size:12px}
+.backup-settings-grid{display:flex;align-items:center;gap:12px 16px;flex-wrap:wrap;margin:0 0 14px;padding:16px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.backup-settings-grid label{margin:0;color:var(--fg);font-size:13px;font-weight:550}
+.backup-settings-grid input{box-sizing:border-box;min-height:42px;padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--fg)}
+#backupDailyTime{width:145px;min-width:0!important}
+#backupMaxCount{width:120px;min-width:0!important}
+.backup-monthly{display:flex;align-items:flex-start;gap:10px;margin:0;color:var(--fg);font-weight:550}
+.backup-monthly-hint{margin:7px 0 17px 27px;color:var(--mut);font-size:12px;line-height:1.5}
+.backup-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#saveBackupSchedule{min-height:42px;padding:9px 17px;border-radius:9px;font-weight:650}
+#backupScheduleStatus{display:block;width:100%;max-width:100%;min-width:0;margin-top:13px;padding:11px 13px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--mut);font-size:12px;line-height:1.55;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+@media(max-width:650px){
+ #t-files>.backup-card>.backup-summary{padding:14px 16px;font-size:16px}
+ .backup-content{padding:16px}
+ .backup-base-row{align-items:stretch;gap:8px}
+ #backupBaseDropdown{width:100%}
+ .backup-settings-grid{align-items:flex-start;gap:10px}
+ .backup-settings-grid label{flex:1 1 100%}
+ #backupDailyTime,#backupMaxCount{width:100%}
+ #backupCredentials .row{flex-direction:column}
+ #backupCredentials .row input{width:100%;flex:1 1 auto}
+ .backup-monthly-hint{margin-left:27px}
+ .backup-actions{align-items:stretch;flex-direction:column}
+ .backup-actions button{width:100%}
 }
 #dlgUpdate #updateUpload{min-width:190px;box-shadow:0 4px 12px color-mix(in srgb,var(--acc) 20%,transparent)}
 #dlgUpdate #updateUpload:disabled{box-shadow:none;opacity:.42}
@@ -286,30 +315,36 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   </section>
 
   <section id="t-files">
-    <details class="settings-card" style="margin:0 0 14px;padding:0">
-      <summary style="cursor:pointer;padding:18px;font-weight:600">Автоматическое резервное копирование</summary>
-      <div style="padding:0 18px 18px">
-        <p class="mut" style="margin:0 0 12px">Выберите базы 1С и время ежедневной выгрузки. Перед каждой копией панель временно запрещает новые подключения и регламентные задания, завершает текущие сеансы пользователей, создаёт .dt и затем автоматически открывает базу снова. На время выгрузки пользователи не смогут войти в выбранную базу.</p>
-        <label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input id="backupScheduleEnabled" type="checkbox" style="min-width:auto"> Включить автоматические бэкапы</label>
-        <details id="backupBaseDropdown" style="margin:12px 0;max-width:520px">
-          <summary id="backupBaseSummary" style="cursor:pointer;padding:10px 12px;border:1px solid var(--border);border-radius:8px">Выбрать базы 1С</summary>
-          <div id="backupScheduleBases" style="display:flex;flex-direction:column;gap:9px;padding:12px;max-height:220px;overflow:auto;border:1px solid var(--border);border-top:0;border-radius:0 0 8px 8px"><span class="mut">Загрузка списка баз…</span></div>
-        </details>
-        <div id="backupCredentials" style="display:flex;flex-direction:column;gap:10px;margin:12px 0;max-width:650px">
-          <div class="mut">Для автоматического отключения пользователей укажите пользователя и пароль администратора каждой выбранной базы 1С. Эти данные нужны для временной блокировки новых сеансов и регламентных заданий. Сохранённые пароли не отображаются.</div>
+    <details class="settings-card backup-card">
+      <summary class="backup-summary">
+        <span class="backup-summary-icon" aria-hidden="true">▤</span>
+        <span>Автоматическое резервное копирование</span>
+      </summary>
+      <div class="backup-content">
+        <p class="backup-intro">Выберите базы 1С и время ежедневной выгрузки. Перед каждой копией панель временно запрещает новые подключения и регламентные задания, завершает текущие сеансы пользователей, создаёт .dt и затем автоматически открывает базу снова. На время выгрузки пользователи не смогут войти в выбранную базу.</p>
+        <label class="backup-enable"><input id="backupScheduleEnabled" type="checkbox"> Включить автоматические бэкапы</label>
+        <div class="backup-base-row">
+          <label for="backupBaseSummary">Выбрать базу:</label>
+          <details id="backupBaseDropdown">
+            <summary id="backupBaseSummary">Выбрать базы 1С</summary>
+            <div id="backupScheduleBases" style="display:flex;flex-direction:column;gap:9px;padding:12px;max-height:220px;overflow:auto;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px"><span class="mut">Загрузка списка баз…</span></div>
+          </details>
         </div>
-        <div class="row">
-          <label for="backupDailyTime" style="margin:0">Ежедневно выгружать в</label>
-          <input id="backupDailyTime" type="time" value="02:00" style="width:130px;min-width:130px">
-          <label for="backupMaxCount" style="margin:0 0 0 10px">Макс. обычных копий</label>
-          <input id="backupMaxCount" type="number" min="1" max="1000" step="1" value="10" style="width:110px;min-width:110px">
+        <div id="backupCredentials">
+          <div>Для автоматического отключения пользователей укажите пользователя и пароль администратора каждой выбранной базы 1С. Эти данные нужны для временной блокировки новых сеансов и регламентных заданий. Сохранённые пароли не отображаются.</div>
         </div>
-        <label style="display:flex;align-items:center;gap:8px;color:var(--fg)"><input id="backupMonthlyEnabled" type="checkbox" style="min-width:auto"> Дополнительно создавать копию в начале каждого месяца (1-го числа в 02:00)</label>
-        <p class="mut" style="margin:4px 0 12px">Месячные копии сохраняются отдельно в dt/monthly и никогда не удаляются автоматической ротацией. Лимит применяется только к обычным копиям.</p>
-        <div class="row">
+        <div class="backup-settings-grid">
+          <label for="backupDailyTime">Ежедневно выгружать в</label>
+          <input id="backupDailyTime" type="time" value="02:00">
+          <label for="backupMaxCount">Макс. обычных копий</label>
+          <input id="backupMaxCount" type="number" min="1" max="1000" step="1" value="10">
+        </div>
+        <label class="backup-monthly"><input id="backupMonthlyEnabled" type="checkbox"> <span>Дополнительно создавать копию в начале каждого месяца (1-го числа в 02:00)</span></label>
+        <p class="backup-monthly-hint">Месячные копии сохраняются отдельно в dt/monthly и никогда не удаляются автоматической ротацией. Лимит применяется только к обычным копиям.</p>
+        <div class="backup-actions">
           <button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button>
         </div>
-        <div id="backupScheduleStatus" class="mut" aria-live="polite">Загрузка расписания…</div>
+        <div id="backupScheduleStatus" aria-live="polite">Загрузка расписания…</div>
       </div>
     </details>
     <h2>Выгрузки сервера (backup) <span class="mut mono" id="dirBackups"></span></h2>
