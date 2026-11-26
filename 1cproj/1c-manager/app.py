@@ -239,7 +239,7 @@ class Job:
         self.lock = threading.Lock()
 
     def append(self, line):
-        line = str(line).rstrip("\\n")
+        line = str(line).rstrip("\n")
         if len(line) > self.MAX_LINE_LENGTH:
             line = line[:self.MAX_LINE_LENGTH] + " … [строка сокращена]"
         with self.lock:
