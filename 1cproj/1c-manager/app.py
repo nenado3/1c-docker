@@ -485,6 +485,10 @@ def do_action(body):
         db = str(body.get("db_name") or n).strip()
         if not NAME_RE.match(db):
             raise ValueError("недопустимое имя базы PostgreSQL")
+        # Подготавливаем каталоги базы заранее; выгрузки и журналы будут попадать сюда.
+        for kind in ("dt", "cf", "logs"):
+            backup_base_dir(n, kind)
+        backup_base_dir(db, "pg")
         return rac_job("Создание базы %s" % n, "create", n, db, need(body, "db_user", NAME_RE), need(body, "db_pwd"))
     if a == "infobase_drop":
         i = need(body, "id", UUID_RE)
