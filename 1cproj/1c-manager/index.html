@@ -231,6 +231,83 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 #console .bar{display:flex;gap:10px;align-items:center;padding:6px 14px;font-size:13px;border-bottom:1px solid #1f2937;flex:none}
 #console pre{margin:0;padding:8px 14px;overflow:auto;flex:1;font:12.5px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre-wrap}
 .logs{background:var(--con);color:var(--confg);padding:10px;border-radius:8px;max-height:340px;overflow:auto;white-space:pre-wrap;font:12.5px/1.4 ui-monospace,Menlo,monospace}
+
+/* Единая визуальная система веб-панели */
+:root{
+ --bg:#f3f6fb;--fg:#19263d;--mut:#71809a;--line:#e3e9f2;--card:#ffffff;
+ --acc:#3268e8;--accfg:#fff;--ok:#16865b;--bad:#c83d4b;--warn:#ad710f;
+ --con:#111b2d;--confg:#d8e1ef;
+}
+@media(prefers-color-scheme:dark){
+ :root{--bg:#111827;--fg:#e5eaf3;--mut:#9aa8bd;--line:#303d52;--card:#192437;
+ --acc:#6692fa;--accfg:#101a2c;--ok:#52d39a;--bad:#ff7883;--warn:#f2bd59;
+ --con:#070d18;--confg:#d8e1ef}
+}
+body{background:var(--bg);color:var(--fg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.5;padding-bottom:260px}
+header{position:sticky;top:0;z-index:30;min-height:68px;padding:13px clamp(16px,3vw,34px);gap:13px;background:color-mix(in srgb,var(--card) 94%,transparent);border-bottom:1px solid var(--line);box-shadow:0 3px 16px rgba(25,45,80,.035);backdrop-filter:blur(14px)}
+header h1{font-size:18px;font-weight:760;letter-spacing:-.035em;color:var(--fg)}
+#dockerBadge{margin-left:auto}
+#dirs{font-size:11px;max-width:38vw;overflow-wrap:anywhere}
+nav{position:sticky;top:68px;z-index:25;display:flex;gap:5px;flex-wrap:nowrap;overflow-x:auto;padding:9px clamp(12px,3vw,34px) 0;background:var(--card);border-bottom:1px solid var(--line);scrollbar-width:thin}
+nav button{flex:none;padding:10px 15px;border:0;border-bottom:3px solid transparent;border-radius:9px 9px 0 0;color:var(--mut);font-size:13px;font-weight:620;white-space:nowrap;transition:background .15s,color .15s}
+nav button:hover{background:color-mix(in srgb,var(--acc) 7%,var(--card));color:var(--fg)}
+nav button.on{background:color-mix(in srgb,var(--acc) 8%,var(--card));color:var(--acc);border-bottom-color:var(--acc);font-weight:750}
+main{width:100%;max-width:1500px;margin:0 auto;padding:26px clamp(14px,3vw,34px) 38px}
+section.on{padding:22px 23px;margin:0 0 20px;border:1px solid var(--line);border-radius:16px;background:var(--card);box-shadow:0 6px 24px rgba(25,45,80,.045);min-width:0}
+h2{margin:23px 0 11px;font-size:16px;font-weight:750;letter-spacing:-.02em;color:var(--fg)}
+section.on>h2:first-child{margin-top:0}
+p{line-height:1.6}
+.mut{color:var(--mut)}
+.badge{padding:5px 10px;border-radius:999px;background:var(--card);font-size:11px;font-weight:700}
+.badge.ok{background:color-mix(in srgb,var(--ok) 10%,var(--card));border-color:color-mix(in srgb,var(--ok) 40%,var(--line))}
+.badge.bad{background:color-mix(in srgb,var(--bad) 9%,var(--card))}
+.badge.warn{background:color-mix(in srgb,var(--warn) 10%,var(--card))}
+.warnbox{border-radius:11px;padding:13px 16px;box-shadow:0 3px 12px rgba(25,45,80,.035)}
+.row{gap:9px;margin:11px 0}
+button.b{min-height:38px;padding:8px 14px;border-radius:9px;font-size:12px;font-weight:680;box-shadow:0 2px 5px rgba(25,45,80,.08);transition:transform .12s,filter .12s,box-shadow .12s}
+button.b:hover:not(:disabled){filter:brightness(.97);box-shadow:0 4px 10px rgba(25,45,80,.12);transform:translateY(-1px)}
+button.b.sec{background:var(--card);border:1px solid var(--line);color:var(--fg);box-shadow:none}
+button.b.red{background:var(--bad);color:white}
+button.b:disabled{transform:none;box-shadow:none}
+input,select{min-height:38px;padding:8px 11px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--fg);font-size:13px;transition:border-color .15s,box-shadow .15s}
+input:focus,select:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 15%,transparent)}
+input[type=checkbox],input[type=radio]{min-width:0;accent-color:var(--acc)}
+label{color:var(--mut);font-size:12px;font-weight:600}
+table{display:block;width:100%;max-width:100%;margin:12px 0 20px;overflow-x:auto;border:1px solid var(--line);border-radius:11px;border-spacing:0;background:var(--card)}
+th,td{padding:11px 13px;border-bottom:1px solid var(--line);font-size:12px}
+th{position:sticky;top:0;background:color-mix(in srgb,var(--bg) 75%,var(--card));color:var(--mut);font-size:10px;font-weight:800;letter-spacing:.055em;text-transform:uppercase}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:color-mix(in srgb,var(--acc) 3%,var(--card))}
+td .b{margin:1px 3px 1px 0}
+details.settings-card,details:not(#backupBaseDropdown){border:1px solid var(--line);border-radius:13px;background:var(--card);box-shadow:0 3px 13px rgba(25,45,80,.035)}
+details>summary{color:var(--fg)}
+#t-containers>.row:first-child,#basesActions,#t-pg>.row:first-child{padding:12px 13px;margin:0 0 17px;border:1px solid var(--line);border-radius:12px;background:color-mix(in srgb,var(--bg) 65%,var(--card))}
+#bErr,#pErr,#pgRolesError,#dockerWarn,#uploadStatus{overflow-wrap:anywhere}
+.logs{border:1px solid var(--line);border-radius:11px;padding:14px;background:var(--con);color:var(--confg);box-shadow:inset 0 1px 4px rgba(0,0,0,.12)}
+dialog{max-width:calc(100vw - 24px);box-shadow:0 24px 80px rgba(0,0,0,.24)}
+dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
+.upload-progress{padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:var(--card)}
+#console{border-top:1px solid #2a3850;box-shadow:0 -8px 28px rgba(12,22,40,.13)}
+#console .bar{min-height:38px;background:#17243a}
+#console-resize{background:#111b2d}
+#console pre{font-size:11.5px}
+.settings-hero,.settings-card,.backup-card{box-shadow:0 4px 18px rgba(25,45,80,.045)}
+#t-files>.backup-card{background:var(--card)}
+#backupScheduleStatus{overflow-wrap:anywhere}
+@media(max-width:700px){
+ header{position:relative;min-height:unset;padding:13px 15px}
+ #dirs{flex-basis:100%;max-width:100%;font-size:10px}
+ #dockerBadge{margin-left:0}
+ nav{top:0;padding:7px 10px 0}
+ nav button{padding:9px 12px;font-size:12px}
+ main{padding:16px 10px 30px}
+ section.on{padding:15px 12px;border-radius:12px}
+ h2{font-size:15px}
+ th,td{padding:9px 10px}
+ #t-containers>.row:first-child,#basesActions,#t-pg>.row:first-child{align-items:stretch}
+ #t-containers>.row:first-child .b,#basesActions .b,#t-pg>.row:first-child .b{flex:1 1 100%}
+}
+
 </style>
 </head>
 <body>
