@@ -633,7 +633,7 @@ dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
   </div>
 </dialog>
 <dialog id="dlgUpdate" aria-labelledby="updateDialogTitle">
-  <h3 id="updateDialogTitle">Сделать обновление базы</h3>
+  <h3 id="updateDialogTitle">Обновление базы</h3>
   <div class="import-body">
     <p class="import-intro">Загрузите файл конфигурации, чтобы обновить конфигурацию выбранной информационной базы.</p>
     <div class="import-group">
@@ -642,12 +642,7 @@ dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
       <select id="updateBase"><option value="">Сначала загрузите список баз</option></select>
     </div>
     <div class="import-group">
-      <div class="import-group-title"><span class="import-step">2</span> Подготовка базы</div>
-      <button class="b sec" id="updateKick">Выкинуть пользователей из выбранной базы</button>
-      <div id="updateUsers" class="import-hint" aria-live="polite">Выберите базу для проверки активных пользователей.</div>
-    </div>
-    <div class="import-group">
-      <div class="import-group-title"><span class="import-step">3</span> Файл обновления</div>
+      <div class="import-group-title"><span class="import-step">2</span> Файл обновления</div>
       <div class="update-source-tabs" role="tablist" aria-label="Способ получения файла">
         <button class="b update-source-tab active" id="updateTabComputer" type="button" role="tab" aria-selected="true" aria-controls="updatePanelComputer">С компьютера</button>
         <button class="b sec update-source-tab" id="updateTabYandex" type="button" role="tab" aria-selected="false" aria-controls="updatePanelYandex">Яндекс Диск</button>
@@ -663,7 +658,12 @@ dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
         <p class="import-hint">Вставьте публичную ссылку. Файл будет скачан в каталог .cf и подготовлен к обновлению.</p>
       </div>
       <p class="import-hint">При наличии активных сеансов загрузка обновления будет заблокирована.</p>
-      <div class="import-grid">
+    </div>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">3</span> Подготовка базы и доступы</div>
+      <button class="b sec" id="updateKick">Выкинуть пользователей из выбранной базы</button>
+      <div id="updateUsers" class="import-hint" aria-live="polite">Выберите базу для проверки активных пользователей.</div>
+      <div class="import-grid" style="margin-top:12px">
         <div><label>Пользователь 1С</label><input id="updateUser" placeholder="Пользователь 1С"></div>
         <div><label>Пароль 1С</label><input id="updatePwd" type="password" placeholder="Пароль 1С" autocomplete="new-password"></div>
       </div>
