@@ -127,10 +127,12 @@ OUT="${IB}_${STAMP}.${KIND}"
 LOG="export_${STAMP}.log"
 
 # выгрузки .dt/.cf кладём в backup-подпапку каталога EXPORT_DIR (она видна на веб со вложенностями)
-BACKUP_SUBDIR="${EXPORT_DIR%/}/backup/$KIND"
-REMOTE_BACKUP="/home/user1c/export/backup/$KIND"
-mkdir -p "$BACKUP_SUBDIR"
-$DOCKER exec onec-client mkdir -p "$REMOTE_BACKUP" 2>/dev/null || true
+BACKUP_SUBDIR="${EXPORT_DIR%/}/${IB}/${KIND}"
+LOG_DIR="${EXPORT_DIR%/}/${IB}/logs"
+REMOTE_BACKUP="/home/user1c/export/${IB}/${KIND}"
+REMOTE_LOG="/home/user1c/export/${IB}/logs"
+mkdir -p "$BACKUP_SUBDIR" "$LOG_DIR"
+$DOCKER exec onec-client mkdir -p "$REMOTE_BACKUP" "$REMOTE_LOG" 2>/dev/null || true
 
 # /DumpIB — выгрузка базы в .dt, /DumpCF — выгрузка конфигурации в .cf
 if [ "$KIND" = "cf" ]; then OP=/DumpCF; else OP=/DumpIB; fi
@@ -141,13 +143,13 @@ $DOCKER exec onec-client \
     /usr/local/bin/1c-xvfb /opt/1cv8/current/1cv8 DESIGNER /S "onec-server:1541\\${IB}" "${AUTH[@]}" \
     /DisableStartupDialogs /DisableStartupMessages \
     "$OP" "${REMOTE_BACKUP}/${OUT}" \
-    /Out "${REMOTE_BACKUP}/${LOG}" || RC=$?
+    /Out "${REMOTE_LOG}/${LOG}" || RC=$?
 
 # чтобы файлами мог управлять пользователь хоста
-$DOCKER exec onec-client chmod a+rw "${REMOTE_BACKUP}/${OUT}" "${REMOTE_BACKUP}/${LOG}" 2>/dev/null || true
+$DOCKER exec onec-client chmod a+rw "${REMOTE_BACKUP}/${OUT}" "${REMOTE_LOG}/${LOG}" 2>/dev/null || true
 
 echo "--- журнал конфигуратора ---"
-cat "$BACKUP_SUBDIR/${LOG}" 2>/dev/null || echo "(журнал пуст)"
+cat "$LOG_DIR/${LOG}" 2>/dev/null || echo "(журнал пуст)"
 echo "----------------------------"
 
 if [ $RC -eq 0 ] && [ -s "$BACKUP_SUBDIR/${OUT}" ]; then
