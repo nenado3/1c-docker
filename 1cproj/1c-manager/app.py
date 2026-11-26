@@ -4,7 +4,8 @@
 import argparse, json, os, re, secrets, shutil, subprocess, sys, threading, time, webbrowser
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import urlparse, parse_qs, quote, urlencode
+from urllib.request import Request, urlopen
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 cfg = {}
@@ -1023,6 +1024,70 @@ class H(BaseHTTPRequestHandler):
             return self._send(403, {"error": "доступ запрещён"})
         try:
             n = int(self.headers.get("Content-Length") or 0)
+            if u.path == "/api/yandex_cf":
+                if n <= 0 or n > 8192:
+                    return self._send(400, {"error": "передайте ссылку на публичный файл Яндекс Диска"})
+                try:
+                    payload = json.loads(self.rfile.read(n).decode("utf-8"))
+                except Exception:
+                    return self._send(400, {"error": "не удалось прочитать ссылку"})
+                public_url = str(payload.get("url", "")).strip()
+                parsed = urlparse(public_url)
+                allowed_hosts = {"disk.yandex.ru", "yadi.sk", "disk.yandex.com",
+                                 "disk.yandex.kz", "disk.yandex.com.tr"}
+                if (parsed.scheme != "https" or (parsed.hostname or "").lower() not in allowed_hosts
+                        or not parsed.path.startswith(("/d/", "/i/")) or parsed.username or parsed.password):
+                    return self._send(400, {"error": "укажите публичную HTTPS-ссылку Яндекс Диска (например, https://disk.yandex.ru/d/…)"})
+                api_base = "https://cloud-api.yandex.net/v1/disk/public/resources"
+                query = urlencode({"public_key": public_url})
+                request = Request(api_base + "?" + query, headers={"User-Agent": "1C-Docker-Manager/1.0"})
+                with urlopen(request, timeout=30) as response:
+                    metadata = json.loads(response.read(1024 * 1024).decode("utf-8"))
+                original_name = str(metadata.get("name", ""))
+                if not original_name.lower().endswith(".cf"):
+                    return self._send(400, {"error": "по ссылке найден файл «%s», нужен файл .cf" % (original_name or "без имени")})
+                size = int(metadata.get("size") or 0)
+                max_size = 8 * 1024 * 1024 * 1024
+                if size <= 0 or size > max_size:
+                    return self._send(413, {"error": "размер файла по ссылке должен быть от 1 байта до 8 ГБ"})
+                request = Request(api_base + "/download?" + query,
+                                  headers={"User-Agent": "1C-Docker-Manager/1.0"})
+                with urlopen(request, timeout=30) as response:
+                    download_info = json.loads(response.read(1024 * 1024).decode("utf-8"))
+                href = str(download_info.get("href", ""))
+                href_info = urlparse(href)
+                if href_info.scheme != "https" or not href_info.hostname:
+                    return self._send(502, {"error": "Яндекс Диск вернул некорректную ссылку скачивания"})
+                safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", os.path.splitext(os.path.basename(original_name))[0]).strip("._-")
+                safe_name = ((safe_stem[:150] or "yandex_config") + ".cf")
+                dest_dir = os.path.join(data_dir("backups"), "cf")
+                os.makedirs(dest_dir, exist_ok=True)
+                dest = os.path.join(dest_dir, safe_name)
+                part = os.path.join(dest_dir, ".yandex-" + secrets.token_hex(8) + ".part")
+                downloaded = 0
+                try:
+                    with urlopen(Request(href, headers={"User-Agent": "1C-Docker-Manager/1.0"}), timeout=60) as response:
+                        with open(part, "xb") as output:
+                            while True:
+                                chunk = response.read(1024 * 1024)
+                                if not chunk:
+                                    break
+                                downloaded += len(chunk)
+                                if downloaded > max_size or downloaded > size:
+                                    raise ValueError("размер скачанного файла превышает размер, указанный Яндекс Диском")
+                                output.write(chunk)
+                            output.flush()
+                            os.fsync(output.fileno())
+                    if downloaded != size:
+                        raise ValueError("файл скачан не полностью: получено %s из %s байт" % (downloaded, size))
+                    os.replace(part, dest)
+                    os.chmod(dest, 0o666)
+                except Exception:
+                    try: os.unlink(part)
+                    except OSError: pass
+                    raise
+                return self._send(200, {"filename": safe_name, "size": downloaded,
+                                        "kind": "cf", "path": dest, "source": "yandex"})
             if u.path == "/api/upload":
                 if n <= 0:
                     return self._send(400, {"error": "загружаемый файл пуст"})
