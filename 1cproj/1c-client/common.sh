@@ -25,8 +25,8 @@ fi
 EXPORT_DIR="${EXPORT_DIR:-./export}"
 mkdir -p licenses "$EXPORT_DIR" && chmod 1777 licenses && chmod 777 "$EXPORT_DIR" 2>/dev/null || true
 # backup-подпапка для выгрузок .dt/.cf (видна на веб-панели вместе со вложенными папками)
-BACKUP_DIR="${EXPORT_DIR%/}/backup"
-mkdir -p "$BACKUP_DIR" "$BACKUP_DIR/dt" "$BACKUP_DIR/cf" && chmod 777 "$BACKUP_DIR" "$BACKUP_DIR/dt" "$BACKUP_DIR/cf" 2>/dev/null || true
+BACKUP_DIR="${EXPORT_DIR%/}"
+mkdir -p "$BACKUP_DIR" && chmod 777 "$BACKUP_DIR" 2>/dev/null || true
 
 # nethasp.ini из NETHASP_ADDRS: адреса через запятую, пробел или точку с запятой
 gen_nethasp() {
