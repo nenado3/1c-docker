@@ -405,12 +405,16 @@ def do_action(body):
         if kind == "cf":
             # Защита на стороне сервера: не начинаем обновление конфигурации,
             # пока в выбранной информационной базе остаются пользовательские сеансы.
-            bases = parse_rac(rac_call("infobase", "summary", "list"))
-            base_info = next((item for item in bases if item.get("name") == ib), None)
-            base_id = (base_info or {}).get("infobase") or (base_info or {}).get("id")
+            clusters = parse_rac(rac_call("cluster", "list"))
+            cluster = next((item.get("cluster") for item in clusters if item.get("cluster")), None)
+            if not cluster:
+                raise ValueError("кластер 1С не найден")
+            bases = parse_rac(rac_call("infobase", "summary", "list", "--cluster=" + cluster))
+            base_info = next((item for item in bases if (item.get("name") or item.get("Name")) == ib), None)
+            base_id = (base_info or {}).get("infobase")
             if not base_id:
                 raise ValueError("не удалось определить идентификатор выбранной информационной базы")
-            sessions = parse_rac(rac_call("session", "list"))
+            sessions = parse_rac(rac_call("session", "list", "--cluster=" + cluster))
             active = [item for item in sessions if item.get("infobase") == base_id]
             if active:
                 raise ValueError("обновление заблокировано: в базе %s остаётся активных сеансов: %d" % (ib, len(active)))
