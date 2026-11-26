@@ -430,9 +430,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     </div>
     <div class="import-group">
       <div class="import-group-title"><span class="import-step">3</span> Файл обновления</div>
-      <label>Файл конфигурации</label>
+      <label>Выберите файл с компьютера</label>
       <input id="updateFile" type="file" accept=".cf,application/octet-stream">
-      <p class="import-hint">Перед загрузкой убедитесь, что у пользователей закрыты все сеансы. При наличии активных сеансов кнопка загрузки будет заблокирована.</p>
+      <div class="import-hint" style="margin:10px 0 7px">Или скачайте файл с Яндекс Диска</div>
+      <div class="import-grid">
+        <div><label for="updateYandexUrl">Публичная ссылка на файл .cf</label><input id="updateYandexUrl" type="url" placeholder="https://disk.yandex.ru/d/…"></div>
+        <div style="display:flex;align-items:end"><button class="b sec" id="updateYandexDownload" type="button">Скачать с Яндекс Диска</button></div>
+      </div>
+      <p class="import-hint">Поддерживаются публичные ссылки. Файл будет сохранён в каталоге резервных копий .cf и подготовлен к обновлению. При наличии активных сеансов загрузка обновления будет заблокирована.</p>
       <div class="import-grid">
         <div><label>Пользователь 1С</label><input id="updateUser" placeholder="Пользователь 1С"></div>
         <div><label>Пароль 1С</label><input id="updatePwd" type="password" placeholder="Пароль 1С" autocomplete="new-password"></div>
@@ -1254,6 +1259,36 @@ $('uploadImport').onclick = async () => {
 };
 
 
+let updateYandexFile = null;
+$('updateFile').onchange = () => {
+  updateYandexFile = null;
+  refreshUpdateAvailability();
+};
+$('updateYandexDownload').onclick = async () => {
+  const url = $('updateYandexUrl').value.trim();
+  if (!url) { $('updateStatus').textContent = 'Вставьте публичную ссылку на Яндекс Диск.'; return; }
+  const button = $('updateYandexDownload');
+  button.disabled = true;
+  $('updateStatus').textContent = 'Скачиваю файл конфигурации с Яндекс Диска…';
+  try {
+    const response = await fetch('/api/yandex_cf', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json', 'X-Token':TOKEN},
+      body: JSON.stringify({url})
+    });
+    const result = await response.json();
+    if (!response.ok || result.error) throw new Error(result.error || ('HTTP ' + response.status));
+    updateYandexFile = result;
+    $('updateFile').value = '';
+    $('updateStatus').textContent = 'Файл скачан: ' + result.filename + ' (' + fmtSize(result.size) + '). Можно запускать обновление.';
+    await refreshUpdateAvailability();
+  } catch (e) {
+    updateYandexFile = null;
+    $('updateStatus').textContent = 'Ошибка скачивания: ' + e.message;
+    await refreshUpdateAvailability();
+  } finally { button.disabled = false; }
+};
+
 async function refreshUpdateAvailability() {
   const ib = $('updateBase').value;
   const button = $('updateUpload');
@@ -1269,7 +1304,7 @@ async function refreshUpdateAvailability() {
   $('updateUsers').textContent = active.length
     ? 'В базе активны сеансы: ' + active.length + '. Сначала завершите их.'
     : 'Активных сеансов нет. Можно загружать обновление.';
-  button.disabled = active.length > 0 || !baseId || !!bases.error || !!sessions.error || !$('updateFile').files[0];
+  button.disabled = active.length > 0 || !baseId || !!bases.error || !!sessions.error || !($('updateFile').files[0] || updateYandexFile);
 }
 $('updateBase').onchange = refreshUpdateAvailability;
 $('updateFile').onchange = refreshUpdateAvailability;
@@ -1295,14 +1330,14 @@ $('updateKick').onclick = async () => {
   finally { $('updateKick').disabled = false; }
 };
 $('updateUpload').onclick = async () => {
-  const ib = $('updateBase').value, file = $('updateFile').files[0];
+  const ib = $('updateBase').value, file = $('updateFile').files[0], remoteFile = updateYandexFile;
   if (!ib) { $('updateStatus').textContent = 'Выберите базу.'; return; }
   if (!file || !/\.cf$/i.test(file.name)) { $('updateStatus').textContent = 'Выберите файл конфигурации .cf.'; return; }
   await refreshUpdateAvailability();
   if ($('updateUpload').disabled) { $('updateStatus').textContent = 'Проверьте файл и выбранную базу: при активных сеансах обновление запрещено.'; return; }
-  if (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024) { $('updateStatus').textContent = 'Размер файла должен быть от 1 байта до 8 ГБ.'; return; }
+  if (file && (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024)) { $('updateStatus').textContent = 'Размер файла должен быть от 1 байта до 8 ГБ.'; return; }
   $('updateUpload').disabled = true;
-  $('updateStatus').textContent = 'Загружаю конфигурацию ' + file.name + '…';
+  $('updateStatus').textContent = file ? ('Загружаю конфигурацию ' + file.name + '…') : ('Запускаю обновление из файла ' + filename + '…');
   try {
     const result = await uploadFileWithProgress(file, 'update');
     await runAction({action:'import_file', ib, filename:result.filename, new_base:false,
