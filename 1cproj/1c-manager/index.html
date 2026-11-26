@@ -168,6 +168,26 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .upload-progress-track{height:9px}
 #dlgUpdate .import-actions{position:sticky;bottom:-1px;z-index:2;justify-content:space-between;gap:10px;margin:18px -27px -25px;padding:14px 27px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(12px)}
 #dlgUpdate .import-actions button{min-height:42px;padding:9px 18px;border-radius:10px;font-weight:650}
+
+/* Адаптивность блока автоматических резервных копий */
+#t-files{min-width:0}
+#t-files>.settings-card{width:100%;max-width:100%;min-width:0}
+#t-files>.settings-card>div{min-width:0;max-width:100%}
+#backupBaseDropdown{width:100%;max-width:520px;min-width:0}
+#backupBaseSummary{white-space:normal;overflow-wrap:anywhere}
+#backupCredentials{width:100%;min-width:0;max-width:650px}
+#backupCredentials>div{min-width:0;max-width:100%;overflow-wrap:anywhere}
+#backupCredentials .row{width:100%;min-width:0}
+#backupCredentials .row input{box-sizing:border-box;width:calc(50% - 4px);max-width:100%;min-width:0;flex:1 1 220px}
+#backupScheduleStatus{display:block;width:100%;max-width:100%;min-width:0;margin-top:10px;line-height:1.55;white-space:normal;overflow-wrap:anywhere;word-break:normal}
+#t-files .row{min-width:0;max-width:100%}
+#t-files input[type=time],#t-files input[type=number]{max-width:100%}
+@media(max-width:560px){
+  #t-files .row{align-items:flex-start}
+  #t-files .row label{flex:1 1 100%}
+  #t-files .row input{flex:1 1 100%;width:100%;min-width:0}
+  #backupCredentials .row input{flex:1 1 100%;width:100%}
+}
 #dlgUpdate #updateUpload{min-width:190px;box-shadow:0 4px 12px color-mix(in srgb,var(--acc) 20%,transparent)}
 #dlgUpdate #updateUpload:disabled{box-shadow:none;opacity:.42}
 @media(max-width:560px){#dlgUpdate{min-width:0;border-radius:15px}#dlgUpdate>h3{padding:20px 19px 17px;font-size:19px}#dlgUpdate>h3:after{right:14px;font-size:70px}#dlgUpdate .import-body{padding:16px 17px 20px}#dlgUpdate .import-intro:after{font-size:8px;letter-spacing:0;word-spacing:0}#dlgUpdate .import-group{padding:14px}#dlgUpdate .import-grid{grid-template-columns:1fr}#dlgUpdate .import-actions{margin:16px -17px -20px;padding:12px 17px;flex-direction:column-reverse}#dlgUpdate .import-actions button{width:100%}#dlgUpdate #updateUpload{min-width:0}}
@@ -933,7 +953,9 @@ async function saveBackupSchedule() {
   $('saveBackupSchedule').disabled = true;
   const maximum = Number($('backupMaxCount').value);
   if (!Number.isInteger(maximum) || maximum < 1 || maximum > 1000) {
-    $('backupScheduleStatus').textContent = 'Максимальное количество обычных копий должно быть от 1 до 1000.'; return;
+    $('backupScheduleStatus').textContent = 'Максимальное количество обычных копий должно быть от 1 до 1000.';
+    $('saveBackupSchedule').disabled = false;
+    return;
   }
   const selected_bases = Array.from(document.querySelectorAll('[data-backup-base]:checked')).map(x => x.dataset.backupBase);
   const credentials = {};
