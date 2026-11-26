@@ -1003,7 +1003,7 @@ def automatic_backup_loop():
                              and now >= backup_schedule["next_run"])
             monthly_due = bool(backup_schedule.get("monthly_enabled") and backup_schedule.get("monthly_next_run")
                                and now >= backup_schedule["monthly_next_run"])
-            if (not daily_due and not monthly_due) or backup_running:
+            if (not daily_due and not monthly_due) or backup_running or update_running:
                 continue
             backup_running = True
             monthly_run = monthly_due
