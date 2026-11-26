@@ -980,7 +980,7 @@ def automatic_update_loop():
         time.sleep(10)
         with update_schedule_lock:
             due = bool(update_schedule.get("enabled") and update_schedule.get("next_run") and time.time() >= update_schedule["next_run"])
-            if not due or update_running: continue
+            if not due or update_running or backup_running: continue
             update_running = True
             update_schedule["next_run"] = next_weekly_update(update_schedule["weekday"],update_schedule["weekly_time"])
             save_update_schedule()
