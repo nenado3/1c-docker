@@ -11,6 +11,8 @@ IB="$1"; FILE="$2"; UPLOAD_PATH="$3"; DB_NAME_ARG="${4:-$IB}"; DB_USER_ARG="${5:
 [[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ && "$IB" != "." && "$IB" != ".." ]] || die "недопустимое имя ИБ"
 [[ "$FILE" =~ ^[A-Za-z0-9_.-]{1,180}\.dt$ ]] || die "разрешён только файл .dt"
 case "$(realpath -m -- "$UPLOAD_PATH")" in "$BACKUP_ROOT/$IB"/dt/*) ;; *) die "файл должен находиться в BACKUP_DIR/$IB/dt";; esac
+mkdir -p "$BACKUP_ROOT/$IB"/{dt,cf,pg,logs}
+if [[ "$DB_NAME_ARG" != "$IB" ]]; then mkdir -p "$BACKUP_ROOT/$DB_NAME_ARG"/{dt,cf,pg,logs}; fi
 [[ -s "$UPLOAD_PATH" ]] || die "файл .dt не найден или пуст: $UPLOAD_PATH"
 echo "== Шаг 1/2. Запуск PostgreSQL и сервера 1С"
 START_WITHOUT_BASE=1 bash "$SCRIPT_DIR/start.sh"
