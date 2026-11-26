@@ -311,6 +311,40 @@ dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
  #t-containers>.row:first-child .b,#basesActions .b,#t-pg>.row:first-child .b{flex:1 1 100%}
 }
 
+
+/* Улучшенный диалог восстановления PostgreSQL из dump */
+#dlgPgRestore.pg-restore-dialog{width:min(94vw,590px);min-width:0;max-width:590px;padding:0;overflow:hidden;border:1px solid var(--line);border-radius:18px;background:var(--card);color:var(--fg);box-shadow:0 28px 90px rgba(15,30,55,.25)}
+#dlgPgRestore .pg-restore-heading{display:flex;align-items:center;gap:14px;padding:22px 25px 19px;border-bottom:1px solid var(--line);background:linear-gradient(120deg,color-mix(in srgb,var(--acc) 10%,var(--card)),var(--card) 75%)}
+#dlgPgRestore .pg-restore-icon{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border-radius:14px;background:var(--acc);color:var(--accfg);font-size:25px;font-weight:750;box-shadow:0 6px 15px color-mix(in srgb,var(--acc) 25%,transparent)}
+#dlgPgRestore .pg-restore-heading h3{margin:0;color:var(--fg);font-size:18px;font-weight:760;letter-spacing:-.03em}
+#dlgPgRestore .pg-restore-heading p{margin:4px 0 0;color:var(--mut);font-size:12px}
+#dlgPgRestore .pg-restore-body{display:grid;gap:17px;padding:22px 25px 20px}
+#dlgPgRestore .pg-restore-field{display:grid;gap:7px;min-width:0}
+#dlgPgRestore .pg-restore-field>label{color:var(--fg);font-size:12px;font-weight:700}
+#dlgPgRestore #pgRestoreFile,#dlgPgRestore #pgRestoreDb{display:block;width:100%;max-width:100%;min-width:0;min-height:44px;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--fg);font-size:13px}
+#dlgPgRestore #pgRestoreFile{padding:7px;background:var(--card)}
+#dlgPgRestore #pgRestoreFile::file-selector-button{margin-right:10px;padding:7px 11px;border:1px solid var(--line);border-radius:7px;background:var(--bg);color:var(--fg);font-weight:650;cursor:pointer}
+#dlgPgRestore .pg-restore-hint{color:var(--mut);font-size:11px}
+#dlgPgRestore .pg-restore-clean{padding:13px 14px;border:1px solid var(--line);border-radius:11px;background:var(--bg)}
+#dlgPgRestore .pg-restore-clean label{display:flex;align-items:flex-start;gap:11px;color:var(--fg);cursor:pointer}
+#dlgPgRestore .pg-restore-clean input{flex:0 0 auto;width:17px;height:17px;margin:2px 0 0;accent-color:var(--acc)}
+#dlgPgRestore .pg-restore-clean b{display:block;font-size:12px}
+#dlgPgRestore .pg-restore-clean small{display:block;margin-top:3px;color:var(--mut);font-size:11px;font-weight:400}
+#dlgPgRestore .pg-restore-warning{display:flex;align-items:flex-start;gap:10px;padding:12px 13px;border:1px solid color-mix(in srgb,var(--warn) 28%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 8%,var(--card))}
+#dlgPgRestore .pg-restore-warning>span{display:grid;place-items:center;flex:0 0 19px;width:19px;height:19px;border-radius:50%;background:color-mix(in srgb,var(--warn) 17%,var(--card));color:var(--warn);font-size:12px;font-weight:800}
+#dlgPgRestore .pg-restore-warning p{margin:0;color:var(--mut);font-size:11px;line-height:1.55}
+#dlgPgRestore .pg-restore-status{font-size:12px;line-height:1.5;overflow-wrap:anywhere}
+#dlgPgRestore .pg-restore-progress{width:100%;max-width:none;margin:0}
+#dlgPgRestore .pg-restore-actions{display:flex;justify-content:flex-end;gap:9px;padding:15px 25px 19px;border-top:1px solid var(--line);background:var(--bg)}
+#dlgPgRestore .pg-restore-actions .b{min-height:41px;padding:9px 15px;border-radius:9px;font-size:12px;font-weight:700}
+@media(max-width:560px){
+ #dlgPgRestore.pg-restore-dialog{width:calc(100vw - 20px);max-width:none;border-radius:14px}
+ #dlgPgRestore .pg-restore-heading{padding:17px 17px 15px}
+ #dlgPgRestore .pg-restore-body{gap:14px;padding:17px}
+ #dlgPgRestore .pg-restore-actions{padding:13px 17px 16px}
+ #dlgPgRestore .pg-restore-actions .b{flex:1}
+}
+
 </style>
 </head>
 <body>
@@ -521,20 +555,38 @@ dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
   <div id="pgRoleEditStatus" class="mut" role="status"></div>
   <div class="row"><button class="b" id="pgRoleEditSave">Сохранить права</button><button class="b sec" id="pgRoleEditCancel">Отмена</button></div>
 </dialog>
-<dialog id="dlgPgRestore">
-  <h3 style="margin-top:0">Восстановить PostgreSQL из .dump</h3>
-  <label>Файл PostgreSQL (.dump, формат pg_dump -Fc)</label>
-  <input id="pgRestoreFile" type="file" accept=".dump,application/octet-stream">
-  <label>Целевая база PostgreSQL</label>
-  <select id="pgRestoreDb"><option value="">Сначала загрузите список баз</option></select>
-  <label><input id="pgRestoreClean" type="checkbox"> Очистить существующие объекты перед восстановлением</label>
-  <p class="mut">Без отметки восстановление добавит объекты в целевую базу и может завершиться конфликтами. С очисткой существующие объекты будут удалены. Саму базу PostgreSQL панель не удаляет.</p>
-  <div id="pgRestoreStatus" class="mut" aria-live="polite"></div>
-  <div id="pgRestoreProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки дампа">
-    <div class="upload-progress-track"><div id="pgRestoreProgressFill" class="upload-progress-fill"></div></div>
-    <div class="upload-progress-meta"><span id="pgRestoreProgressLabel">Загрузка: 0%</span><span id="pgRestoreProgressSize">0 / 0 МБ</span></div>
+<dialog id="dlgPgRestore" class="pg-restore-dialog" aria-labelledby="pgRestoreTitle">
+  <div class="pg-restore-heading">
+    <div class="pg-restore-icon" aria-hidden="true">↥</div>
+    <div>
+      <h3 id="pgRestoreTitle">Восстановление PostgreSQL</h3>
+      <p>Загрузка базы из резервного файла</p>
+    </div>
   </div>
-  <div class="row"><button class="b" id="pgRestoreOk">Загрузить и восстановить</button><button class="b sec" id="pgRestoreCancel">Отмена</button></div>
+  <div class="pg-restore-body">
+    <div class="pg-restore-field">
+      <label for="pgRestoreFile">Файл резервной копии</label>
+      <input id="pgRestoreFile" type="file" accept=".dump,application/octet-stream">
+      <span class="pg-restore-hint">Формат PostgreSQL custom — <b>.dump</b> (pg_dump -Fc)</span>
+    </div>
+    <div class="pg-restore-field">
+      <label for="pgRestoreDb">Целевая база PostgreSQL</label>
+      <select id="pgRestoreDb"><option value="">Сначала загрузите список баз</option></select>
+    </div>
+    <div class="pg-restore-clean">
+      <label><input id="pgRestoreClean" type="checkbox"><span><b>Очистить существующие объекты</b><small>Удалить объекты в целевой базе перед восстановлением</small></span></label>
+    </div>
+    <div class="pg-restore-warning"><span aria-hidden="true">!</span><p>Без очистки восстановление добавит объекты к существующим и может завершиться конфликтами. При включённой очистке существующие объекты будут удалены. Сама база PostgreSQL не удаляется.</p></div>
+    <div id="pgRestoreStatus" class="pg-restore-status" aria-live="polite"></div>
+    <div id="pgRestoreProgress" class="upload-progress pg-restore-progress" role="group" aria-label="Прогресс загрузки дампа">
+      <div class="upload-progress-track"><div id="pgRestoreProgressFill" class="upload-progress-fill"></div></div>
+      <div class="upload-progress-meta"><span id="pgRestoreProgressLabel">Загрузка: 0%</span><span id="pgRestoreProgressSize">0 / 0 МБ</span></div>
+    </div>
+  </div>
+  <div class="pg-restore-actions">
+    <button class="b sec" id="pgRestoreCancel">Отмена</button>
+    <button class="b" id="pgRestoreOk">Загрузить и восстановить <span aria-hidden="true">→</span></button>
+  </div>
 </dialog>
 <dialog id="dlgImport" aria-labelledby="importDialogTitle">
   <h3 id="importDialogTitle">Создать/Загрузить базу 1С</h3>
