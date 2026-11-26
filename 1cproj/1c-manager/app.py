@@ -1031,7 +1031,33 @@ def api_get(path, q):
                "SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE NOT datistemplate ORDER BY 1")
         if r.returncode != 0:
             return {"error": (r.stderr or r.stdout).strip(), "items": []}
-        return {"items": [dict(zip(("name", "size"), l.split("|"))) for l in r.stdout.splitlines() if "|" in l]}
+        items = [dict(zip(("name", "size"), l.split("|", 1))) for l in r.stdout.splitlines() if "|" in l]
+        roles_sql = """
+            SELECT r.rolname,
+                   r.rolsuper::text,
+                   r.rolcreatedb::text,
+                   r.rolcreaterole::text,
+                   r.rolcanlogin::text,
+                   r.rolinherit::text,
+                   r.rolreplication::text,
+                   r.rolbypassrls::text,
+                   COALESCE((SELECT string_agg(pg_get_userbyid(m.roleid), ', ' ORDER BY pg_get_userbyid(m.roleid))
+                             FROM pg_auth_members m WHERE m.member = r.oid), '')
+            FROM pg_roles r
+            ORDER BY r.rolname
+        """
+        rr = dk("exec", "onec-postgres", "runuser", "-u", "postgres", "--",
+                "/usr/local/pgbin/psql", "-d", "postgres", "-At", "-F", "|", "-c", roles_sql)
+        if rr.returncode != 0:
+            return {"items": items, "roles": [], "roles_error": (rr.stderr or rr.stdout).strip()}
+        roles = []
+        for line in rr.stdout.splitlines():
+            cols = line.split("|", 8)
+            if len(cols) != 9:
+                continue
+            roles.append(dict(zip(("name", "superuser", "createdb", "createrole", "login",
+                                   "inherit", "replication", "bypassrls", "memberships"), cols)))
+        return {"items": items, "roles": roles}
     if path == "/api/files":
         # При открытии раздела «Выгрузки» создаём папки для всех зарегистрированных
         # баз, чтобы структура была видна даже до первой резервной копии.
