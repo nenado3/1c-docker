@@ -42,28 +42,30 @@ split_src() {
 
 pull_latest() {
     split_src
-    local newest
+    local newest rel target
     mkdir -p "$BACKUP_DIR"
     if [ -z "$SRC_HOST" ]; then
-        newest=$(ls -t "$SRC_DIR"/dt/*.dt "$SRC_DIR"/cf/*.cf "$SRC_DIR"/*.dt "$SRC_DIR"/*.cf 2>/dev/null | head -n1)
+        newest=$(find "$SRC_DIR" -type f \( -name "*.dt" -o -name "*.cf" \) -printf "%T@ %p\\n" 2>/dev/null | sort -nr | head -n1 | cut -d" " -f2-)
         [ -n "$newest" ] || die "в $SRC_DIR нет .dt/.cf файлов (сначала ./backup.sh в 1c-server)"
-        kind="${newest##*.}"
-        mkdir -p "$BACKUP_DIR/$kind"
-        echo "Копирую $newest в $BACKUP_DIR/$kind"
-        cp -p "$newest" "$BACKUP_DIR/$kind/" || die "копирование не удалось"
+        rel="${newest#"$SRC_DIR"/}"
+        if [[ "$rel" == "$newest" ]]; then rel="$(basename "$newest")"; fi
+        target="$BACKUP_DIR/$rel"
+        mkdir -p "$(dirname "$target")"
+        echo "Копирую $newest в $target"
+        cp -p "$newest" "$target" || die "копирование не удалось"
     else
-        newest=$(ssh "$SRC_HOST" "ls -t '$SRC_DIR'/dt/*.dt '$SRC_DIR'/cf/*.cf '$SRC_DIR'/*.dt '$SRC_DIR'/*.cf 2>/dev/null | head -n1") \
-            || die "ssh к ${SRC_HOST} не удался: проверьте адрес компьютера сервера (не контейнера), что на нём запущен sshd и порт 22 открыт, и работает ли вход: ssh ${SRC_HOST}"
+        newest=$(ssh "$SRC_HOST" "find '$SRC_DIR' -type f \\( -name '*.dt' -o -name '*.cf' \\) -printf '%T@ %p\\\\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-") \
+            || die "ssh к ${SRC_HOST} не удался: проверьте адрес компьютера сервера и доступность ssh"
         [ -n "$newest" ] || die "на сервере в $SRC_DIR нет .dt/.cf файлов (сначала ./backup.sh на сервере)"
-        kind="${newest##*.}"
-        mkdir -p "$BACKUP_DIR/$kind"
-        echo "Копирую $SRC_HOST:$newest в $BACKUP_DIR/$kind"
-        scp -p "$SRC_HOST:$newest" "$BACKUP_DIR/$kind/" || die "scp не удался"
+        rel="${newest#"$SRC_DIR"/}"
+        if [[ "$rel" == "$newest" ]]; then rel="$(basename "$newest")"; fi
+        target="$BACKUP_DIR/$rel"
+        mkdir -p "$(dirname "$target")"
+        echo "Копирую $SRC_HOST:$newest в $target"
+        scp -p "$SRC_HOST:$newest" "$target" || die "scp не удался"
     fi
-    kind="${newest##*.}"
-    mkdir -p "$BACKUP_DIR/$kind"
-    ls -lh "$BACKUP_DIR/$kind/$(basename "$newest")"
-    echo "Готово: $(cd "$BACKUP_DIR/$kind" && pwd)/$(basename "$newest")"
+    ls -lh "$target"
+    echo "Готово: $target"
 }
 
 # Экранирование аргумента одинарными кавычками для удалённой оболочки (любой, не только bash)
