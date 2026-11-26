@@ -76,16 +76,39 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .settings-actions .b{min-height:40px;padding:8px 16px;border-radius:9px}
 .settings-footnote{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 6%,var(--bg));color:var(--mut);font-size:12px;line-height:1.55}
 .settings-footnote strong{color:var(--fg)}
-#dlgBackupSchedule{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 32px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
-#dlgBackupSchedule::backdrop{background:rgba(0,0,0,.48)}
-#dlgBackupSchedule .backup-content{padding:18px 21px 21px}
-#dlgBackupSchedule .backup-settings-grid{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(0,1.2fr);gap:8px 14px;align-items:center}
-#dlgBackupSchedule .backup-settings-grid input{width:100%;min-width:0}
-#dlgBackupSchedule .backup-base-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:center;margin:12px 0}
+#dlgBackupSchedule{width:min(700px,calc(100vw - 28px));max-width:700px;max-height:calc(100vh - 32px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:20px;background:var(--bg);color:var(--fg);box-shadow:0 28px 90px rgba(0,0,0,.32)}
+#dlgBackupSchedule::backdrop{background:rgba(8,14,28,.62);backdrop-filter:blur(4px)}
+#dlgBackupSchedule .backup-dialog-head{position:sticky;top:0;z-index:3;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:23px 25px 21px;border-bottom:1px solid var(--line);background:var(--card)}
+#dlgBackupSchedule .backup-dialog-title{display:flex;gap:14px;align-items:center;min-width:0}
+#dlgBackupSchedule .backup-dialog-icon{display:grid;place-items:center;flex:none;width:48px;height:48px;border-radius:15px;background:color-mix(in srgb,var(--acc) 13%,var(--bg));font-size:23px}
+#dlgBackupSchedule .backup-dialog-head h3{margin:0;font-size:19px;letter-spacing:-.35px}
+#dlgBackupSchedule .backup-dialog-head p{margin:5px 0 0;color:var(--mut);font-size:12px}
+#dlgBackupSchedule .backup-dialog-head .b{flex:none;width:36px;height:36px;padding:0;border-radius:10px}
+#dlgBackupSchedule .backup-content{display:grid;gap:15px;padding:21px 25px 24px}
+#dlgBackupSchedule .backup-intro{margin:0;padding:13px 15px;border:1px solid color-mix(in srgb,var(--acc) 24%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--acc) 6%,var(--card));color:var(--mut);font-size:12px;line-height:1.6}
+#dlgBackupSchedule .backup-enable{display:flex;align-items:center;gap:11px;margin:0;padding:15px 16px;border:1px solid var(--line);border-radius:12px;background:var(--card);font-size:13px;font-weight:700}
+#dlgBackupSchedule .backup-enable input,#dlgBackupSchedule .backup-monthly input{width:17px;height:17px;accent-color:var(--acc)}
+#dlgBackupSchedule .backup-section{padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--card)}
+#dlgBackupSchedule .backup-section-title{margin:0 0 13px;font-size:13px;font-weight:750}
+#dlgBackupSchedule .backup-base-row{display:grid;grid-template-columns:125px minmax(0,1fr);gap:12px;align-items:center;margin:0}
+#dlgBackupSchedule .backup-base-row>label,#dlgBackupSchedule .backup-settings-grid label{color:var(--mut);font-size:12px;font-weight:650}
 #dlgBackupSchedule #backupBaseDropdown{min-width:0}
-#dlgBackupSchedule #backupBaseSummary{padding:10px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
-#dlgBackupSchedule .backup-enable{display:flex;align-items:center;gap:9px;margin:14px 0}
-#dlgBackupSchedule .backup-actions{margin-top:16px}
+#dlgBackupSchedule #backupBaseSummary{padding:11px 13px;border:1px solid var(--line);border-radius:9px;background:var(--bg);cursor:pointer;font-size:13px}
+#dlgBackupSchedule #backupScheduleBases{background:var(--bg)}
+#dlgBackupSchedule #backupCredentials{margin-top:13px;color:var(--mut);font-size:12px;line-height:1.55}
+#dlgBackupSchedule .backup-settings-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(130px,.8fr);gap:12px 16px;align-items:center}
+#dlgBackupSchedule .backup-settings-grid input{width:100%;min-width:0;min-height:41px;padding:9px 11px;border:1px solid var(--line);border-radius:9px;background:var(--bg);color:var(--fg)}
+#dlgBackupSchedule .backup-settings-grid input:focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 14%,transparent)}
+#dlgBackupSchedule .backup-monthly{display:flex;align-items:flex-start;gap:10px;margin:14px 0 0;font-size:12px;line-height:1.5}
+#dlgBackupSchedule .backup-monthly input{flex:none;margin-top:1px}
+#dlgBackupSchedule .backup-monthly-hint{margin:10px 0 0;color:var(--mut);font-size:11px;line-height:1.5}
+#dlgBackupSchedule .backup-actions{display:flex;justify-content:flex-end;margin-top:0;padding-top:16px;border-top:1px solid var(--line)}
+#dlgBackupSchedule #saveBackupSchedule{min-height:43px;padding:10px 20px;border-radius:10px;font-weight:700}
+#dlgBackupSchedule #backupScheduleStatus{padding:11px 13px;border-radius:10px;background:var(--card);color:var(--mut);font-size:12px;line-height:1.5}
+#dlgBackupSchedule .backup-schedule-launch{margin-top:16px}
+#openBackupSchedule{display:inline-flex;align-items:center;gap:9px;min-height:44px;padding:10px 16px;border:1px solid color-mix(in srgb,var(--acc) 35%,var(--line));border-radius:11px;background:color-mix(in srgb,var(--acc) 8%,var(--card));color:var(--fg);font-weight:700;transition:transform .15s,border-color .15s,background .15s}
+#openBackupSchedule:hover{transform:translateY(-1px);border-color:var(--acc);background:color-mix(in srgb,var(--acc) 13%,var(--card))}
+@media(max-width:560px){#dlgBackupSchedule .backup-dialog-head{padding:18px}#dlgBackupSchedule .backup-content{padding:16px;gap:12px}#dlgBackupSchedule .backup-section{padding:13px}#dlgBackupSchedule .backup-base-row,#dlgBackupSchedule .backup-settings-grid{grid-template-columns:1fr;gap:7px}#dlgBackupSchedule .backup-dialog-icon{width:42px;height:42px}}
 @media(max-width:520px){#dlgBackupSchedule .backup-settings-grid,#dlgBackupSchedule .backup-base-row{grid-template-columns:1fr;gap:5px}}
 #dlgWeeklyUpdate{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 32px);overflow:auto;padding:0;border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
 #dlgWeeklyUpdate .weekly-update-dialog-head{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:18px 21px;border-bottom:1px solid var(--line);background:var(--card)}
@@ -525,35 +548,44 @@ input[type="checkbox"],input[type="radio"]{
         <div id="weeklyUpdateStatus" aria-live="polite" class="backupScheduleStatus">Загрузка расписания…</div>
       </div>
     </dialog>
-    <div class="backup-schedule-launch" style="margin-top:16px">
-      <button class="b sec" id="openBackupSchedule" type="button">▤ Автоматическое резервное копирование</button>
+    <div class="backup-schedule-launch">
+      <button class="b sec" id="openBackupSchedule" type="button"><span aria-hidden="true">◷</span> Автоматическое резервное копирование</button>
     </div>
     <dialog id="dlgBackupSchedule" aria-labelledby="backupScheduleTitle">
-      <div class="weekly-update-dialog-head">
-        <div><h3 id="backupScheduleTitle">Автоматическое резервное копирование</h3><p>Настройка расписания резервных копий баз 1С</p></div>
+      <div class="backup-dialog-head">
+        <div class="backup-dialog-title">
+          <div class="backup-dialog-icon" aria-hidden="true">🗄️</div>
+          <div><h3 id="backupScheduleTitle">Автоматическое резервное копирование</h3><p>Расписание и параметры резервных копий баз 1С</p></div>
+        </div>
         <button class="b sec" id="closeBackupSchedule" type="button" aria-label="Закрыть">✕</button>
       </div>
       <div class="backup-content">
-        <p class="backup-intro">Выберите базы 1С и время ежедневной выгрузки. Перед каждой копией панель временно запрещает новые подключения и регламентные задания, завершает текущие сеансы пользователей, создаёт .dt и затем автоматически открывает базу снова. На время выгрузки пользователи не смогут войти в выбранную базу.</p>
-        <label class="backup-enable"><input id="backupScheduleEnabled" type="checkbox"> Включить автоматические бэкапы</label>
-        <div class="backup-base-row">
-          <label for="backupBaseSummary">Выбрать базу:</label>
-          <details id="backupBaseDropdown">
-            <summary id="backupBaseSummary">Выбрать базы 1С</summary>
-            <div id="backupScheduleBases" style="display:flex;flex-direction:column;gap:9px;padding:12px;max-height:220px;overflow:auto;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px"><span class="mut">Загрузка списка баз…</span></div>
-          </details>
-        </div>
-        <div id="backupCredentials">
-          <div>Для автоматического отключения пользователей укажите пользователя и пароль администратора каждой выбранной базы 1С. Эти данные нужны для временной блокировки новых сеансов и регламентных заданий. Сохранённые пароли не отображаются.</div>
-        </div>
-        <div class="backup-settings-grid">
-          <label for="backupDailyTime">Ежедневно выгружать в</label>
-          <input id="backupDailyTime" type="time" value="02:00">
-          <label for="backupMaxCount">Макс. обычных копий</label>
-          <input id="backupMaxCount" type="number" min="1" max="1000" step="1" value="10">
-        </div>
-        <label class="backup-monthly"><input id="backupMonthlyEnabled" type="checkbox"> <span>Дополнительно создавать копию в начале каждого месяца (1-го числа в 02:00)</span></label>
-        <p class="backup-monthly-hint">Месячные копии сохраняются отдельно в dt/monthly и никогда не удаляются автоматической ротацией. Лимит применяется только к обычным копиям.</p>
+        <p class="backup-intro">Перед созданием копии новые подключения и регламентные задания временно блокируются, активные сеансы пользователей завершаются. После выгрузки .dt база автоматически открывается снова. Во время операции пользователи не смогут войти в выбранную базу.</p>
+        <label class="backup-enable"><input id="backupScheduleEnabled" type="checkbox"> Включить автоматическое резервное копирование</label>
+        <section class="backup-section">
+          <h4 class="backup-section-title">Базы и доступ</h4>
+          <div class="backup-base-row">
+            <label for="backupBaseSummary">Базы 1С</label>
+            <details id="backupBaseDropdown">
+              <summary id="backupBaseSummary">Выбрать базы 1С</summary>
+              <div id="backupScheduleBases" style="display:flex;flex-direction:column;gap:9px;padding:12px;max-height:220px;overflow:auto;border:1px solid var(--line);border-top:0;border-radius:0 0 10px 10px"><span class="mut">Загрузка списка баз…</span></div>
+            </details>
+          </div>
+          <div id="backupCredentials">
+            <div>Для автоматического отключения пользователей укажите логин и пароль администратора каждой выбранной базы. Сохранённые пароли не отображаются.</div>
+          </div>
+        </section>
+        <section class="backup-section">
+          <h4 class="backup-section-title">Расписание и хранение</h4>
+          <div class="backup-settings-grid">
+            <label for="backupDailyTime">Время ежедневной выгрузки</label>
+            <input id="backupDailyTime" type="time" value="02:00">
+            <label for="backupMaxCount">Количество обычных копий</label>
+            <input id="backupMaxCount" type="number" min="1" max="1000" step="1" value="10">
+          </div>
+          <label class="backup-monthly"><input id="backupMonthlyEnabled" type="checkbox"> <span>Создавать дополнительную копию в начале каждого месяца (1-го числа в 02:00)</span></label>
+          <p class="backup-monthly-hint">Месячные копии хранятся отдельно в <code>dt/monthly</code> и не удаляются автоматически. Лимит применяется только к обычным копиям.</p>
+        </section>
         <div class="backup-actions"><button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button></div>
         <div id="backupScheduleStatus" aria-live="polite">Загрузка расписания…</div>
       </div>
