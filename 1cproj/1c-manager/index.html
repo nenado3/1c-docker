@@ -771,7 +771,7 @@ async function loadPg() {
 }
 
 function fileRows(list, kind) {
-  // дерево папки backup/export: вложенные показываем отступом, файлы — со скачиванием
+  // дерево папки backup: вложенные показываем отступом, файлы — со скачиванием
   const tree = list.tree || [];
   if (!tree.length) return '<tr><td colspan="4" class="mut">Пусто</td></tr>';
   return tree.map(e => {
@@ -786,8 +786,8 @@ function fileRows(list, kind) {
 async function loadFiles() {
   const r = await api('/api/files');
   if (r.error) return;
-  $('dirBackups').textContent = r.backups.dir; $('dirExport').textContent = r.export.dir;
-  $('fBackups').innerHTML = fileRows(r.backups, 'backups'); $('fExport').innerHTML = fileRows(r.export, 'export');
+  $('dirBackups').textContent = r.backups.dir;
+  $('fBackups').innerHTML = fileRows(r.backups, 'backups');
   $('dirLic').textContent = r.licenses.dir;
   $('fLic').innerHTML = r.licenses.files.length ? r.licenses.files.map(f => '<tr><td class="mono">' + esc(f.name) + '</td><td>' + fmtSize(f.size) + '</td><td>' + fmtDate(f.mtime) + '</td></tr>').join('') : '<tr><td colspan="3" class="mut">Файлов лицензий нет</td></tr>';
 }
@@ -1018,7 +1018,7 @@ async function init() {
   const b = $('dockerBadge');
   b.textContent = s.docker ? 'Docker: ' + s.docker_cmd : 'Docker: недоступен';
   b.className = 'badge ' + (s.docker ? 'ok' : 'bad');
-  $('dirs').textContent = (s.server_ok ? '' : 'нет папки 1c-server. ') + (s.client_ok ? '' : 'нет папки 1c-client.');
+  $('dirs').textContent = s.server_ok ? '' : 'нет папки 1c-server.';
   if (!s.docker) {
     const w = $('dockerWarn'); w.style.display = 'block';
     w.innerHTML = 'Панель не может выполнять команды docker от вашего пользователя. Добавьте себя в группу docker: ' +
