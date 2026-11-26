@@ -188,6 +188,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <section id="t-bases">
     <div class="row" id="basesActions" style="flex-wrap:wrap">
       <button class="b" id="openImport">Создать/Загрузить базу 1С</button>
+      <button class="b sec" id="openUpdate">Сделать обновление базы</button>
       <span id="apacheState" class="badge">Apache: проверка…</span>
       <button class="b sec" id="apacheToggle" data-apache="start">Запустить Apache</button>
       <button class="b sec" data-apache="restart">Перезапустить Apache</button>
@@ -341,20 +342,14 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 <dialog id="dlgImport" aria-labelledby="importDialogTitle">
   <h3 id="importDialogTitle">Создать/Загрузить базу 1С</h3>
   <div class="import-body">
-    <p class="import-intro">Выберите базу и архив. Файл будет передан в Docker, после чего панель запустит импорт.</p>
+    <p class="import-intro">Создайте новую информационную базу или восстановите существующую из архива.</p>
     <div class="import-group">
-      <div class="import-group-title"><span class="import-step">1</span> Куда импортировать</div>
+      <div class="import-group-title"><span class="import-step">1</span> Куда загрузить данные</div>
       <label class="import-check"><input id="importNewBase" type="checkbox"> Создать новую информационную базу и отдельную БД PostgreSQL</label>
       <div id="importNewBaseFields" hidden>
         <div class="import-grid">
-          <div>
-            <label>Имя новой информационной базы 1С</label>
-            <input id="importNewIb" placeholder="например mybase2">
-          </div>
-          <div>
-            <label>Имя новой базы PostgreSQL <span class="mut">(пусто — как имя ИБ)</span></label>
-            <input id="importNewDbName" placeholder="например mybase2">
-          </div>
+          <div><label>Имя новой информационной базы 1С</label><input id="importNewIb" placeholder="например mybase2"></div>
+          <div><label>Имя новой базы PostgreSQL <span class="mut">(пусто — как имя ИБ)</span></label><input id="importNewDbName" placeholder="например mybase2"></div>
         </div>
       </div>
       <div id="importExistingBaseFields">
@@ -363,41 +358,63 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       </div>
     </div>
     <div class="import-group">
-      <div class="import-group-title"><span class="import-step">2</span> Файл для импорта</div>
-      <label>Выберите архив .dt или файл конфигурации .cf</label>
-      <input id="importFile" type="file" accept=".dt,.cf,application/octet-stream">
-      <p class="import-hint">.dt — восстановление данных базы; .cf — обновление конфигурации.</p>
+      <div class="import-group-title"><span class="import-step">2</span> Архив информационной базы</div>
+      <label>Выберите архив базы</label>
+      <input id="importFile" type="file" accept=".dt,application/octet-stream">
+      <p class="import-hint">Поддерживается восстановление данных из архива. Существующая база будет полностью перезаписана.</p>
     </div>
     <div class="import-group">
       <div class="import-group-title"><span class="import-step">3</span> Доступы (если требуются)</div>
       <div class="import-grid">
-        <div>
-          <label>Пользователь 1С</label>
-          <input id="importUser" placeholder="Пользователь 1С">
-        </div>
-        <div>
-          <label>Пароль 1С</label>
-          <input id="importPwd" type="password" placeholder="Пароль 1С" autocomplete="new-password">
-        </div>
-        <div>
-          <label>Пользователь PostgreSQL</label>
-          <input id="importDbUser" placeholder="Пользователь PostgreSQL">
-        </div>
-        <div>
-          <label>Пароль PostgreSQL</label>
-          <input id="importDbPwd" type="password" placeholder="Пароль PostgreSQL" autocomplete="new-password">
-        </div>
+        <div><label>Пользователь 1С</label><input id="importUser" placeholder="Пользователь 1С"></div>
+        <div><label>Пароль 1С</label><input id="importPwd" type="password" placeholder="Пароль 1С" autocomplete="new-password"></div>
+        <div><label>Пользователь PostgreSQL</label><input id="importDbUser" placeholder="Пользователь PostgreSQL"></div>
+        <div><label>Пароль PostgreSQL</label><input id="importDbPwd" type="password" placeholder="Пароль PostgreSQL" autocomplete="new-password"></div>
       </div>
     </div>
-    <p class="import-hint">Важно: импорт .dt в существующую базу полностью заменяет её данные. Файл .cf обновляет конфигурацию.</p>
     <div id="importStatus" class="mut" aria-live="polite"></div>
-    <div id="importProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки файла" style="display:none">
+    <div id="importProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки архива" style="display:none">
       <div class="upload-progress-track"><div id="importProgressFill" class="upload-progress-fill"></div></div>
       <div class="upload-progress-meta"><span id="importProgressLabel">Загрузка: 0%</span><span id="importProgressSize">0 / 0 МБ</span></div>
     </div>
     <div class="import-actions">
       <button class="b sec" id="importCancel">Отмена</button>
       <button class="b" id="uploadImport">Загрузить и импортировать</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="dlgUpdate" aria-labelledby="updateDialogTitle">
+  <h3 id="updateDialogTitle">Сделать обновление базы</h3>
+  <div class="import-body">
+    <p class="import-intro">Загрузите файл конфигурации, чтобы обновить конфигурацию выбранной информационной базы.</p>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">1</span> Выберите базу</div>
+      <label>Информационная база 1С</label>
+      <select id="updateBase"><option value="">Сначала загрузите список баз</option></select>
+    </div>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">2</span> Подготовка базы</div>
+      <button class="b sec" id="updateKick">Выкинуть пользователей из выбранной базы</button>
+      <div id="updateUsers" class="import-hint" aria-live="polite">Выберите базу для проверки активных пользователей.</div>
+    </div>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">3</span> Файл обновления</div>
+      <label>Файл конфигурации</label>
+      <input id="updateFile" type="file" accept=".cf,application/octet-stream">
+      <p class="import-hint">Перед загрузкой убедитесь, что у пользователей закрыты все сеансы. При наличии активных сеансов кнопка загрузки будет заблокирована.</p>
+      <div class="import-grid">
+        <div><label>Пользователь 1С</label><input id="updateUser" placeholder="Пользователь 1С"></div>
+        <div><label>Пароль 1С</label><input id="updatePwd" type="password" placeholder="Пароль 1С" autocomplete="new-password"></div>
+      </div>
+    </div>
+    <div id="updateStatus" class="mut" aria-live="polite"></div>
+    <div id="updateProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки конфигурации" style="display:none">
+      <div class="upload-progress-track"><div id="updateProgressFill" class="upload-progress-fill"></div></div>
+      <div class="upload-progress-meta"><span id="updateProgressLabel">Загрузка: 0%</span><span id="updateProgressSize">0 / 0 МБ</span></div>
+    </div>
+    <div class="import-actions">
+      <button class="b sec" id="updateCancel">Отмена</button>
+      <button class="b" id="updateUpload" disabled>Загрузить и обновить</button>
     </div>
   </div>
 </dialog>
@@ -574,6 +591,8 @@ async function loadBases() {
     (web.error ? 'Не удалось проверить публикации: ' + web.error : '');
   const items = r.items || [];
   $('importBase').innerHTML = items.length ? '<option value="">Выберите базу</option>' + items.map(i => '<option value="' + esc(i.name) + '">' + esc(i.name) + '</option>').join('') : '<option value="">Нет доступных баз</option>';
+  $('updateBase').innerHTML = items.length ? '<option value="">Выберите базу</option>' + items.map(i => '<option value="' + esc(i.name) + '">' + esc(i.name) + '</option>').join('') : '<option value="">Нет доступных баз</option>';
+  window.infobaseNames = Object.fromEntries(items.map(i => [i.infobase || i.id || '', i.name || '']));
 
   const apacheState = $('apacheState'), apacheToggle = $('apacheToggle');
   if (apache.error) {
@@ -613,6 +632,7 @@ async function loadBases() {
   }).join('') : '<tr><td colspan="4" class="mut">Баз нет</td></tr>';
 
   const sess = await api('/api/sessions');
+  window.currentSessions = sess.items || [];
   const ss = sess.items || [];
   const truthy = value => ['yes', 'true', '1', 'да'].includes(String(value || '').trim().toLowerCase());
   const sessionStatus = x => {
@@ -625,7 +645,8 @@ async function loadBases() {
   } else {
     const groups = new Map();
     ss.forEach(x => {
-      const base = x.infobase || 'База не определена';
+      const baseId = x.infobase || '';
+      const base = (window.infobaseNames || {})[baseId] || baseId || 'База не определена';
       if (!groups.has(base)) groups.set(base, []);
       groups.get(base).push(x);
     });
@@ -1070,6 +1091,8 @@ document.addEventListener('click', e => {
   if (e.target.closest('#chooseBackupDir')) openBackupPicker();
 });
 $('openImport').onclick = () => { $('dlgImport').showModal(); };
+$('openUpdate').onclick = () => { $('dlgUpdate').showModal(); refreshUpdateAvailability(); };
+$('updateCancel').onclick = () => $('dlgUpdate').close();
 $('importCancel').onclick = () => $('dlgImport').close();
 $('dtCancel').onclick = () => $('dlgDt').close(); $('dCancel').onclick = () => $('dlgDump').close();
 $('dOk').onclick = () => { $('dlgDump').close();
@@ -1168,7 +1191,6 @@ $('importNewBase').onchange = () => {
   const creating = $('importNewBase').checked;
   $('importNewBaseFields').hidden = !creating;
   $('importExistingBaseFields').hidden = creating;
-  $('importFile').setAttribute('accept', creating ? '.dt,application/octet-stream' : '.dt,.cf,application/octet-stream');
 };
 
 $('uploadImport').onclick = async () => {
@@ -1176,7 +1198,7 @@ $('uploadImport').onclick = async () => {
   const newBase = $('importNewBase').checked;
   const ib = newBase ? $('importNewIb').value.trim() : $('importBase').value;
   const dbName = $('importNewDbName').value.trim();
-  if (!file) { $('importStatus').textContent = 'Выберите файл .dt или .cf.'; return; }
+  if (!file) { $('importStatus').textContent = 'Выберите файл .dt.'; return; }
   if (!ib) { $('importStatus').textContent = newBase ? 'Укажите имя новой информационной базы.' : 'Выберите существующую информационную базу.'; return; }
   if (!/^[A-Za-z0-9_.-]{1,64}$/.test(ib)) { $('importStatus').textContent = 'Имя ИБ: 1–64 символа, латиница, цифры, точка, дефис или подчёркивание.'; return; }
   if (newBase && !/\.dt$/i.test(file.name)) { $('importStatus').textContent = 'Создать новую базу можно только из файла .dt.'; return; }
@@ -1198,6 +1220,62 @@ $('uploadImport').onclick = async () => {
     $('dlgImport').close();
   } catch (e) { $('importStatus').textContent = 'Ошибка: ' + e.message; }
   finally { $('uploadImport').disabled = false; $('uploadProgress').style.display = 'none'; }
+};
+
+
+async function refreshUpdateAvailability() {
+  const ib = $('updateBase').value;
+  const button = $('updateUpload');
+  if (!ib) {
+    $('updateUsers').textContent = 'Выберите базу для проверки активных пользователей.';
+    button.disabled = true;
+    return;
+  }
+  const [bases, sessions] = await Promise.all([api('/api/infobases'), api('/api/sessions')]);
+  const baseInfo = (bases.items || []).find(x => x.name === ib);
+  const baseId = baseInfo && (baseInfo.infobase || baseInfo.id);
+  const active = (sessions.items || []).filter(x => String(x.infobase || '') === String(baseId || ''));
+  $('updateUsers').textContent = active.length
+    ? 'В базе активны сеансы: ' + active.length + '. Сначала завершите их.'
+    : 'Активных сеансов нет. Можно загружать обновление.';
+  button.disabled = active.length > 0 || !baseId || !!bases.error || !!sessions.error;
+}
+$('updateBase').onchange = refreshUpdateAvailability;
+$('updateKick').onclick = async () => {
+  const ib = $('updateBase').value;
+  if (!ib) { $('updateStatus').textContent = 'Сначала выберите базу.'; return; }
+  const [bases, sessions] = await Promise.all([api('/api/infobases'), api('/api/sessions')]);
+  const baseInfo = (bases.items || []).find(x => x.name === ib);
+  const baseId = baseInfo && (baseInfo.infobase || baseInfo.id);
+  if (!baseId) { $('updateStatus').textContent = 'Не удалось определить идентификатор базы.'; return; }
+  const active = (sessions.items || []).filter(x => String(x.infobase || '') === String(baseId));
+  if (!active.length) { $('updateStatus').textContent = 'Активных пользователей нет.'; await refreshUpdateAvailability(); return; }
+  if (!confirm('Завершить все ' + active.length + ' сеансов базы «' + ib + '»? Несохранённые данные пользователей могут быть потеряны.')) return;
+  $('updateKick').disabled = true;
+  try {
+    for (const session of active) await runAction({action:'session_kill', id:session.session});
+    $('updateStatus').textContent = 'Команды завершения сеансов отправлены. Проверяю базу…';
+    await refreshUpdateAvailability();
+  } catch (e) { $('updateStatus').textContent = 'Ошибка завершения сеансов: ' + e.message; }
+  finally { $('updateKick').disabled = false; }
+};
+$('updateUpload').onclick = async () => {
+  const ib = $('updateBase').value, file = $('updateFile').files[0];
+  if (!ib) { $('updateStatus').textContent = 'Выберите базу.'; return; }
+  if (!file || !/\\.cf$/i.test(file.name)) { $('updateStatus').textContent = 'Выберите файл конфигурации .cf.'; return; }
+  await refreshUpdateAvailability();
+  if ($('updateUpload').disabled) { $('updateStatus').textContent = 'В базе ещё есть активные сеансы. Завершите их перед обновлением.'; return; }
+  if (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024) { $('updateStatus').textContent = 'Размер файла должен быть от 1 байта до 8 ГБ.'; return; }
+  $('updateUpload').disabled = true;
+  $('updateStatus').textContent = 'Загружаю конфигурацию ' + file.name + '…';
+  try {
+    const result = await uploadFileWithProgress(file, 'update');
+    await runAction({action:'import_file', ib, filename:result.filename, new_base:false,
+                     user:$('updateUser').value, pwd:$('updatePwd').value});
+    $('updateFile').value = '';
+    $('updateStatus').textContent = 'Обновление передано на выполнение.';
+  } catch (e) { $('updateStatus').textContent = 'Ошибка: ' + e.message; }
+  finally { await refreshUpdateAvailability(); $('updateProgress').style.display = 'none'; }
 };
 
 setupConsoleResize();
