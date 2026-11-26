@@ -130,7 +130,7 @@ def save_settings(body):
         values = body.get(section, {})
         if not isinstance(values, dict):
             raise ValueError("неверный формат настроек: " + section)
-        directory = cfg["server_dir"] if section == "server" else cfg["client_dir"]
+        directory = cfg["server_dir"]
         if not os.path.isdir(directory):
             raise ValueError("каталог проекта не найден: " + directory)
         path = os.path.join(directory, ".env")
@@ -193,7 +193,7 @@ def backup_base_dir(base_name, kind=None):
 
 
 def walk_files(d, rel=""):
-    """Обход каталога со вложенными папками (для веб-обзора backup/export)."""
+    """Обход каталога со вложенными папками (для веб-обзора резервных копий)."""
     out = []
     try:
         entries = sorted(os.scandir(d), key=lambda e: (not e.is_dir(follow_symlinks=False), e.name.lower()))
@@ -332,8 +332,8 @@ def do_action(body):
         return script_job("Сборка образов (%s)" % proj, proj, "build.sh", *args)
     if a == "update_image":
         proj = need(body, "project")
-        if proj not in ("server", "client"):
-            raise ValueError("недопустимый проект")
+        if proj != "server":
+            raise ValueError("доступна только серверная часть")
         return script_job("Обновление Docker-образа (%s)" % proj, proj, "update-image.sh")
     if a == "recreate_server":
         d = project("server")
@@ -947,7 +947,7 @@ def api_get(path, q):
     if path == "/api/status":
         return {"docker": bool(cfg["docker"]), "docker_cmd": " ".join(cfg["docker"] or []),
                 "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"]),
-                "client_dir": None, "client_ok": True}
+                "server_dir": cfg["server_dir"]}
     if path == "/api/apache_status":
         r = dk("exec", "onec-server", "bash", "-lc",
                "ps -eo comm=,stat= | awk '$1 == \"apache2\" || $1 == \"httpd\" { if ($2 !~ /^Z/) found=1 } END { exit !found }' && echo running || echo stopped")
@@ -1117,7 +1117,7 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, html, "text/html; charset=utf-8")
             if u.path == "/download":
                 kind, name = q.get("dir", [""])[0], q.get("name", [""])[0]
-                # name может быть с вложенными папками (backup/export просматриваются на веб целиком);
+                # name может быть с вложенными папками (backup просматриваются на веб целиком);
                 # защита от выхода за пределы каталога — normpath + проверка префикса
                 if kind != "backups" or not name or name.startswith(".") or "\x00" in name:
                     return self._send(400, {"error": "недопустимый запрос"})
