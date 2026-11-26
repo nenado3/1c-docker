@@ -184,6 +184,20 @@ def data_dir(kind):
     return os.path.normpath(os.path.join(base, os.path.expanduser(val)))
 
 
+def backup_base_dir(base_name, kind=None):
+    """Каталог конкретной информационной базы и его подкаталоги."""
+    name = str(base_name or "").strip()
+    if not NAME_RE.fullmatch(name):
+        raise ValueError("недопустимое имя информационной базы")
+    root = os.path.join(data_dir("backups"), name)
+    if kind:
+        if kind not in ("dt", "cf", "pg", "logs"):
+            raise ValueError("недопустимый тип каталога резервной копии")
+        root = os.path.join(root, kind)
+    os.makedirs(root, exist_ok=True)
+    return root
+
+
 def walk_files(d, rel=""):
     """Обход каталога со вложенными папками (для веб-обзора backup/export)."""
     out = []
@@ -361,7 +375,7 @@ def do_action(body):
             raise ValueError("для отдельного пользователя PostgreSQL укажите и логин, и пароль; иначе оставьте оба поля пустыми для использования .env")
         if len(db_pwd) > 200:
             raise ValueError("слишком длинный пароль PostgreSQL")
-        uploaded_file = os.path.join(data_dir("backups"), "dt", filename)
+        uploaded_file = os.path.join(backup_base_dir(ib, "dt"), filename)
         if not os.path.isfile(uploaded_file) or os.path.getsize(uploaded_file) <= 0:
             raise ValueError("Загруженный .dt не найден или пуст: %s" % uploaded_file)
         return script_job("Запуск сервера и создание базы %s из .dt" % ib, "server",
@@ -396,7 +410,7 @@ def do_action(body):
             raise ValueError("слишком длинный пароль PostgreSQL")
         # Передаём import.sh тот же абсолютный путь, куда API загрузки реально сохранил файл.
         # Это исключает расхождение BACKUP_DIR/cwd между веб-панелью и shell-скриптом.
-        uploaded_file = os.path.join(data_dir("backups"), kind, filename)
+        uploaded_file = os.path.join(backup_base_dir(ib, kind), filename)
         if not os.path.isfile(uploaded_file):
             raise ValueError("Загрузка не найдена на диске: %s. Проверьте ответ загрузки и каталог BACKUP_DIR." % uploaded_file)
         if os.path.getsize(uploaded_file) <= 0:
@@ -440,7 +454,7 @@ def do_action(body):
     if a == "restore_pg_dump":
         db = need(body, "db", NAME_RE)
         filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.dump$", re.I), 190)
-        uploaded_file = os.path.join(data_dir("backups"), "pg", filename)
+        uploaded_file = os.path.join(backup_base_dir(db, "pg"), filename)
         if not os.path.isfile(uploaded_file) or os.path.getsize(uploaded_file) <= 0:
             raise ValueError("Загруженный .dump не найден или пуст")
         clean = "yes" if body.get("clean") else "no"
@@ -481,6 +495,31 @@ def do_action(body):
     if a == "session_kill":
         return rac_job("Завершение сеанса", "kill", need(body, "id", UUID_RE))
     raise ValueError("неизвестное действие")
+
+
+def migrate_legacy_backups():
+    """Переносит старые файлы ИБ_дата.dt/.cf в backups/ИБ/тип."""
+    root = data_dir("backups")
+    for kind in ("dt", "cf"):
+        legacy = os.path.join(root, kind)
+        if not os.path.isdir(legacy):
+            continue
+        try:
+            entries = list(os.scandir(legacy))
+        except OSError:
+            continue
+        for entry in entries:
+            if not entry.is_file(follow_symlinks=False):
+                continue
+            match = re.fullmatch(r"([A-Za-z0-9_.-]{1,64})_\d{8}_\d{6}\." + kind, entry.name, re.I)
+            if not match:
+                continue
+            target = os.path.join(backup_base_dir(match.group(1), kind), entry.name)
+            if not os.path.exists(target):
+                try:
+                    shutil.move(entry.path, target)
+                except OSError as exc:
+                    print("Не удалось перенести старую копию %s: %s" % (entry.path, exc), file=sys.stderr)
 
 
 # ---------------- автоматические резервные копии ----------------
@@ -617,7 +656,7 @@ def save_backup_schedule_request(body):
 
 def prune_regular_backups(base_name, maximum):
     """Ограничивает число обычных .dt для базы; monthly/ не затрагивает."""
-    directory = os.path.join(data_dir("backups"), "dt")
+    directory = os.path.join(backup_base_dir(base_name), "dt")
     if not os.path.isdir(directory):
         return
     pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\\.dt$")
@@ -1031,6 +1070,9 @@ class H(BaseHTTPRequestHandler):
                     payload = json.loads(self.rfile.read(n).decode("utf-8"))
                 except Exception:
                     return self._send(400, {"error": "не удалось прочитать ссылку"})
+                ib = str(payload.get("ib", "")).strip()
+                if not NAME_RE.fullmatch(ib):
+                    return self._send(400, {"error": "сначала выберите информационную базу"})
                 public_url = str(payload.get("url", "")).strip()
                 parsed = urlparse(public_url)
                 allowed_hosts = {"disk.yandex.ru", "yadi.sk", "disk.yandex.com",
@@ -1060,7 +1102,7 @@ class H(BaseHTTPRequestHandler):
                     return self._send(502, {"error": "Яндекс Диск вернул некорректную ссылку скачивания"})
                 safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", os.path.splitext(os.path.basename(original_name))[0]).strip("._-")
                 safe_name = ((safe_stem[:150] or "yandex_config") + ".cf")
-                dest_dir = os.path.join(data_dir("backups"), "cf")
+                dest_dir = backup_base_dir(ib, "cf")
                 os.makedirs(dest_dir, exist_ok=True)
                 dest = os.path.join(dest_dir, safe_name)
                 part = os.path.join(dest_dir, ".yandex-" + secrets.token_hex(8) + ".part")
@@ -1097,11 +1139,13 @@ class H(BaseHTTPRequestHandler):
                         or filename.startswith(".")):
                     return self._send(400, {"error": "разрешены только файлы .dt и .cf (имя до 180 символов)"})
                 ext = filename.rsplit(".", 1)[1].lower()
-                # .dt и .cf хранятся раздельно. Сначала пишем во временный файл,
+                ib = parse_qs(u.query).get("ib", [""])[0]
+                if not NAME_RE.fullmatch(ib):
+                    return self._send(400, {"error": "не указана корректная информационная база"})
+                # .dt и .cf хранятся отдельно для каждой информационной базы.
                 # затем атомарно заменяем целевой: оборванная загрузка не уничтожит старую копию.
                 safe_name = filename
-                dest_dir = os.path.join(data_dir("backups"), ext)
-                os.makedirs(dest_dir, exist_ok=True)
+                dest_dir = backup_base_dir(ib, ext)
                 dest = os.path.join(dest_dir, safe_name)
                 part = os.path.join(dest_dir, ".upload-" + secrets.token_hex(8) + ".part")
                 remaining = n
@@ -1120,7 +1164,7 @@ class H(BaseHTTPRequestHandler):
                     try: os.unlink(part)
                     except OSError: pass
                     raise
-                return self._send(200, {"filename": safe_name, "size": n, "kind": ext, "path": dest, "backup_dir": data_dir("backups")})
+                return self._send(200, {"filename": safe_name, "size": n, "kind": ext, "path": dest, "backup_dir": dest_dir, "ib": ib})
             if u.path == "/api/upload_license":
                 if n <= 0 or n > 50 * 1024 * 1024:
                     return self._send(413, {"error": "размер файла лицензии должен быть от 1 байта до 50 МБ"})
@@ -1154,8 +1198,10 @@ class H(BaseHTTPRequestHandler):
                 filename = os.path.basename(parse_qs(u.query).get("name", [""])[0]).strip()
                 if not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.dump", filename, re.I) or filename.startswith("."):
                     return self._send(400, {"error": "разрешены только файлы .dump"})
-                dest_dir = os.path.join(data_dir("backups"), "pg")
-                os.makedirs(dest_dir, exist_ok=True)
+                db = parse_qs(u.query).get("db", [""])[0]
+                if not NAME_RE.fullmatch(db):
+                    return self._send(400, {"error": "сначала выберите целевую базу PostgreSQL"})
+                dest_dir = backup_base_dir(db, "pg")
                 dest = os.path.join(dest_dir, filename)
                 part = os.path.join(dest_dir, ".upload-" + secrets.token_hex(8) + ".part")
                 remaining = n
@@ -1234,6 +1280,7 @@ def main():
     cfg.update(server_dir=os.path.abspath(a.server_dir), client_dir=os.path.abspath(a.client_dir),
                token=a.token or secrets.token_urlsafe(16), docker=detect_docker())
     load_backup_schedule()
+    migrate_legacy_backups()
     threading.Thread(target=automatic_backup_loop, daemon=True, name="automatic-backups").start()
     try:
         srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)
