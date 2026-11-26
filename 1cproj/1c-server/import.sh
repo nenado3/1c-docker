@@ -24,7 +24,9 @@ DB_PASS="${DB_PASS_ARG:-${DB_PASS:-${POSTGRES_PASSWORD:-}}}"
 [[ "$DB" =~ ^[A-Za-z0-9_.-]{1,63}$ && "$DB" != "." && "$DB" != ".." ]] || die "недопустимое имя БД PostgreSQL"
 [[ "$DB_USER" =~ ^[A-Za-z0-9_.-]{1,64}$ && -n "$DB_PASS" ]] || die "не заданы корректные реквизиты PostgreSQL в .env"
 BACKUP_ROOT="$(realpath -m -- "$BACKUP_DIR")"
-mkdir -p "$BACKUP_ROOT/$IB/$KIND" "$BACKUP_ROOT/$IB/logs"
+mkdir -p "$BACKUP_ROOT/$IB"/{dt,cf,pg,logs}
+# Если имя PostgreSQL отличается от имени ИБ, готовим и её отдельный каталог.
+if [[ "$DB" != "$IB" ]]; then mkdir -p "$BACKUP_ROOT/$DB"/{dt,cf,pg,logs}; fi
 if [[ -n "$UPLOAD_PATH" ]]; then HOST_FILE="$UPLOAD_PATH"; else HOST_FILE="$BACKUP_ROOT/$IB/$KIND/$FILE"; [[ -s "$HOST_FILE" ]] || HOST_FILE="$BACKUP_ROOT/$KIND/$FILE"; fi
 [[ -s "$HOST_FILE" ]] || die "файл не найден или пуст: $HOST_FILE"
 HOST_FILE="$(realpath -- "$HOST_FILE")"
