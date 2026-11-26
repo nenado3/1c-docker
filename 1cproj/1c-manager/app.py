@@ -443,6 +443,20 @@ def do_action(body):
         return script_job(title, "server", "import.sh", *args)
     if a == "backup_pg":
         return script_job("Дамп PostgreSQL %s" % need(body, "db", NAME_RE), "server", "backup.sh", "--pg", need(body, "db", NAME_RE))
+    if a == "postgres_create_admin":
+        username = need(body, "username", NAME_RE)
+        password = body.get("password", "")
+        if not isinstance(password, str) or len(password) < 12 or len(password) > 128 or "\\x00" in password:
+            raise ValueError("пароль должен содержать от 12 до 128 символов")
+        # Имена ролей проверяются регулярным выражением и заключаются в кавычки;
+        # пароль экранируется как SQL-литерал, чтобы исключить инъекцию.
+        role_ident = '"' + username.replace('"', '""') + '"'
+        password_literal = "'" + password.replace("'", "''") + "'"
+        sql = "CREATE ROLE " + role_ident + " WITH LOGIN SUPERUSER PASSWORD " + password_literal
+        return run_job("Создание администратора PostgreSQL %s" % username,
+                       cfg["docker"] + ["exec", "onec-postgres", "runuser", "-u", "postgres", "--",
+                                        "/usr/local/pgbin/psql", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+                                        "-c", sql])
     if a == "postgres_drop_db":
         db = need(body, "db", NAME_RE)
         if db.lower() in ("postgres", "template0", "template1"):
@@ -1313,7 +1327,7 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, save_backup_schedule_request(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
-            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
+            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "postgres_create_admin", "postgres_drop_db", "backup_pg", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
                 return self._send(400, {"error": "Docker недоступен для этого пользователя"})
             return self._send(200, {"job": do_action(body)})
         except ValueError as e:
