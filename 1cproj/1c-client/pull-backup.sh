@@ -26,6 +26,7 @@ while [ $# -gt 0 ]; do
     esac
 done
 IB="${1:-${IB_NAME:-mybase}}"
+[[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ && "$IB" != "." && "$IB" != ".." ]] || die "недопустимое имя базы"
 IB_USER="$2"
 
 [ -n "$SERVER_SSH" ] || die "не задан SERVER_SSH в .env (например user@192.168.1.10)"
@@ -38,14 +39,14 @@ QIB=$(printf '%q' "$IB")
 
 if [ "$MODE" = dt ]; then
     EXT=dt
-    REMOTE_BACKUP_DIR="$RDIR/backups/dt"
-    DEST_DIR="export/backup/dt"
+    REMOTE_BACKUP_DIR="$RDIR/backups/$QIB/dt"
+    DEST_DIR="$EXPORT_DIR/$IB/dt"
     REMOTE_CMD="cd $RDIR && ./backup.sh $QIB"
     [ -n "$IB_USER" ] && REMOTE_CMD="$REMOTE_CMD $(printf '%q' "$IB_USER")"
 else
     EXT=dump
-    REMOTE_BACKUP_DIR="$RDIR/backups"
-    DEST_DIR="export/backup/pg"
+    REMOTE_BACKUP_DIR="$RDIR/backups/$QIB/pg"
+    DEST_DIR="$EXPORT_DIR/$IB/pg"
     REMOTE_CMD="cd $RDIR && ./backup.sh --pg $QIB"
 fi
 
@@ -58,7 +59,7 @@ REMOTE_FILE=$(RSSH "$SERVER_SSH" "ls -t $REMOTE_BACKUP_DIR/${QIB}_*.${EXT} 2>/de
 NAME=$(basename "$REMOTE_FILE")
 RQ=$(printf '%q' "$REMOTE_FILE")
 
-mkdir -p "$DEST_DIR"
+mkdir -p "$DEST_DIR" "$EXPORT_DIR/$IB/logs"
 echo "== Копирование $NAME в $DEST_DIR"
 RSIZE=$(RSSH "$SERVER_SSH" "wc -c < $RQ" | tr -d '[:space:]')
 RSSH "$SERVER_SSH" "cat $RQ" > "$DEST_DIR/${NAME}.part" || { rm -f "$DEST_DIR/${NAME}.part"; die "копирование не удалось"; }
