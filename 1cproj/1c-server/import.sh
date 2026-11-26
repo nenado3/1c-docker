@@ -24,13 +24,14 @@ DB_PASS="${DB_PASS_ARG:-${DB_PASS:-${POSTGRES_PASSWORD:-}}}"
 [[ "$DB" =~ ^[A-Za-z0-9_.-]{1,63}$ ]] || die "недопустимое имя БД PostgreSQL"
 [[ "$DB_USER" =~ ^[A-Za-z0-9_.-]{1,64}$ && -n "$DB_PASS" ]] || die "не заданы корректные реквизиты PostgreSQL в .env"
 BACKUP_ROOT="$(realpath -m -- "$BACKUP_DIR")"
-if [[ -n "$UPLOAD_PATH" ]]; then HOST_FILE="$UPLOAD_PATH"; else HOST_FILE="$BACKUP_ROOT/$KIND/$FILE"; [[ -s "$HOST_FILE" ]] || HOST_FILE="$BACKUP_ROOT/$FILE"; fi
+mkdir -p "$BACKUP_ROOT/$IB/$KIND" "$BACKUP_ROOT/$IB/logs"
+if [[ -n "$UPLOAD_PATH" ]]; then HOST_FILE="$UPLOAD_PATH"; else HOST_FILE="$BACKUP_ROOT/$IB/$KIND/$FILE"; [[ -s "$HOST_FILE" ]] || HOST_FILE="$BACKUP_ROOT/$KIND/$FILE"; fi
 [[ -s "$HOST_FILE" ]] || die "файл не найден или пуст: $HOST_FILE"
 HOST_FILE="$(realpath -- "$HOST_FILE")"
 case "$HOST_FILE" in "$BACKUP_ROOT"/*) REL="${HOST_FILE#"$BACKUP_ROOT"/}";; *) die "файл должен находиться внутри BACKUP_DIR=$BACKUP_ROOT";; esac
 CONTAINER_FILE="/home/usr1cv8/backups/$REL"
 SIZE="$(stat -c %s "$HOST_FILE")"
-LOG_DIR="$BACKUP_ROOT/import-logs"; mkdir -p "$LOG_DIR"
+LOG_DIR="$BACKUP_ROOT/$IB/logs"; mkdir -p "$LOG_DIR"
 STAMP="$(date +%Y%m%d_%H%M%S)_$$"; LOG="$LOG_DIR/import_$STAMP.log"
 : > "$LOG"; chmod 600 "$LOG"
 log(){ echo "[$(date '+%F %T')] $*" | tee -a "$LOG"; }
