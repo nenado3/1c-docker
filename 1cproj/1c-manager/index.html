@@ -76,6 +76,17 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 .settings-actions .b{min-height:40px;padding:8px 16px;border-radius:9px}
 .settings-footnote{display:flex;gap:10px;align-items:flex-start;padding:12px 14px;margin:0 0 18px;border:1px solid color-mix(in srgb,var(--warn) 35%,var(--line));border-radius:10px;background:color-mix(in srgb,var(--warn) 6%,var(--bg));color:var(--mut);font-size:12px;line-height:1.55}
 .settings-footnote strong{color:var(--fg)}
+#dlgBackupSchedule{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 32px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
+#dlgBackupSchedule::backdrop{background:rgba(0,0,0,.48)}
+#dlgBackupSchedule .backup-content{padding:18px 21px 21px}
+#dlgBackupSchedule .backup-settings-grid{display:grid;grid-template-columns:minmax(150px,.8fr) minmax(0,1.2fr);gap:8px 14px;align-items:center}
+#dlgBackupSchedule .backup-settings-grid input{width:100%;min-width:0}
+#dlgBackupSchedule .backup-base-row{display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px;align-items:center;margin:12px 0}
+#dlgBackupSchedule #backupBaseDropdown{min-width:0}
+#dlgBackupSchedule #backupBaseSummary{padding:10px;border:1px solid var(--line);border-radius:8px;cursor:pointer}
+#dlgBackupSchedule .backup-enable{display:flex;align-items:center;gap:9px;margin:14px 0}
+#dlgBackupSchedule .backup-actions{margin-top:16px}
+@media(max-width:520px){#dlgBackupSchedule .backup-settings-grid,#dlgBackupSchedule .backup-base-row{grid-template-columns:1fr;gap:5px}}
 #dlgWeeklyUpdate{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 32px);overflow:auto;padding:0;border-radius:16px;box-shadow:0 24px 80px rgba(0,0,0,.28)}
 #dlgWeeklyUpdate .weekly-update-dialog-head{position:sticky;top:0;z-index:2;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding:18px 21px;border-bottom:1px solid var(--line);background:var(--card)}
 #dlgWeeklyUpdate .weekly-update-dialog-head h3{margin:0;font-size:18px}
@@ -514,11 +525,14 @@ input[type="checkbox"],input[type="radio"]{
         <div id="weeklyUpdateStatus" aria-live="polite" class="backupScheduleStatus">Загрузка расписания…</div>
       </div>
     </dialog>
-    <details class="settings-card backup-card">
-      <summary class="backup-summary">
-        <span class="backup-summary-icon" aria-hidden="true">▤</span>
-        <span>Автоматическое резервное копирование</span>
-      </summary>
+    <div class="backup-schedule-launch" style="margin-top:16px">
+      <button class="b sec" id="openBackupSchedule" type="button">▤ Автоматическое резервное копирование</button>
+    </div>
+    <dialog id="dlgBackupSchedule" aria-labelledby="backupScheduleTitle">
+      <div class="weekly-update-dialog-head">
+        <div><h3 id="backupScheduleTitle">Автоматическое резервное копирование</h3><p>Настройка расписания резервных копий баз 1С</p></div>
+        <button class="b sec" id="closeBackupSchedule" type="button" aria-label="Закрыть">✕</button>
+      </div>
       <div class="backup-content">
         <p class="backup-intro">Выберите базы 1С и время ежедневной выгрузки. Перед каждой копией панель временно запрещает новые подключения и регламентные задания, завершает текущие сеансы пользователей, создаёт .dt и затем автоматически открывает базу снова. На время выгрузки пользователи не смогут войти в выбранную базу.</p>
         <label class="backup-enable"><input id="backupScheduleEnabled" type="checkbox"> Включить автоматические бэкапы</label>
@@ -540,12 +554,10 @@ input[type="checkbox"],input[type="radio"]{
         </div>
         <label class="backup-monthly"><input id="backupMonthlyEnabled" type="checkbox"> <span>Дополнительно создавать копию в начале каждого месяца (1-го числа в 02:00)</span></label>
         <p class="backup-monthly-hint">Месячные копии сохраняются отдельно в dt/monthly и никогда не удаляются автоматической ротацией. Лимит применяется только к обычным копиям.</p>
-        <div class="backup-actions">
-          <button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button>
-        </div>
+        <div class="backup-actions"><button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button></div>
         <div id="backupScheduleStatus" aria-live="polite">Загрузка расписания…</div>
       </div>
-    </details>
+    </dialog>
   </section>
 
   <section id="t-files">
@@ -1547,6 +1559,9 @@ $('clearCon').onclick = () => {
 };
 $('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
 $('saveBackupSchedule').onclick = saveBackupSchedule;
+$('openBackupSchedule').onclick = () => $('dlgBackupSchedule').showModal();
+$('closeBackupSchedule').onclick = () => $('dlgBackupSchedule').close();
+$('dlgBackupSchedule').addEventListener('click', e => { if (e.target === $('dlgBackupSchedule')) $('dlgBackupSchedule').close(); });
 $('openWeeklyUpdate').onclick = async () => { $('dlgWeeklyUpdate').showModal(); await loadWeeklyUpdateSchedule(); };
 $('closeWeeklyUpdate').onclick = () => $('dlgWeeklyUpdate').close();
 $('dlgWeeklyUpdate').addEventListener('click', e => { if (e.target === $('dlgWeeklyUpdate')) $('dlgWeeklyUpdate').close(); });
