@@ -24,7 +24,7 @@ fi
 # Каталоги, которые монтируются в контейнер (создаём заранее, иначе Docker создаст их от root)
 EXPORT_DIR="${EXPORT_DIR:-./export}"
 mkdir -p licenses "$EXPORT_DIR" && chmod 1777 licenses && chmod 777 "$EXPORT_DIR" 2>/dev/null || true
-# backup-подпапка для выгрузок .dt/.cf (видна на веб-панели вместе со вложенными папками)
+# Корень клиентских выгрузок; внутри него создаются папки каждой ИБ.
 BACKUP_DIR="${EXPORT_DIR%/}"
 mkdir -p "$BACKUP_DIR" && chmod 777 "$BACKUP_DIR" 2>/dev/null || true
 
