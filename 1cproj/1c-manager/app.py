@@ -402,6 +402,18 @@ def do_action(body):
             raise ValueError("Загруженный файл пустой: %s" % uploaded_file)
         if new_base and kind != "dt":
             raise ValueError("создание новой базы поддерживается только из файла .dt")
+        if kind == "cf":
+            # Защита на стороне сервера: не начинаем обновление конфигурации,
+            # пока в выбранной информационной базе остаются пользовательские сеансы.
+            bases = parse_rac(rac_call("infobase", "summary", "list"))
+            base_info = next((item for item in bases if item.get("name") == ib), None)
+            base_id = (base_info or {}).get("infobase") or (base_info or {}).get("id")
+            if not base_id:
+                raise ValueError("не удалось определить идентификатор выбранной информационной базы")
+            sessions = parse_rac(rac_call("session", "list"))
+            active = [item for item in sessions if item.get("infobase") == base_id]
+            if active:
+                raise ValueError("обновление заблокировано: в базе %s остаётся активных сеансов: %d" % (ib, len(active)))
         # Девятый аргумент включает строгий режим: только новая ИБ и новая БД PostgreSQL.
         args = [ib, filename, kind, user, pwd, db_user, db_pwd, uploaded_file, "new" if new_base else "", db_name if new_base else ""]
         title = "Создание базы %s из .dt" % ib if new_base else "Импорт .%s в базу %s" % (kind, ib)
