@@ -440,6 +440,31 @@ input[type="checkbox"],input[type="radio"]{
     <div id="bErr" class="mut"></div>
     <table><thead><tr><th>Имя</th><th>Идентификатор</th><th>Описание</th><th>Действия</th></tr></thead>
       <tbody id="bBody"><tr><td colspan="4" class="mut">Загрузка…</td></tr></tbody></table>
+    <details class="settings-card backup-card" id="weeklyUpdateCard" style="margin-top:16px">
+      <summary class="backup-summary"><span class="backup-summary-icon" aria-hidden="true">↻</span><span>Автоматическое обновление базы 1С</span></summary>
+      <div class="backup-content">
+        <p class="backup-intro">Каждую неделю панель скачает актуальный файл .cf по публичной ссылке Яндекс Диска и обновит выбранную информационную базу. Перед запуском проверяются активные сеансы: если кто-то подключён, обновление отменяется без отключения пользователей. Время указывается по часам сервера.</p>
+        <label class="backup-enable"><input id="weeklyUpdateEnabled" type="checkbox"> Включить автоматическое обновление</label>
+        <div class="backup-settings-grid">
+          <label for="weeklyUpdateBase">Информационная база</label>
+          <select id="weeklyUpdateBase" style="min-width:220px;max-width:100%;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:9px;padding:9px 11px"><option value="">Загрузка баз…</option></select>
+          <label for="weeklyUpdateUrl">Публичная ссылка Яндекс Диска (.cf)</label>
+          <input id="weeklyUpdateUrl" type="url" placeholder="https://disk.yandex.ru/d/…" style="flex:1 1 320px;min-width:220px">
+          <label for="weeklyUpdateDay">День недели</label>
+          <select id="weeklyUpdateDay" style="min-width:150px;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:9px;padding:9px 11px">
+            <option value="0">Понедельник</option><option value="1">Вторник</option><option value="2">Среда</option><option value="3">Четверг</option><option value="4">Пятница</option><option value="5">Суббота</option><option value="6">Воскресенье</option>
+          </select>
+          <label for="weeklyUpdateTime">Время запуска</label><input id="weeklyUpdateTime" type="time" value="03:00">
+        </div>
+        <div id="weeklyUpdateCredentials" class="backup-settings-grid">
+          <label for="weeklyUpdateUser">Пользователь 1С</label><input id="weeklyUpdateUser" type="text" autocomplete="off" placeholder="Администратор 1С">
+          <label for="weeklyUpdatePassword">Пароль 1С</label><input id="weeklyUpdatePassword" type="password" autocomplete="new-password" placeholder="Пароль администратора">
+        </div>
+        <p class="backup-monthly-hint">Ссылка должна быть публичной и вести непосредственно на файл .cf. Пароль хранится в локальном файле расписания с ограниченными правами доступа.</p>
+        <div class="backup-actions"><button class="b" id="saveWeeklyUpdate" type="button">Сохранить расписание</button></div>
+        <div id="weeklyUpdateStatus" aria-live="polite" class="backupScheduleStatus">Загрузка расписания…</div>
+      </div>
+    </details>
     <h2>Сеансы</h2>
     <table><thead><tr><th>Пользователь</th><th>Приложение</th><th>Начало</th><th>Статус</th><th>Действия</th></tr></thead>
       <tbody id="sBody"><tr><td colspan="5" class="mut">Загрузка…</td></tr></tbody></table>
@@ -1118,6 +1143,32 @@ async function loadSettings() {
   $('settingsFields').innerHTML = out;
   $('settingsStatus').textContent = '✓ Настройки загружены из файлов .env.';
 }
+
+async function loadWeeklyUpdateSchedule() {
+  const [r,b] = await Promise.all([api('/api/update_schedule'),api('/api/backup_bases')]);
+  if (b.error) { $('weeklyUpdateBase').innerHTML='<option value="">Не удалось загрузить базы</option>'; }
+  else $('weeklyUpdateBase').innerHTML='<option value="">Выберите базу</option>'+(b.items||[]).map(n=>'<option value="'+esc(n)+'">'+esc(n)+'</option>').join('');
+  if (r.error) { $('weeklyUpdateStatus').textContent='Ошибка: '+r.error; return; }
+  $('weeklyUpdateEnabled').checked=!!r.enabled;
+  $('weeklyUpdateBase').value=r.base||'';
+  $('weeklyUpdateUrl').value=r.yandex_url||'';
+  $('weeklyUpdateDay').value=String(r.weekday ?? 6);
+  $('weeklyUpdateTime').value=r.weekly_time||'03:00';
+  $('weeklyUpdateUser').value=r.username||'';
+  $('weeklyUpdatePassword').value='';
+  $('weeklyUpdatePassword').placeholder=r.password_set?'Пароль сохранён — пусто = не менять':'Пароль администратора 1С';
+  const when=ts=>ts?new Date(ts*1000).toLocaleString():'—';
+  $('weeklyUpdateStatus').textContent=(r.running?'Сейчас выполняется обновление. ':'')+(r.last_result||'')+' Последний запуск: '+when(r.last_run)+'. Следующий запуск: '+when(r.next_run)+'.';
+}
+async function saveWeeklyUpdateSchedule() {
+  const button=$('saveWeeklyUpdate'); button.disabled=true;
+  const r=await api('/api/update_schedule',{enabled:$('weeklyUpdateEnabled').checked,base:$('weeklyUpdateBase').value,
+    yandex_url:$('weeklyUpdateUrl').value.trim(),weekday:Number($('weeklyUpdateDay').value),
+    weekly_time:$('weeklyUpdateTime').value,username:$('weeklyUpdateUser').value.trim(),password:$('weeklyUpdatePassword').value});
+  button.disabled=false;
+  if(r.error){$('weeklyUpdateStatus').textContent='Ошибка: '+r.error;return;}
+  await loadWeeklyUpdateSchedule();
+}
 async function loadBackupSchedule() {
   const [r, b] = await Promise.all([api('/api/backup_schedule'), api('/api/backup_bases')]);
   if (r.error) { $('backupScheduleStatus').textContent = 'Ошибка: ' + r.error; return; }
@@ -1462,7 +1513,7 @@ $('clearCon').onclick = () => {
   }
 };
 $('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
-$('saveBackupSchedule').onclick = saveBackupSchedule;
+$('saveBackupSchedule').onclick = saveBackupSchedule;\n$('saveWeeklyUpdate').onclick = saveWeeklyUpdateSchedule;\nloadWeeklyUpdateSchedule();
  // Автоматически обновляем данные активной вкладки без ручных кнопок.
  // Не обновляем во время фоновой задачи, открытого диалога или скрытой страницы,
  // чтобы не сбрасывать введённые данные и не мешать работе пользователя.
