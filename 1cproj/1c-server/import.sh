@@ -85,15 +85,13 @@ else
   [[ -n "$IBID" ]] || die "RAC не вернул UUID созданной ИБ"
 fi
 log "UUID ИБ: $IBID"
-if [[ "$KIND" == dt || "$NEW_BASE_ONLY" == "new" ]]; then
-  log "Для восстановления .dt/создания базы требуется перезапуск onec-server."
-  compose restart onec-server 2>&1 | tee -a "$LOG"
-  READY=0
-  for _ in $(seq 1 90); do
-    if compose exec -T onec-server "$RAC" cluster list >/dev/null 2>&1; then READY=1; break; fi
-    sleep 2
-  done
-  [[ "$READY" == 1 ]] || die "RAS не поднялся после перезапуска"
+# Регистрация новой ИБ через RAC сразу доступна работающему кластеру.
+# Для восстановления .dt и создания базы перезапуск onec-server не нужен:
+# выполняем ibcmd в текущем контейнере, не прерывая другие информационные базы.
+if [[ "$KIND" == dt ]]; then
+  log "Восстанавливаю .dt без перезапуска onec-server."
+elif [[ "$NEW_BASE_ONLY" == "new" ]]; then
+  log "Новая база зарегистрирована; продолжаю без перезапуска onec-server."
 else
   log "Перезапуск onec-server не требуется для обновления конфигурации .cf."
 fi
