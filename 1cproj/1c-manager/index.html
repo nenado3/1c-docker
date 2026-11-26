@@ -1307,7 +1307,6 @@ async function refreshUpdateAvailability() {
   button.disabled = active.length > 0 || !baseId || !!bases.error || !!sessions.error || !($('updateFile').files[0] || updateYandexFile);
 }
 $('updateBase').onchange = refreshUpdateAvailability;
-$('updateFile').onchange = refreshUpdateAvailability;
 setInterval(() => {
   if ($('dlgUpdate').open && $('updateBase').value) refreshUpdateAvailability();
 }, 3000);
