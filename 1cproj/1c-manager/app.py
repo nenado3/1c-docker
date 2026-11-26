@@ -10,7 +10,7 @@ from urllib.request import Request, urlopen
 HERE = os.path.dirname(os.path.abspath(__file__))
 cfg = {}
 jobs, jobs_lock = {}, threading.Lock()
-CONTAINERS = {"onec-server", "onec-postgres", "onec-client"}
+CONTAINERS = {"onec-server", "onec-postgres"}
 NAME_RE = re.compile(r"^(?!\.{1,2}$)[A-Za-z0-9_.-]{1,64}$")
 UUID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
 MEM_RE = re.compile(r"^(0|[0-9]{1,6}[bkmg]?)$")
@@ -107,12 +107,6 @@ ENV_SETTINGS = {
         "BACKUP_DIR": "Каталог резервных копий", "SERVER_MEMORY_LIMIT": "Лимит памяти сервера",
         "POSTGRES_MEMORY_LIMIT": "Лимит памяти PostgreSQL"
     },
-    "client": {
-        "ONEC_VERSION": "Версия платформы 1С", "ONEC_RUN_COMPONENTS": "Компоненты установщика",
-        "CLIENT_UID": "UID пользователя клиента", "SERVER_IP": "IP-адрес сервера 1С",
-        "NETHASP_ADDRS": "Адреса NetHASP", "EXPORT_DIR": "Каталог выгрузок",
-        "CLIENT_MEMORY_LIMIT": "Лимит памяти клиентского контейнера"
-    }
 }
 ENV_SECRET_KEYS = {"POSTGRES_PASSWORD"}
 
@@ -120,7 +114,7 @@ ENV_SECRET_KEYS = {"POSTGRES_PASSWORD"}
 def settings_snapshot():
     result = {}
     for section, keys in ENV_SETTINGS.items():
-        directory = cfg["server_dir"] if section == "server" else cfg["client_dir"]
+        directory = cfg["server_dir"]
         values = read_env(directory)
         result[section] = {key: {"label": label, "value": "" if key in ENV_SECRET_KEYS else values.get(key, ""),
                                 "configured": bool(values.get(key, "")) if key in ENV_SECRET_KEYS else None,
@@ -158,10 +152,8 @@ def save_settings(body):
                 raise ValueError("недопустимое значение параметра " + key)
             if any(ch in value for ch in ('"', "'", "\\", "#", "$")):
                 raise ValueError("параметр %s содержит символы, несовместимые с форматом .env: кавычки, #, $ и обратная косая черта не поддерживаются" % key)
-            if key in ("SERVER_MEMORY_LIMIT", "POSTGRES_MEMORY_LIMIT", "CLIENT_MEMORY_LIMIT") and not MEM_RE.match(value.lower()):
+            if key in ("SERVER_MEMORY_LIMIT", "POSTGRES_MEMORY_LIMIT") and not MEM_RE.match(value.lower()):
                 raise ValueError("%s: укажите 0 или значение, например 8g или 512m" % key)
-            if key == "CLIENT_UID" and value and not value.isdigit():
-                raise ValueError("CLIENT_UID должен быть числом")
             if key == "ONEC_VERSION" and value and not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+", value):
                 raise ValueError("ONEC_VERSION должен иметь формат 8.5.1.1522")
             write_env_value(path, key, value)
@@ -176,8 +168,6 @@ def data_dir(kind):
         # Должен совпадать с BACKUP_DIR в docker-compose.yml и common.sh:
         # этот каталог используется и веб-загрузкой, и контейнером onec-server.
         base, key, default = cfg["server_dir"], "BACKUP_DIR", "./backups"
-    elif kind == "export":
-        base, key, default = cfg["client_dir"], "EXPORT_DIR", "./export"
     else:
         base, key, default = cfg["server_dir"], None, "./licenses"
     val = read_env(base).get(key, default) if key else default
@@ -270,7 +260,7 @@ def run_job(title, argv, cwd=None):
 
 
 def project(name):
-    d = cfg["server_dir"] if name == "server" else cfg["client_dir"]
+    d = cfg["server_dir"]
     if not os.path.isdir(d):
         raise ValueError("папка проекта не найдена: %s" % d)
     return d
@@ -309,20 +299,15 @@ def do_action(body):
         return run_job("%s %s" % (op, name), cfg["docker"] + [op, name])
     if a == "compose_op":
         proj, op = need(body, "project"), need(body, "op")
-        if proj not in ("server", "client") or op not in ("up", "stop", "restart"):
+        if proj != "server" or op not in ("up", "stop", "restart"):
             raise ValueError("недопустимое действие")
         d = project(proj)
-        # клиент и запуск сервера идут через скрипты проектов: common.sh переводит имя хоста SERVER_IP в IP,
-        # генерирует nethasp.ini и создаёт каталоги (прямой docker compose всё это пропускает)
-        if proj == "client":
-            sub = {"up": "up", "stop": "stop", "restart": "recreate"}[op]
-            return script_job("Клиентский контейнер: %s" % op, "client", "client.sh", sub)
         if op == "up":
             return script_job("Запуск сервера (postgres + 1С)", "server", "start.sh")
         return run_job("Сервер: %s" % op, cfg["docker"] + ["compose", op], cwd=d)
     if a == "build":
         proj = need(body, "project")
-        if proj not in ("server", "client"):
+        if proj != "server":
             raise ValueError("недопустимый проект")
         args = []
         if proj == "server":
@@ -337,7 +322,6 @@ def do_action(body):
             limits = (
                 ("memory", "SERVER_MEMORY_LIMIT", project("server")),
                 ("postgres_memory", "POSTGRES_MEMORY_LIMIT", project("server")),
-                ("client_memory", "CLIENT_MEMORY_LIMIT", project("client")),
             )
             for field, env_key, directory in limits:
                 value = str(body.get(field, "")).strip().lower()
@@ -501,10 +485,6 @@ def do_action(body):
         clean = "yes" if body.get("clean") else "no"
         title = "Восстановление PostgreSQL dump в %s%s" % (db, " с очисткой объектов" if clean == "yes" else "")
         return script_job(title, "server", "restore-pg.sh", db, uploaded_file, clean)
-    if a == "client_start":
-        return script_job("Запуск клиента 1С", "client", "client.sh")
-    if a == "license_install":
-        return script_job("Перенос лицензий", "client", "license.sh", "install")
     if a == "apache_op":
         op = need(body, "op")
         if op not in ("start", "stop", "restart", "status"):
@@ -967,7 +947,7 @@ def api_get(path, q):
     if path == "/api/status":
         return {"docker": bool(cfg["docker"]), "docker_cmd": " ".join(cfg["docker"] or []),
                 "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"]),
-                "client_dir": cfg["client_dir"], "client_ok": os.path.isdir(cfg["client_dir"])}
+                "client_dir": None, "client_ok": True}
     if path == "/api/apache_status":
         r = dk("exec", "onec-server", "bash", "-lc",
                "ps -eo comm=,stat= | awk '$1 == \"apache2\" || $1 == \"httpd\" { if ($2 !~ /^Z/) found=1 } END { exit !found }' && echo running || echo stopped")
@@ -1012,8 +992,6 @@ def api_get(path, q):
         env = read_env(cfg["server_dir"])
         limit = (env.get("SERVER_MEMORY_LIMIT") or "0").strip()
         postgres_limit = (env.get("POSTGRES_MEMORY_LIMIT") or "0").strip()
-        client_env = read_env(cfg["client_dir"])
-        client_limit = (client_env.get("CLIENT_MEMORY_LIMIT") or "0").strip()
         usage, percent = "", ""
         try:
             r = dk("stats", "--no-stream", "--format", "{{.MemUsage}}|{{.MemPerc}}", "onec-server")
@@ -1094,7 +1072,7 @@ def api_get(path, q):
                             backup_base_dir(name)
             except Exception as exc:
                 print("Не удалось подготовить каталоги резервных копий: %s" % exc, file=sys.stderr)
-        return {"backups": list_files("backups"), "export": list_files("export"), "licenses": list_files("licenses")}
+        return {"backups": list_files("backups"), "export": [], "licenses": list_files("licenses")}
     if path == "/api/job":
         j = jobs.get(q.get("id", [""])[0])
         if not j:
@@ -1141,7 +1119,7 @@ class H(BaseHTTPRequestHandler):
                 kind, name = q.get("dir", [""])[0], q.get("name", [""])[0]
                 # name может быть с вложенными папками (backup/export просматриваются на веб целиком);
                 # защита от выхода за пределы каталога — normpath + проверка префикса
-                if kind not in ("backups", "export") or not name or name.startswith(".") or "\x00" in name:
+                if kind != "backups" or not name or name.startswith(".") or "\x00" in name:
                     return self._send(400, {"error": "недопустимый запрос"})
                 base = os.path.realpath(data_dir(kind))
                 p = os.path.normpath(os.path.join(base, name))
@@ -1388,12 +1366,11 @@ class H(BaseHTTPRequestHandler):
 def main():
     ap = argparse.ArgumentParser(description="Менеджер контейнеров 1С")
     ap.add_argument("--server-dir", default=os.path.join(HERE, "..", "1c-server"))
-    ap.add_argument("--client-dir", default=os.path.join(HERE, "..", "1c-client"))
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--token", default=None, help="фиксированный токен (по умолчанию случайный)")
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args()
-    cfg.update(server_dir=os.path.abspath(a.server_dir), client_dir=os.path.abspath(a.client_dir),
+    cfg.update(server_dir=os.path.abspath(a.server_dir),
                token=a.token or secrets.token_urlsafe(16), docker=detect_docker())
     load_backup_schedule()
     migrate_legacy_backups()
