@@ -1068,20 +1068,20 @@ $('pgRestoreOk').onclick = async () => {
   $('pgRestoreOk').disabled = true;
   $('pgRestoreStatus').textContent = 'Загружаю ' + file.name + ' (' + fmtSize(file.size) + ')…';
   try {
-    const result = await uploadPgDump(file);
+    const result = await uploadPgDump(file, db);
     $('pgRestoreStatus').textContent = 'Дамп загружен. Запускаю восстановление в ' + db + '…';
     await runAction({action:'restore_pg_dump', filename:result.filename, db, clean});
     $('dlgPgRestore').close();
   } catch (e) { $('pgRestoreStatus').textContent = 'Ошибка: ' + e.message; }
   finally { $('pgRestoreOk').disabled = false; }
 };
-function uploadPgDump(file) {
+function uploadPgDump(file, db) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     $('pgRestoreProgress').style.display = 'block';
     const update = (loaded, total) => { const pct = total ? loaded / total * 100 : 0; $('pgRestoreProgressFill').style.width = pct + '%'; $('pgRestoreProgressLabel').textContent = 'Загрузка: ' + Math.round(pct) + '%'; $('pgRestoreProgressSize').textContent = fmtSize(loaded) + ' / ' + fmtSize(total); };
     update(0, file.size);
-    xhr.open('POST', '/api/upload_pg_dump?name=' + encodeURIComponent(file.name));
+    xhr.open('POST', '/api/upload_pg_dump?name=' + encodeURIComponent(file.name) + '&db=' + encodeURIComponent(db));
     xhr.setRequestHeader('X-Token', TOKEN); xhr.setRequestHeader('Content-Type', 'application/octet-stream');
     xhr.upload.onprogress = e => { if (e.lengthComputable) update(e.loaded, e.total); };
     xhr.onload = () => { let r = {}; try { r = JSON.parse(xhr.responseText || '{}'); } catch (_) {} if (xhr.status >= 200 && xhr.status < 300 && !r.error) { update(file.size, file.size); resolve(r); } else reject(new Error(r.error || ('Ошибка загрузки HTTP ' + xhr.status))); };
@@ -1174,7 +1174,7 @@ $('buildOk').onclick = async () => {
   catch (e) { conLine('ОШИБКА загрузки установщиков: ' + e.message); return; }
   runAction({action: 'build', project: 'server', memory: mem, postgres_memory: pgMem, client_memory: clientMem});
 };
-function uploadFileWithProgress(file, prefix = 'upload') {
+function uploadFileWithProgress(file, prefix = 'upload', ib = '') {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     const progress = $(prefix + 'Progress'), fill = $(prefix + 'ProgressFill');
@@ -1186,7 +1186,7 @@ function uploadFileWithProgress(file, prefix = 'upload') {
       $(prefix + 'ProgressSize').textContent = fmtSize(loaded) + ' / ' + fmtSize(total);
     };
     update(0, file.size, 0);
-    xhr.open('POST', '/api/upload?name=' + encodeURIComponent(file.name));
+    xhr.open('POST', '/api/upload?name=' + encodeURIComponent(file.name) + '&ib=' + encodeURIComponent(ib));
     xhr.setRequestHeader('X-Token', TOKEN);
     xhr.setRequestHeader('Content-Type', 'application/octet-stream');
     xhr.upload.onprogress = (event) => {
@@ -1221,7 +1221,7 @@ $('dtOk').onclick = async () => {
   $('dlgDt').close();
   $('uploadStatus').textContent = 'Загружаю архив ' + file.name + ' (' + fmtSize(file.size) + ')…';
   try {
-    const result = await uploadFileWithProgress(file);
+    const result = await uploadFileWithProgress(file, 'upload', ib);
     $('uploadStatus').textContent = 'Архив загружен. ' + (dtLaunchMode === 'startup' ? 'Запускаю сервер и восстанавливаю базу ' : 'Создаю базу ') + ib + '…';
     if (dtLaunchMode === 'startup') {
       await runAction({action:'start_server_with_dt', ib, filename:result.filename,
@@ -1259,7 +1259,7 @@ $('uploadImport').onclick = async () => {
   $('uploadImport').disabled = true;
   $('importStatus').textContent = 'Загружаю ' + file.name + ' (' + fmtSize(file.size) + ')…';
   try {
-    const result = await uploadFileWithProgress(file, 'import');
+    const result = await uploadFileWithProgress(file, 'import', ib);
     $('importStatus').textContent = 'Файл загружен (100%): ' + (result.path || result.filename) + '. Запускаю импорт в базу ' + ib + '…';
     await runAction({action:'import_file', ib, filename:result.filename, new_base:newBase,
                      db_name:newBase ? dbName : '',
@@ -1300,7 +1300,7 @@ $('updateYandexDownload').onclick = async () => {
     const response = await fetch('/api/yandex_cf', {
       method: 'POST',
       headers: {'Content-Type':'application/json', 'X-Token':TOKEN},
-      body: JSON.stringify({url})
+      body: JSON.stringify({url, ib: $('updateBase').value})
     });
     const result = await response.json();
     if (!response.ok || result.error) throw new Error(result.error || ('HTTP ' + response.status));
@@ -1365,7 +1365,7 @@ $('updateUpload').onclick = async () => {
   $('updateUpload').disabled = true;
   $('updateStatus').textContent = file ? ('Загружаю конфигурацию ' + filename + '…') : ('Запускаю обновление из файла ' + filename + '…');
   try {
-    const result = file ? await uploadFileWithProgress(file, 'update') : remoteFile;
+    const result = file ? await uploadFileWithProgress(file, 'update', ib) : remoteFile;
     await runAction({action:'import_file', ib, filename:result.filename, new_base:false,
                      user:$('updateUser').value, pwd:$('updatePwd').value});
     $('updateFile').value = '';
