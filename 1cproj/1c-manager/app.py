@@ -830,6 +830,169 @@ def unlock_infobase_after_backup(base_name, lock_info):
     print("[%s] Подключения и регламентные задания снова разрешены" % base_name, flush=True)
 
 
+
+# ---------------- еженедельное автоматическое обновление .cf ----------------
+update_schedule_lock = threading.Lock()
+update_schedule = {"enabled": False, "base": "", "yandex_url": "", "weekday": 6,
+                   "weekly_time": "03:00", "username": "", "password": "",
+                   "next_run": None, "last_run": None, "last_result": "Расписание не настроено"}
+update_schedule_path = None
+update_running = False
+
+def next_weekly_update(weekday, clock_time, now=None):
+    now = now or datetime.now()
+    hour, minute = map(int, clock_time.split(":"))
+    days = (int(weekday) - now.weekday()) % 7
+    candidate = (now + timedelta(days=days)).replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if candidate <= now:
+        candidate += timedelta(days=7)
+    return candidate.timestamp()
+
+def save_update_schedule():
+    if not update_schedule_path: return
+    tmp = update_schedule_path + ".tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        json.dump(update_schedule, f, ensure_ascii=False, indent=2)
+    os.chmod(tmp, 0o600); os.replace(tmp, update_schedule_path)
+
+def load_update_schedule():
+    global update_schedule_path
+    update_schedule_path = os.path.join(cfg["server_dir"], ".update-schedule.json")
+    try:
+        with open(update_schedule_path, encoding="utf-8") as f:
+            data = json.load(f)
+        if isinstance(data, dict):
+            update_schedule.update(data)
+            if not isinstance(update_schedule.get("weekday"), int) or not 0 <= update_schedule["weekday"] <= 6:
+                update_schedule["weekday"] = 6
+            if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", str(update_schedule.get("weekly_time", ""))):
+                update_schedule["weekly_time"] = "03:00"
+            if update_schedule.get("enabled") and not update_schedule.get("next_run"):
+                update_schedule["next_run"] = next_weekly_update(update_schedule["weekday"], update_schedule["weekly_time"])
+    except FileNotFoundError: pass
+    except Exception as e: print("Не удалось прочитать расписание обновлений: %s" % e, file=sys.stderr)
+
+def update_schedule_snapshot():
+    with update_schedule_lock:
+        result = dict(update_schedule)
+        result["password_set"] = bool(result.pop("password", ""))
+        result["running"] = update_running
+        return result
+
+def save_update_schedule_request(body):
+    enabled = body.get("enabled") is True
+    base = str(body.get("base", "")).strip()
+    url = str(body.get("yandex_url", "")).strip()
+    username = str(body.get("username", "")).strip()
+    password = body.get("password", "")
+    weekday = body.get("weekday", 6)
+    clock_time = body.get("weekly_time", "03:00")
+    if enabled and not NAME_RE.fullmatch(base): raise ValueError("Выберите информационную базу 1С")
+    if enabled:
+        parsed = urlparse(url)
+        if parsed.scheme != "https" or (parsed.hostname or "").lower() not in {"disk.yandex.ru","yadi.sk","disk.yandex.com","disk.yandex.kz","disk.yandex.com.tr"} or not parsed.path.startswith(("/d/","/i/")) or parsed.username or parsed.password:
+            raise ValueError("Укажите публичную HTTPS-ссылку на файл .cf в Яндекс Диске")
+        if not username or not password and not update_schedule.get("password"):
+            raise ValueError("Укажите пользователя и пароль администратора 1С")
+    try: weekday = int(weekday)
+    except (TypeError, ValueError): raise ValueError("Некорректный день недели")
+    if weekday < 0 or weekday > 6: raise ValueError("Некорректный день недели")
+    if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", clock_time):
+        raise ValueError("Укажите время в формате ЧЧ:ММ")
+    if not isinstance(password, str) or len(password) > 1024 or len(username) > 256:
+        raise ValueError("Слишком длинные учётные данные")
+    with update_schedule_lock:
+        old = update_schedule.get("password", "")
+        update_schedule.update({"enabled":enabled, "base":base, "yandex_url":url,
+            "weekday":weekday, "weekly_time":clock_time, "username":username,
+            "password":password or old, "next_run":next_weekly_update(weekday, clock_time) if enabled else None,
+            "last_result":"Еженедельное расписание сохранено" if enabled else "Автоматическое обновление выключено"})
+        save_update_schedule()
+    return update_schedule_snapshot()
+
+def download_update_cf(public_url, base):
+    api = "https://cloud-api.yandex.net/v1/disk/public/resources"
+    query = urlencode({"public_key":public_url})
+    headers = {"User-Agent":"1C-Docker-Manager/1.0"}
+    with urlopen(Request(api+"?"+query, headers=headers), timeout=30) as response:
+        metadata = json.loads(response.read(1024*1024).decode("utf-8"))
+    original = str(metadata.get("name",""))
+    size = int(metadata.get("size") or 0)
+    if not original.lower().endswith(".cf") or size <= 0 or size > 8*1024*1024*1024:
+        raise RuntimeError("По ссылке Яндекс Диска должен находиться непустой файл .cf размером до 8 ГБ")
+    with urlopen(Request(api+"/download?"+query, headers=headers), timeout=30) as response:
+        href = json.loads(response.read(1024*1024).decode("utf-8")).get("href","")
+    parsed = urlparse(href)
+    if parsed.scheme != "https" or not parsed.hostname: raise RuntimeError("Яндекс Диск вернул некорректную ссылку")
+    directory = backup_base_dir(base, "cf"); os.makedirs(directory, exist_ok=True)
+    stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", os.path.splitext(os.path.basename(original))[0]).strip("._-")[:140] or "scheduled_update"
+    filename = stem + ".cf"
+    dest = os.path.join(directory, filename)
+    part = dest + "." + secrets.token_hex(6) + ".part"
+    count = 0
+    try:
+        with urlopen(Request(href, headers=headers), timeout=60) as response, open(part,"xb") as output:
+            while True:
+                chunk = response.read(1024*1024)
+                if not chunk: break
+                count += len(chunk)
+                if count > size or count > 8*1024*1024*1024: raise RuntimeError("Размер скачанного файла превышен")
+                output.write(chunk)
+            output.flush(); os.fsync(output.fileno())
+        if count != size: raise RuntimeError("Файл .cf скачан не полностью")
+        os.replace(part,dest); os.chmod(dest,0o640)
+    except Exception:
+        try: os.unlink(part)
+        except OSError: pass
+        raise
+    return filename, dest
+
+def run_weekly_update():
+    global update_running
+    with update_schedule_lock:
+        settings = dict(update_schedule)
+    base = settings["base"]
+    if not cfg.get("docker"): raise RuntimeError("Docker недоступен")
+    clusters = parse_rac(rac_call("cluster","list"))
+    cluster = next((x.get("cluster") for x in clusters if x.get("cluster")),None)
+    if not cluster: raise RuntimeError("Кластер 1С не найден")
+    bases = parse_rac(rac_call("infobase","summary","list","--cluster="+cluster))
+    info = next((x for x in bases if (x.get("name") or x.get("Name")) == base),None)
+    base_id = (info or {}).get("infobase")
+    if not base_id: raise RuntimeError("Информационная база %s не найдена" % base)
+    sessions = parse_rac(rac_call("session","list","--cluster="+cluster))
+    active = [x for x in sessions if x.get("infobase") == base_id]
+    if active: raise RuntimeError("Обновление отменено: в базе %s активны сеансы (%d). Пользователи не отключались." % (base,len(active)))
+    filename, path = download_update_cf(settings["yandex_url"],base)
+    command = ["bash",os.path.join(cfg["server_dir"],"import.sh"),base,filename,"cf",
+               settings.get("username",""),settings.get("password",""),"","","", ""]
+    env = os.environ.copy(); env["DOCKER"] = " ".join(cfg["docker"])
+    result = subprocess.run(command,cwd=cfg["server_dir"],env=env,capture_output=True,text=True,errors="replace",timeout=6*3600)
+    if result.stdout: print(result.stdout[-12000:],flush=True)
+    if result.stderr: print(result.stderr[-6000:],flush=True)
+    if result.returncode: raise RuntimeError("Скрипт обновления завершился с кодом %d: %s" % (result.returncode,(result.stderr or result.stdout)[-1500:]))
+    return "База %s успешно обновлена из %s" % (base,filename)
+
+def automatic_update_loop():
+    global update_running
+    while True:
+        time.sleep(10)
+        with update_schedule_lock:
+            due = bool(update_schedule.get("enabled") and update_schedule.get("next_run") and time.time() >= update_schedule["next_run"])
+            if not due or update_running: continue
+            update_running = True
+            update_schedule["next_run"] = next_weekly_update(update_schedule["weekday"],update_schedule["weekly_time"])
+            save_update_schedule()
+        try: summary = run_weekly_update()
+        except Exception as e: summary = "Ошибка автоматического обновления: " + str(e)
+        finally:
+            with update_schedule_lock:
+                update_schedule["last_run"] = time.time()
+                update_schedule["last_result"] = summary if "summary" in locals() else "Ошибка автоматического обновления"
+                update_running = False
+                save_update_schedule()
+
 def automatic_backup_loop():
     global backup_running
     while True:
