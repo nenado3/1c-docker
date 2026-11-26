@@ -261,8 +261,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
       <div style="padding:0 16px 16px">
         <p class="mut">Показаны атрибуты ролей PostgreSQL и членство в других ролях. Пароли пользователей PostgreSQL не отображаются.</p>
         <div id="pgRolesError" class="mut" role="status"></div>
-        <table><thead><tr><th>Пользователь / роль</th><th>Вход</th><th>Администратор</th><th>Создание БД</th><th>Управление ролями</th><th>Репликация</th><th>Обход RLS</th><th>Членство в ролях</th></tr></thead>
-          <tbody id="pgRolesBody"><tr><td colspan="8" class="mut">Загрузка…</td></tr></tbody></table>
+        <table><thead><tr><th>Пользователь / роль</th><th>Вход</th><th>Администратор</th><th>Создание БД</th><th>Управление ролями</th><th>Репликация</th><th>Обход RLS</th><th>Членство в ролях</th><th>Действия</th></tr></thead>
+          <tbody id="pgRolesBody"><tr><td colspan="9" class="mut">Загрузка…</td></tr></tbody></table>
       </div>
     </details>
   </section>
@@ -387,6 +387,22 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <p class="mut">Пользователь получит роль SUPERUSER — полный доступ ко всем базам, ролям и настройкам PostgreSQL. Используйте отдельный сложный пароль и не применяйте эту учётную запись для обычной работы приложений.</p>
   <div id="pgAdminStatus" class="mut" aria-live="polite"></div>
   <div class="row"><button class="b" id="pgAdminCreate">Создать администратора</button><button class="b sec" id="pgAdminCancel">Отмена</button></div>
+</dialog>
+<dialog id="dlgPgRoleEdit" style="width:min(92vw,440px);max-width:440px;box-sizing:border-box">
+  <h3 style="margin-top:0">Изменение прав PostgreSQL</h3>
+  <p class="mut">Пользователь: <b id="pgRoleEditName"></b></p>
+  <div class="pg-role-options" style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0">
+    <label><input type="checkbox" id="pgRoleLogin"> LOGIN — вход</label>
+    <label><input type="checkbox" id="pgRoleSuperuser"> SUPERUSER — администратор</label>
+    <label><input type="checkbox" id="pgRoleCreatedb"> CREATEDB — создание БД</label>
+    <label><input type="checkbox" id="pgRoleCreaterole"> CREATEROLE — управление ролями</label>
+    <label><input type="checkbox" id="pgRoleInherit"> INHERIT — наследование прав</label>
+    <label><input type="checkbox" id="pgRoleReplication"> REPLICATION — репликация</label>
+    <label><input type="checkbox" id="pgRoleBypassrls"> BYPASSRLS — обход RLS</label>
+  </div>
+  <p class="mut">SUPERUSER предоставляет полный доступ ко всему серверу PostgreSQL. Выдавайте это право только доверенным пользователям.</p>
+  <div id="pgRoleEditStatus" class="mut" role="status"></div>
+  <div class="row"><button class="b" id="pgRoleEditSave">Сохранить права</button><button class="b sec" id="pgRoleEditCancel">Отмена</button></div>
 </dialog>
 <dialog id="dlgPgRestore">
   <h3 style="margin-top:0">Восстановить PostgreSQL из .dump</h3>
@@ -755,7 +771,7 @@ async function loadPg() {
     '<button class="b red" data-pgdrop="' + esc(i.name) + '">Удалить</button></td></tr>').join('')
     : '<tr><td colspan="3" class="mut">Баз нет</td></tr>';
   $('pgRestoreDb').innerHTML = items.length ? '<option value="">Выберите целевую базу</option>' + items.map(i => '<option value="' + esc(i.name) + '">' + esc(i.name) + '</option>').join('') : '<option value="">Баз нет</option>';
-  const roles = r.roles || [];
+  const roles = r.roles || []; window.pgRolesCache = roles;
   $('pgRolesError').textContent = r.roles_error ? 'Не удалось получить пользователей: ' + r.roles_error : '';
   const yesNo = value => value === 'true' ? '<span class="badge ok">Да</span>' : '<span class="mut">Нет</span>';
   const roleFlag = (value, label) => value === 'true' ? '<span class="badge">' + label + '</span>' : '';
@@ -763,10 +779,13 @@ async function loadPg() {
     const admin = role.superuser === 'true' ? '<span class="badge ok">SUPERUSER</span>' : '<span class="mut">—</span>';
     const attrs = [roleFlag(role.createdb, 'CREATEDB'), roleFlag(role.createrole, 'CREATEROLE'),
                    roleFlag(role.inherit, 'INHERIT')].filter(Boolean).join(' ');
+    const protectedRole = role.name === 'postgres' || role.name.startsWith('pg_');
     return '<tr><td><b>' + esc(role.name) + '</b></td><td>' + yesNo(role.login) +
       '</td><td>' + admin + '</td><td>' + yesNo(role.createdb) + '</td><td>' + yesNo(role.createrole) +
       '</td><td>' + yesNo(role.replication) + '</td><td>' + yesNo(role.bypassrls) +
-      '</td><td>' + esc(role.memberships || '—') + (attrs ? '<div class="mut" style="font-size:11px;margin-top:4px">' + attrs + '</div>' : '') + '</td></tr>';
+      '</td><td>' + esc(role.memberships || '—') + (attrs ? '<div class="mut" style="font-size:11px;margin-top:4px">' + attrs + '</div>' : '') +
+      '</td><td>' + (protectedRole ? '<span class="mut">Системная роль</span>' :
+        '<button class="b sec pg-role-edit" data-role="' + esc(role.name) + '">Изменить</button>') + '</td></tr>';
   }).join('') : '<tr><td colspan="8" class="mut">Пользователей и ролей нет</td></tr>';
 }
 
@@ -1090,6 +1109,41 @@ document.addEventListener('click', async e => {
     return runAction(body);
   }
 });
+
+let editingPgRole = null;
+const pgRoleFields = ['login','superuser','createdb','createrole','inherit','replication','bypassrls'];
+$('pgRolesBody').addEventListener('click', event => {
+  const button = event.target.closest('.pg-role-edit');
+  if (!button) return;
+  const role = (window.pgRolesCache || []).find(item => item.name === button.dataset.role);
+  if (!role) return;
+  editingPgRole = role.name;
+  $('pgRoleEditName').textContent = role.name;
+  pgRoleFields.forEach(field => { $('pgRole' + field[0].toUpperCase() + field.slice(1)).checked = role[field] === 'true'; });
+  $('pgRoleEditStatus').textContent = '';
+  $('pgRoleEditSave').disabled = false;
+  $('dlgPgRoleEdit').showModal();
+});
+$('pgRoleEditCancel').onclick = () => $('dlgPgRoleEdit').close();
+$('pgRoleEditSave').onclick = async () => {
+  if (!editingPgRole) return;
+  const values = {action:'postgres_update_role', username:editingPgRole};
+  pgRoleFields.forEach(field => { values[field] = $('pgRole' + field[0].toUpperCase() + field.slice(1)).checked; });
+  if (values.superuser && !confirm('Выдать «' + editingPgRole + '» полные права SUPERUSER? Это даёт полный доступ ко всем базам и ролям PostgreSQL.')) return;
+  $('pgRoleEditSave').disabled = true;
+  $('pgRoleEditStatus').textContent = 'Сохраняю права…';
+  try {
+    await runAction(values);
+    $('pgRoleEditStatus').textContent = 'Команда изменения прав отправлена. Обновляю список…';
+    await new Promise(resolve => setTimeout(resolve, 1200));
+    await loadPg();
+    $('dlgPgRoleEdit').close();
+  } catch (e) {
+    $('pgRoleEditStatus').textContent = 'Ошибка: ' + e.message;
+  } finally {
+    $('pgRoleEditSave').disabled = false;
+  }
+};
 
 $('openPgAdmin').onclick = () => {
   $('pgAdminUser').value = '';
