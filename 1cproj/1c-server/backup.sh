@@ -24,10 +24,13 @@ case "$1" in
     --pg)
         shift
         DB="${1:-$DB_NAME}"
-        OUT="${BACKUP_DIR%/}/${DB}/pg/${DB}_$(date +%Y%m%d_%H%M%S).dump"
-        mkdir -p "$(dirname "$OUT")"
-        echo "Дамп PostgreSQL базы '$DB' в $OUT ..."
-        if $DOCKER compose exec -T postgres bash -c 'runuser -u postgres -- /usr/local/pgbin/pg_dump -Fc -d "$1"' _ "$DB" > "$OUT" && [ -s "$OUT" ]; then
+        [[ "$DB" =~ ^[A-Za-z0-9_.-]{1,63}$ && "$DB" != "." && "$DB" != ".." ]] || die "недопустимое имя базы PostgreSQL"
+        PG_DIR="${BACKUP_DIR%/}/${DB}/pg"; LOG_DIR="${BACKUP_DIR%/}/${DB}/logs"
+        mkdir -p "$PG_DIR" "$LOG_DIR" || die "не удалось создать каталоги базы $DB"
+        OUT="$PG_DIR/${DB}_$(date +%Y%m%d_%H%M%S).dump"
+        LOG="$LOG_DIR/pg_dump_$(date +%Y%m%d_%H%M%S).log"
+        echo "Дамп PostgreSQL базы '$DB' в $OUT ..." | tee -a "$LOG"
+        if $DOCKER compose exec -T postgres bash -c 'runuser -u postgres -- /usr/local/pgbin/pg_dump -Fc -d "$1"' _ "$DB" > "$OUT" 2>>"$LOG" && [ -s "$OUT" ]; then
             ls -lh "$OUT"
             echo "Восстановление: pg_restore -d <пустая база> файл.dump (на PostgreSQL с mchar и fulleq)."
             exit 0
@@ -39,6 +42,7 @@ KIND=dt
 if [ "$1" = "--cf" ]; then KIND=cf; shift; fi
 
 IB="${1:-$IB_NAME}"
+[[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ && "$IB" != "." && "$IB" != ".." ]] || die "недопустимое имя информационной базы"
 IB_USER="$2"
 IB_PASS="$3"
 
