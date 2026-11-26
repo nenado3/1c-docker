@@ -130,7 +130,7 @@ STAMP=$(date +%Y%m%d_%H%M%S)
 OUT="${IB}_${STAMP}.${KIND}"
 LOG="export_${STAMP}.log"
 
-# выгрузки .dt/.cf кладём в backup-подпапку каталога EXPORT_DIR (она видна на веб со вложенностями)
+# Выгрузки и журналы каждой ИБ хранятся в отдельных подпапках EXPORT_DIR/ИМЯ_ИБ.
 BACKUP_SUBDIR="${EXPORT_DIR%/}/${IB}/${KIND}"
 LOG_DIR="${EXPORT_DIR%/}/${IB}/logs"
 REMOTE_BACKUP="/home/user1c/export/${IB}/${KIND}"
