@@ -229,18 +229,50 @@ def list_files(kind):
 
 # ---------------- фоновые задачи ----------------
 class Job:
+    MAX_LINES = 3000
+    MAX_LINE_LENGTH = 8000
+
     def __init__(self, title):
         self.id, self.title = secrets.token_hex(6), title
-        self.lines, self.status, self.rc, self.started = [], "running", None, time.time()
+        self.lines, self.line_offset = [], 0
+        self.status, self.rc, self.started = "running", None, time.time()
+        self.lock = threading.Lock()
+
+    def append(self, line):
+        line = str(line).rstrip("\\n")
+        if len(line) > self.MAX_LINE_LENGTH:
+            line = line[:self.MAX_LINE_LENGTH] + " … [строка сокращена]"
+        with self.lock:
+            self.lines.append(line)
+            if len(self.lines) > self.MAX_LINES:
+                remove = len(self.lines) - self.MAX_LINES
+                del self.lines[:remove]
+                self.line_offset += remove
+
+    def snapshot(self, since=0):
+        with self.lock:
+            start = max(0, int(since) - self.line_offset)
+            return {"title": self.title, "status": self.status, "rc": self.rc,
+                    "lines": self.lines[start:], "next": self.line_offset + len(self.lines),
+                    "line_offset": self.line_offset}
+
+
+MAX_ACTIVE_JOBS = 4
 
 
 def run_job(title, argv, cwd=None):
     job = Job(title)
     with jobs_lock:
+        active = sum(1 for item in jobs.values() if item.status == "running")
+        if active >= MAX_ACTIVE_JOBS:
+            raise ValueError("Слишком много одновременных операций (максимум %d). Дождитесь завершения текущих задач." % MAX_ACTIVE_JOBS)
         jobs[job.id] = job
-        if len(jobs) > 30:
-            for k in sorted(jobs, key=lambda k: jobs[k].started)[:len(jobs) - 30]:
-                del jobs[k]
+        # Не удаляем выполняющиеся задачи: их идентификаторы нужны веб-панели.
+        finished = sorted((item for item in jobs.values() if item.status != "running"),
+                          key=lambda item: item.started)
+        while len(jobs) > 50 and finished:
+            expired = finished.pop(0)
+            jobs.pop(expired.id, None)
     env = os.environ.copy()
     env["DOCKER"] = " ".join(cfg["docker"] or ["docker"])
 
@@ -249,11 +281,14 @@ def run_job(title, argv, cwd=None):
             p = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT, text=True, errors="replace", bufsize=1)
             for line in p.stdout:
-                job.lines.append(line.rstrip("\n"))
+                job.append(line)
             job.rc = p.wait()
         except Exception as e:
-            job.lines.append("Не удалось запустить: %s" % e); job.rc = -1
-        job.status = "done" if job.rc == 0 else "error"
+            job.append("Не удалось запустить: %s" % e)
+            job.rc = -1
+        finally:
+            with job.lock:
+                job.status = "done" if job.rc == 0 else "error"
 
     threading.Thread(target=worker, daemon=True).start()
     return job.id
@@ -1238,11 +1273,16 @@ def api_get(path, q):
                 print("Не удалось подготовить каталоги резервных копий: %s" % exc, file=sys.stderr)
         return {"backups": list_files("backups"), "export": [], "licenses": list_files("licenses")}
     if path == "/api/job":
-        j = jobs.get(q.get("id", [""])[0])
+        job_id = q.get("id", [""])[0]
+        with jobs_lock:
+            j = jobs.get(job_id)
         if not j:
             raise ValueError("задача не найдена")
-        since = int(q.get("since", ["0"])[0] or 0)
-        return {"title": j.title, "status": j.status, "rc": j.rc, "lines": j.lines[since:], "next": len(j.lines)}
+        try:
+            since = max(0, int(q.get("since", ["0"])[0] or 0))
+        except (TypeError, ValueError):
+            raise ValueError("некорректный номер строки журнала")
+        return j.snapshot(since)
     return None
 
 
@@ -1391,6 +1431,8 @@ class H(BaseHTTPRequestHandler):
             if u.path == "/api/upload":
                 if n <= 0:
                     return self._send(400, {"error": "загружаемый файл пуст"})
+                if n > 8 * 1024 * 1024 * 1024:
+                    return self._send(413, {"error": "размер файла .dt/.cf не должен превышать 8 ГБ"})
                 filename = parse_qs(u.query).get("name", [""])[0]
                 filename = os.path.basename(filename).strip()
                 if (not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.(dt|cf)", filename, re.I)
