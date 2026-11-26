@@ -345,6 +345,11 @@ dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
  #dlgPgRestore .pg-restore-actions .b{flex:1}
 }
 
+
+/* Нумерация шагов обновления в точности как в форме создания базы */
+#dlgUpdate .import-group-title{display:flex;align-items:center;gap:9px}
+#dlgUpdate .import-step{display:inline-grid;place-items:center;flex:0 0 24px;width:24px;height:24px;min-width:24px;padding:0;border-radius:8px;background:var(--acc);color:var(--accfg);font-size:12px;line-height:1;font-weight:750;text-align:center;opacity:1;visibility:visible}
+
 </style>
 </head>
 <body>
@@ -642,7 +647,16 @@ dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
       <select id="updateBase"><option value="">Сначала загрузите список баз</option></select>
     </div>
     <div class="import-group">
-      <div class="import-group-title"><span class="import-step">2</span> Файл обновления</div>
+      <div class="import-group-title"><span class="import-step">2</span> Подготовка базы</div>
+      <button class="b sec" id="updateKick">Выкинуть пользователей из выбранной базы</button>
+      <div id="updateUsers" class="import-hint" aria-live="polite">Выберите базу для проверки активных пользователей.</div>
+      <div class="import-grid" style="margin-top:12px">
+        <div><label>Пользователь 1С</label><input id="updateUser" placeholder="Пользователь 1С"></div>
+        <div><label>Пароль 1С</label><input id="updatePwd" type="password" placeholder="Пароль 1С" autocomplete="new-password"></div>
+      </div>
+    </div>
+    <div class="import-group">
+      <div class="import-group-title"><span class="import-step">3</span> Файл обновления</div>
       <div class="update-source-tabs" role="tablist" aria-label="Способ получения файла">
         <button class="b update-source-tab active" id="updateTabComputer" type="button" role="tab" aria-selected="true" aria-controls="updatePanelComputer">С компьютера</button>
         <button class="b sec update-source-tab" id="updateTabYandex" type="button" role="tab" aria-selected="false" aria-controls="updatePanelYandex">Яндекс Диск</button>
@@ -658,15 +672,6 @@ dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
         <p class="import-hint">Вставьте публичную ссылку. Файл будет скачан в каталог .cf и подготовлен к обновлению.</p>
       </div>
       <p class="import-hint">При наличии активных сеансов загрузка обновления будет заблокирована.</p>
-    </div>
-    <div class="import-group">
-      <div class="import-group-title"><span class="import-step">3</span> Подготовка базы и доступы</div>
-      <button class="b sec" id="updateKick">Выкинуть пользователей из выбранной базы</button>
-      <div id="updateUsers" class="import-hint" aria-live="polite">Выберите базу для проверки активных пользователей.</div>
-      <div class="import-grid" style="margin-top:12px">
-        <div><label>Пользователь 1С</label><input id="updateUser" placeholder="Пользователь 1С"></div>
-        <div><label>Пароль 1С</label><input id="updatePwd" type="password" placeholder="Пароль 1С" autocomplete="new-password"></div>
-      </div>
     </div>
     <div id="updateStatus" class="mut" aria-live="polite"></div>
     <div id="updateProgress" class="upload-progress" role="group" aria-label="Прогресс загрузки конфигурации" style="display:none">
