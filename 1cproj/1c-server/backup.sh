@@ -23,8 +23,8 @@ case "$1" in
         shift
         DB="${1:-$DB_NAME}"
         [[ "$DB" =~ ^[A-Za-z0-9_.-]{1,63}$ && "$DB" != "." && "$DB" != ".." ]] || die "недопустимое имя базы PostgreSQL"
-        PG_DIR="${BACKUP_DIR%/}/${DB}/pg"; LOG_DIR="${BACKUP_DIR%/}/${DB}/logs"
-        mkdir -p "$PG_DIR" "$LOG_DIR" || die "не удалось создать каталоги базы $DB"
+        DB_ROOT="${BACKUP_DIR%/}/${DB}"; PG_DIR="$DB_ROOT/pg"; LOG_DIR="$DB_ROOT/logs"
+        mkdir -p "$DB_ROOT/dt" "$DB_ROOT/cf" "$PG_DIR" "$LOG_DIR" || die "не удалось создать каталоги базы $DB"
         OUT="$PG_DIR/${DB}_$(date +%Y%m%d_%H%M%S).dump"
         LOG="$LOG_DIR/pg_dump_$(date +%Y%m%d_%H%M%S).log"
         echo "Дамп PostgreSQL базы '$DB' в $OUT ..." | tee -a "$LOG"
@@ -66,7 +66,8 @@ fi
 STAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_KIND_DIR="${BACKUP_DIR%/}/${IB}/$KIND"
 LOG_DIR="${BACKUP_DIR%/}/${IB}/logs"
-mkdir -p "$BACKUP_KIND_DIR" "$LOG_DIR" || die "не удалось создать каталоги резервных копий или журналов"
+BASE_DIR="${BACKUP_DIR%/}/${IB}"
+mkdir -p "$BASE_DIR/dt" "$BASE_DIR/cf" "$BASE_DIR/pg" "$LOG_DIR" || die "не удалось создать каталоги резервных копий или журналов"
 FILE="${IB}_${STAMP}.${KIND}"
 LOGF="backup_${STAMP}.log"
 
