@@ -9,9 +9,7 @@ usage() {
   ./backup.sh --cf [база] [пользователь] [пароль]    выгрузка конфигурации в .cf
   ./backup.sh --pg [база]                       дамп PostgreSQL (pg_dump -Fc)
 
-.dt и .cf всегда кладутся в backup-каталог: серверный — в BACKUP_DIR (1c-server/backups),
-клиентский export-db.sh — в EXPORT_DIR/backup (1c-client/export/backup). Файлы с исходными
-именами видны на веб-панели (вкладка «Выгрузки») со всеми вложенными папками.
+Каждая ИБ хранится отдельно: BACKUP_DIR/ИМЯ_ИБ/{dt,cf,logs}; дампы PostgreSQL — BACKUP_DIR/ИМЯ_БД/pg.
 
 Для .dt/.cf в образе сервера нужен полный клиент (компонент client_full из setup-full-*.run);
 конфигуратор работает на виртуальном дисплее xvfb, графическая сессия не нужна.
