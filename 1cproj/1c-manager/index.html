@@ -562,7 +562,7 @@ input[type="checkbox"],input[type="radio"]{
       <div class="backup-content">
         <p class="backup-intro">Перед созданием копии новые подключения и регламентные задания временно блокируются, активные сеансы пользователей завершаются. После выгрузки .dt база автоматически открывается снова. Во время операции пользователи не смогут войти в выбранную базу.</p>
         <label class="backup-enable"><input id="backupScheduleEnabled" type="checkbox"> Включить автоматическое резервное копирование</label>
-        <section class="backup-section">
+        <div class="backup-section">
           <h4 class="backup-section-title">Базы и доступ</h4>
           <div class="backup-base-row">
             <label for="backupBaseSummary">Базы 1С</label>
@@ -574,8 +574,8 @@ input[type="checkbox"],input[type="radio"]{
           <div id="backupCredentials">
             <div>Для автоматического отключения пользователей укажите логин и пароль администратора каждой выбранной базы. Сохранённые пароли не отображаются.</div>
           </div>
-        </section>
-        <section class="backup-section">
+        </div>
+        <div class="backup-section">
           <h4 class="backup-section-title">Расписание и хранение</h4>
           <div class="backup-settings-grid">
             <label for="backupDailyTime">Время ежедневной выгрузки</label>
@@ -585,7 +585,7 @@ input[type="checkbox"],input[type="radio"]{
           </div>
           <label class="backup-monthly"><input id="backupMonthlyEnabled" type="checkbox"> <span>Создавать дополнительную копию в начале каждого месяца (1-го числа в 02:00)</span></label>
           <p class="backup-monthly-hint">Месячные копии хранятся отдельно в <code>dt/monthly</code> и не удаляются автоматически. Лимит применяется только к обычным копиям.</p>
-        </section>
+        </div>
         <div class="backup-actions"><button class="b" id="saveBackupSchedule" type="button">Сохранить расписание</button></div>
         <div id="backupScheduleStatus" aria-live="polite">Загрузка расписания…</div>
       </div>
