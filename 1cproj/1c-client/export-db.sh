@@ -45,7 +45,7 @@ pull_latest() {
     local newest rel target
     mkdir -p "$BACKUP_DIR"
     if [ -z "$SRC_HOST" ]; then
-        newest=$(find "$SRC_DIR" -type f \( -name "*.dt" -o -name "*.cf" \) -printf "%T@ %p\\n" 2>/dev/null | sort -nr | head -n1 | cut -d" " -f2-)
+        newest=$(find "$SRC_DIR" -type f \( -name "*.dt" -o -name "*.cf" \) -printf "%T@ %p\n" 2>/dev/null | sort -nr | head -n1 | cut -d" " -f2-)
         [ -n "$newest" ] || die "в $SRC_DIR нет .dt/.cf файлов (сначала ./backup.sh в 1c-server)"
         rel="${newest#"$SRC_DIR"/}"
         if [[ "$rel" == "$newest" ]]; then rel="$(basename "$newest")"; fi
@@ -54,7 +54,7 @@ pull_latest() {
         echo "Копирую $newest в $target"
         cp -p "$newest" "$target" || die "копирование не удалось"
     else
-        newest=$(ssh "$SRC_HOST" "find '$SRC_DIR' -type f \\( -name '*.dt' -o -name '*.cf' \\) -printf '%T@ %p\\\\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-") \
+        newest=$(ssh "$SRC_HOST" "find '$SRC_DIR' -type f \\( -name '*.dt' -o -name '*.cf' \\) -printf '%T@ %p\\n' 2>/dev/null | sort -nr | head -n1 | cut -d' ' -f2-") \
             || die "ssh к ${SRC_HOST} не удался: проверьте адрес компьютера сервера и доступность ssh"
         [ -n "$newest" ] || die "на сервере в $SRC_DIR нет .dt/.cf файлов (сначала ./backup.sh на сервере)"
         rel="${newest#"$SRC_DIR"/}"
@@ -62,7 +62,8 @@ pull_latest() {
         target="$BACKUP_DIR/$rel"
         mkdir -p "$(dirname "$target")"
         echo "Копирую $SRC_HOST:$newest в $target"
-        scp -p "$SRC_HOST:$newest" "$target" || die "scp не удался"
+        remote_file="$(printf '%q' "$newest")"
+        scp -p "$SRC_HOST:$remote_file" "$target" || die "scp не удался"
     fi
     ls -lh "$target"
     echo "Готово: $target"
