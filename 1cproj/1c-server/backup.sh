@@ -24,7 +24,8 @@ case "$1" in
     --pg)
         shift
         DB="${1:-$DB_NAME}"
-        OUT="${BACKUP_DIR}/${DB}_$(date +%Y%m%d_%H%M%S).dump"
+        OUT="${BACKUP_DIR%/}/${DB}/pg/${DB}_$(date +%Y%m%d_%H%M%S).dump"
+        mkdir -p "$(dirname "$OUT")"
         echo "Дамп PostgreSQL базы '$DB' в $OUT ..."
         if $DOCKER compose exec -T postgres bash -c 'runuser -u postgres -- /usr/local/pgbin/pg_dump -Fc -d "$1"' _ "$DB" > "$OUT" && [ -s "$OUT" ]; then
             ls -lh "$OUT"
@@ -61,8 +62,8 @@ if [ -n "$IB_USER" ] && [ -z "$IB_PASS" ]; then
 fi
 
 STAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_KIND_DIR="${BACKUP_DIR%/}/$KIND"
-LOG_DIR="${BACKUP_DIR%/}/logs"
+BACKUP_KIND_DIR="${BACKUP_DIR%/}/${IB}/$KIND"
+LOG_DIR="${BACKUP_DIR%/}/${IB}/logs"
 mkdir -p "$BACKUP_KIND_DIR" "$LOG_DIR" || die "не удалось создать каталоги резервных копий или журналов"
 FILE="${IB}_${STAMP}.${KIND}"
 LOGF="backup_${STAMP}.log"
