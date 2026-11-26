@@ -1071,11 +1071,11 @@ $('pgAdminCancel').onclick = () => $('dlgPgAdmin').close();
 $('pgAdminCreate').onclick = async () => {
   const username = $('pgAdminUser').value.trim();
   const password = $('pgAdminPwd').value;
-  if (!/^(?!\\.{1,2}$)[A-Za-z0-9_.-]{1,64}$/.test(username)) {
+  if (!/^(?!\.{1,2}$)[A-Za-z0-9_.-]{1,64}$/.test(username)) {
     $('pgAdminStatus').textContent = 'Имя: латинские буквы, цифры, точка, дефис или подчёркивание (до 64 символов).';
     return;
   }
-  if (password.length < 12 || password.length > 128 || password.includes('\\0')) {
+  if (password.length < 12 || password.length > 128 || password.includes('\0')) {
     $('pgAdminStatus').textContent = 'Пароль должен содержать от 12 до 128 символов.';
     return;
   }
