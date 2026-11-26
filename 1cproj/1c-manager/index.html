@@ -195,7 +195,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
   <button data-tab="bases">Базы 1С</button>
   <button data-tab="pg">PostgreSQL</button>
   <button data-tab="files">Выгрузки</button>
-  <button data-tab="client">Клиент и лицензии</button>
   <button data-tab="build">Сборка</button>
   <button data-tab="settings">Настройки</button>
 </nav>
@@ -211,7 +210,6 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <div class="row">
       <button class="b" data-act="server-up">Запустить сервер (postgres + 1С)</button>
       <button class="b sec" data-act="server-stop">Остановить сервер</button>
-      <button class="b sec" data-act="client-up">Запустить клиентский контейнер</button>
     </div>
     <h2>Память сервера 1С</h2>
     <div class="row">
@@ -296,35 +294,19 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     </details>
     <h2>Выгрузки сервера (backup) <span class="mut mono" id="dirBackups"></span></h2>
     <table><thead><tr><th>Файл / папка</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fBackups"></tbody></table>
-    <h2>Выгрузки клиента (export) <span class="mut mono" id="dirExport"></span></h2>
-    <table><thead><tr><th>Файл / папка</th><th>Размер</th><th>Дата</th><th></th></tr></thead><tbody id="fExport"></tbody></table>
-    <p class="mut">Папки backup и export показываются целиком, со всеми вложенными каталогами; файлы выгрузок (.dt/.cf) можно скачать по ссылке. Файл, загруженный для импорта, остаётся в backup с исходным именем без изменений.</p>
-  </section>
-
-  <section id="t-client">
-    <div class="row" style="flex-wrap:wrap">
-      <button class="b" data-act="client-start">Запустить клиент 1С</button>
-      <button class="b" data-act="license-install">Перенести полученные лицензии на сервер</button>
-      <button class="b" id="openServerLicenseDialog">Активировать лицензию на сервере</button>
-    </div>
-    <p class="mut">Окно клиента откроется на вашем рабочем столе. Для получения лицензии запустите клиент, получите её в окне 1С,
-      затем нажмите «Перенести полученные лицензии». Сетевой ключ NetHASP настраивается в 1c-client/.env (NETHASP_ADDRS).</p>
-    <h2>Файлы лицензий на сервере <span class="mut mono" id="dirLic"></span></h2>
-    <table><thead><tr><th>Файл</th><th>Размер</th><th>Дата</th></tr></thead><tbody id="fLic"></tbody></table>
+    <p class="mut">Папки резервных копий показываются целиком, со всеми вложенными каталогами; файлы выгрузок (.dt/.cf) можно скачать по ссылке.</p>
   </section>
 
   <section id="t-build">
     <p class="mut">Сборка образов из .deb / .run. Ход выполнения виден в консоли внизу.</p>
     <div class="row">
       <button class="b" data-act="build-server">Собрать образы сервера (postgres + 1С)</button>
-      <button class="b" data-act="build-client">Собрать образ клиента</button>
     </div>
     <p class="mut">При нажатии «Собрать образы сервера» откроется окно: выбор папок с установщиками и память сервера.</p>
     <h2>Обновление Docker-образов</h2>
     <p class="mut">Загружает обновления базовых образов, пересобирает локальные образы из текущих Dockerfile и пересоздаёт контейнеры. Данные PostgreSQL и 1С в именованных Docker volumes сохраняются.</p>
     <div class="row">
       <button class="b" data-act="update-server">Обновить сервер (PostgreSQL + 1С)</button>
-      <button class="b" data-act="update-client">Обновить клиент 1С</button>
     </div>
   </section>
 
@@ -332,7 +314,7 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <div class="settings-hero">
       <div class="settings-eyebrow">⚙ ПАРАМЕТРЫ СИСТЕМЫ</div>
       <h2>Настройки проекта</h2>
-      <p>Управляйте параметрами сервера 1С, PostgreSQL и клиентского приложения в одном месте. Все изменения сохраняются в соответствующие файлы .env.</p>
+      <p>Управляйте параметрами сервера 1С и PostgreSQL.</p>
     </div>
     <div id="settingsStatus" class="settings-status" aria-live="polite">Загружаю настройки…</div>
     <div id="settingsFields"></div>
@@ -565,9 +547,8 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     <div class="build-memory-grid">
       <div class="build-memory-card"><div class="build-memory-icon">▦</div><label for="buildMem">Сервер 1С</label><input id="buildMem" placeholder="например 8g"><small>SERVER_MEMORY_LIMIT · 0 — без лимита</small></div>
       <div class="build-memory-card"><div class="build-memory-icon">▤</div><label for="buildPgMem">PostgreSQL</label><input id="buildPgMem" placeholder="например 4g"><small>POSTGRES_MEMORY_LIMIT · 0 — без лимита</small></div>
-      <div class="build-memory-card"><div class="build-memory-icon">▣</div><label for="buildClientMem">Клиентские пользователи</label><input id="buildClientMem" placeholder="например 2g"><small>CLIENT_MEMORY_LIMIT · 0 — без лимита</small></div>
     </div>
-    <div class="build-note">Это верхние лимиты Docker, а не заранее зарезервированная память. Фактическое потребление зависит от нагрузки. Для пользователей ограничивается общий клиентский контейнер, а не каждый пользователь отдельно.</div>
+    <div class="build-note">Это верхние лимиты Docker, а не заранее зарезервированная память. Фактическое потребление зависит от нагрузки. </div>
     <div class="build-actions"><button class="b sec" id="buildCancel">Отмена</button><button class="b" id="buildOk">Собрать образы</button></div>
     <p class="mut" style="font-size:11px;margin:13px 0 0">Установщики загружаются в server/dist и postgres/dist. Если папки не выбраны, используются уже имеющиеся файлы.</p>
   </div>
@@ -825,7 +806,6 @@ async function loadBuild() {
   if (!r.error) {
     $('buildMem').value = r.limit || '0';
     $('buildPgMem').value = r.postgres_limit || '0';
-    $('buildClientMem').value = r.client_limit || '0';
   }
 }
 
@@ -881,16 +861,15 @@ async function uploadSelectedDist() {
   }
 }
 
-const settingsGroups = {server:'Сервер 1С и PostgreSQL',client:'Клиент 1С'};
+const settingsGroups = {server:'Сервер 1С и PostgreSQL'};
 async function loadSettings() {
   const r = await api('/api/settings');
   if (r.error) { $('settingsStatus').textContent = 'Ошибка чтения .env: ' + r.error; return; }
   let out = '<div class="settings-layout">';
   const meta = {
     server:{icon:'▦',title:'Сервер 1С и PostgreSQL',subtitle:'Параметры серверной части и хранилища данных'},
-    client:{icon:'▣',title:'Клиент 1С',subtitle:'Подключение клиентского приложения и лицензирование'}
   };
-  for (const section of ['server','client']) {
+  for (const section of ['server']) {
     out += '<details class="settings-card"><summary class="settings-card-head"><div class="settings-card-icon">' + meta[section].icon + '</div><div><h3>' + meta[section].title + '</h3><p>' + meta[section].subtitle + '</p></div></summary><div class="settings-card-body">';
     for (const [key, item] of Object.entries(r[section] || {})) {
       const type = item.secret ? 'password' : 'text';
@@ -1005,7 +984,7 @@ $('backupPickerSelect').onclick = () => {
 $('backupPickerCancel').onclick = () => $('dlgBackupPicker').close();
 
 async function saveSettings() {
-  const payload = {server:{},client:{}};
+  const payload = {server:{}};
   document.querySelectorAll('#settingsFields [data-env-key]').forEach(el => { payload[el.dataset.envSection][el.dataset.envKey] = el.value; });
   $('saveSettings').disabled = true;
   $('settingsStatus').textContent = 'Сохраняю настройки…';
@@ -1029,7 +1008,6 @@ function loadTab(t) {
   else if (t === 'bases') loadBases();
   else if (t === 'pg') loadPg();
   else if (t === 'files') { loadFiles(); loadBackupSchedule(); }
-  else if (t === 'client') loadFiles();
   else if (t === 'build') loadBuild();
   else if (t === 'settings') loadSettings();
 }
@@ -1100,8 +1078,7 @@ document.addEventListener('click', async e => {
     return runAction({action: 'postgres_drop_db', db});
   }
   const m = {'server-up': {action: 'compose_op', project: 'server', op: 'up'}, 'server-stop': {action: 'compose_op', project: 'server', op: 'stop'},
-    'client-up': {action: 'compose_op', project: 'client', op: 'up'}, 'client-start': {action: 'client_start'}, 'license-install': {action: 'license_install'},
-    'build-server': {action: 'build', project: 'server'}, 'build-client': {action: 'build', project: 'client'}, 'update-server': {action: 'update_image', project: 'server'}, 'update-client': {action: 'update_image', project: 'client'}};
+    'build-server': {action: 'build', project: 'server'}, 'update-server': {action: 'update_image', project: 'server'},};
   if (t.dataset.act && m[t.dataset.act]) {
     if (t.dataset.act.startsWith('update-') &&
         !confirm('Обновить Docker-образ? Контейнер будет пересоздан. Текущие процессы будут остановлены; именованные Docker volumes с данными сохранятся.')) return;
@@ -1266,7 +1243,7 @@ $('saveBackupSchedule').onclick = saveBackupSchedule;
    const active = document.querySelector('#tabs button.on');
    if (!active) return;
    const tab = active.dataset.tab;
-   if (['containers', 'bases', 'pg', 'files', 'client'].includes(tab)) loadTab(tab);
+   if (['containers', 'bases', 'pg', 'files'].includes(tab)) loadTab(tab);
  }, 15000);
 document.addEventListener('click', e => {
   if (e.target.closest('#chooseBackupDir')) openBackupPicker();
@@ -1296,15 +1273,14 @@ $('buildCancel').onclick = () => $('dlgBuild').close();
 $('buildOk').onclick = async () => {
   const mem = $('buildMem').value.trim();
   const pgMem = $('buildPgMem').value.trim();
-  const clientMem = $('buildClientMem').value.trim();
   const validMem = /^(0|[0-9]{1,6}[bkmg]?)$/i;
-  for (const [label, value] of [['Сервер 1С',mem],['PostgreSQL',pgMem],['Клиентские пользователи',clientMem]]) {
+  for (const [label, value] of [['Сервер 1С',mem],['PostgreSQL',pgMem]]) {
     if (!validMem.test(value)) { conLine('ОШИБКА: для «' + label + '» укажите 0 или число с единицей, например 8g или 512m.'); return; }
   }
   $('dlgBuild').close();
   try { await uploadSelectedDist(); }
   catch (e) { conLine('ОШИБКА загрузки установщиков: ' + e.message); return; }
-  runAction({action: 'build', project: 'server', memory: mem, postgres_memory: pgMem, client_memory: clientMem});
+  runAction({action: 'build', project: 'server', memory: mem, postgres_memory: pgMem});
 };
 function uploadFileWithProgress(file, prefix = 'upload', ib = '') {
   return new Promise((resolve, reject) => {
