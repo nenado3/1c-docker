@@ -850,7 +850,7 @@ function setupConsoleResize() {
   window.addEventListener('resize', () => applyHeight(panel.getBoundingClientRect().height));
 }
 
-function conLine(t) { const o = $('conOut'); o.textContent += t + '\n'; o.scrollTop = o.scrollHeight; }
+function conLine(t) { const o = $('conOut'); o.appendChild(document.createTextNode(String(t) + '\n')); while (o.childNodes.length > 3000) o.removeChild(o.firstChild); o.scrollTop = o.scrollHeight; }
 
 async function runAction(body) {
   const r = await api('/api/action', body);
