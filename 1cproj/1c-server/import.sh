@@ -62,7 +62,10 @@ if [[ "$NEW_BASE_ONLY" == "new" ]]; then
   [[ -z "$PG_EXISTS" ]] || die "база PostgreSQL '$DB' уже существует; выберите другое имя"
   log "Создаю новую регистрацию 1С и PostgreSQL-базу '$DB' для восстановления архива .dt."
 fi
-if [[ -n "$IBID" && "$NEW_BASE_ONLY" != "new" ]]; then
+if [[ "$KIND" == cf ]]; then
+  [[ -n "$IBID" ]] || die "информационная база '$IB' не зарегистрирована в кластере"
+  log "Обновляю конфигурацию существующей ИБ '$IB' (UUID $IBID); параметры регистрации и контейнер не изменяю."
+elif [[ -n "$IBID" && "$NEW_BASE_ONLY" != "new" ]]; then
   [[ -n "$USER_1C" && -n "$PASS_1C" ]] || die "для изменения параметров существующей ИБ '$IB' укажите пользователя и пароль администратора 1С в веб-панели"
   log "ИБ уже зарегистрирована (UUID $IBID). Обновляю параметры СУБД с авторизацией администратора ИБ."
   compose exec -T onec-server "$RAC" infobase update --cluster="$CLUSTER" --infobase="$IBID" --infobase-user="$USER_1C" --infobase-pwd="$PASS_1C" --dbms=PostgreSQL --db-server="postgres port=5432" --db-name="$DB" --db-user="$DB_USER" --db-pwd="$DB_PASS" 2>&1 | tee -a "$LOG"
@@ -79,14 +82,18 @@ else
   [[ -n "$IBID" ]] || die "RAC не вернул UUID созданной ИБ"
 fi
 log "UUID ИБ: $IBID"
-log "Перезапускаю onec-server для сброса кэша кластера. Текущие сеансы сервера будут отключены."
-compose restart onec-server 2>&1 | tee -a "$LOG"
-READY=0
-for _ in $(seq 1 90); do
-  if compose exec -T onec-server "$RAC" cluster list >/dev/null 2>&1; then READY=1; break; fi
-  sleep 2
-done
-[[ "$READY" == 1 ]] || die "RAS не поднялся после перезапуска"
+if [[ "$KIND" == dt || "$NEW_BASE_ONLY" == "new" ]]; then
+  log "Для восстановления .dt/создания базы требуется перезапуск onec-server."
+  compose restart onec-server 2>&1 | tee -a "$LOG"
+  READY=0
+  for _ in $(seq 1 90); do
+    if compose exec -T onec-server "$RAC" cluster list >/dev/null 2>&1; then READY=1; break; fi
+    sleep 2
+  done
+  [[ "$READY" == 1 ]] || die "RAS не поднялся после перезапуска"
+else
+  log "Перезапуск onec-server не требуется для обновления конфигурации .cf."
+fi
 AUTH=()
 if [[ -n "$USER_1C" ]]; then AUTH=(--user="$USER_1C" --password="$PASS_1C"); fi
 if [[ "$KIND" == dt ]]; then
