@@ -946,8 +946,7 @@ def api_get(path, q):
         return {"path": current, "parent": parent, "dirs": dirs}
     if path == "/api/status":
         return {"docker": bool(cfg["docker"]), "docker_cmd": " ".join(cfg["docker"] or []),
-                "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"]),
-                "server_dir": cfg["server_dir"]}
+                "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"])}
     if path == "/api/apache_status":
         r = dk("exec", "onec-server", "bash", "-lc",
                "ps -eo comm=,stat= | awk '$1 == \"apache2\" || $1 == \"httpd\" { if ($2 !~ /^Z/) found=1 } END { exit !found }' && echo running || echo stopped")
@@ -999,7 +998,7 @@ def api_get(path, q):
                 usage, percent = r.stdout.strip().split("|", 1)
         except Exception:
             pass
-        return {"limit": limit, "postgres_limit": postgres_limit, "client_limit": client_limit,
+        return {"limit": limit, "postgres_limit": postgres_limit,
                 "usage": usage, "percent": percent}
     if path == "/api/dist":
         target = q.get("target", [""])[0]
@@ -1125,7 +1124,7 @@ class H(BaseHTTPRequestHandler):
                 p = os.path.normpath(os.path.join(base, name))
                 if not (p == base or p.startswith(base + os.sep)):
                     return self._send(400, {"error": "недопустимый путь"})
-                # Не разрешаем обход каталога через символьные ссылки внутри backup/export.
+                # Не разрешаем обход каталога через символьные ссылки внутри backup.
                 p = os.path.realpath(p)
                 if not (p == base or p.startswith(base + os.sep)):
                     return self._send(400, {"error": "недопустимый путь"})
