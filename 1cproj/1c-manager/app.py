@@ -520,6 +520,37 @@ def migrate_legacy_backups():
                     shutil.move(entry.path, target)
                 except OSError as exc:
                     print("Не удалось перенести старую копию %s: %s" % (entry.path, exc), file=sys.stderr)
+        old_monthly = os.path.join(legacy, "monthly")
+        if os.path.isdir(old_monthly):
+            for entry in os.scandir(old_monthly):
+                match = re.fullmatch(r"([A-Za-z0-9_.-]{1,64})_\d{8}_\d{6}\." + kind, entry.name, re.I)
+                if not entry.is_file(follow_symlinks=False) or not match:
+                    continue
+                target_dir = os.path.join(backup_base_dir(match.group(1), kind), "monthly")
+                os.makedirs(target_dir, exist_ok=True)
+                target = os.path.join(target_dir, entry.name)
+                if not os.path.exists(target):
+                    try:
+                        shutil.move(entry.path, target)
+                    except OSError as exc:
+                        print("Не удалось перенести месячную копию %s: %s" % (entry.path, exc), file=sys.stderr)
+    # Старые дампы PostgreSQL лежали в корне backups или backups/pg.
+    for legacy_pg in (root, os.path.join(root, "pg")):
+        if not os.path.isdir(legacy_pg):
+            continue
+        for entry in os.scandir(legacy_pg):
+            if not entry.is_file(follow_symlinks=False):
+                continue
+            match = re.fullmatch(r"([A-Za-z0-9_.-]{1,63})_\d{8}_\d{6}\.dump", entry.name, re.I)
+            if not match:
+                continue
+            target_dir = backup_base_dir(match.group(1), "pg")
+            target = os.path.join(target_dir, entry.name)
+            if not os.path.exists(target):
+                try:
+                    shutil.move(entry.path, target)
+                except OSError as exc:
+                    print("Не удалось перенести старый дамп %s: %s" % (entry.path, exc), file=sys.stderr)
 
 
 # ---------------- автоматические резервные копии ----------------
