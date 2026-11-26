@@ -97,6 +97,7 @@ KIND=dt
 if [ "$1" = "--cf" ]; then KIND=cf; shift; fi
 
 IB="${1:-${IB_NAME:-mybase}}"
+[[ "$IB" =~ ^[A-Za-z0-9_.-]{1,64}$ && "$IB" != "." && "$IB" != ".." ]] || die "недопустимое имя информационной базы"
 IB_USER="$2"
 IB_PASS="$3"
 
