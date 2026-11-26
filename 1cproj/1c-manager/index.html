@@ -1518,7 +1518,9 @@ $('clearCon').onclick = () => {
   }
 };
 $('saveSettings').onclick = saveSettings; $('reloadSettings').onclick = loadSettings;
-$('saveBackupSchedule').onclick = saveBackupSchedule;\n$('saveWeeklyUpdate').onclick = saveWeeklyUpdateSchedule;\nloadWeeklyUpdateSchedule();
+$('saveBackupSchedule').onclick = saveBackupSchedule;
+$('saveWeeklyUpdate').onclick = saveWeeklyUpdateSchedule;
+loadWeeklyUpdateSchedule();
  // Автоматически обновляем данные активной вкладки без ручных кнопок.
  // Не обновляем во время фоновой задачи, открытого диалога или скрытой страницы,
  // чтобы не сбрасывать введённые данные и не мешать работе пользователя.
