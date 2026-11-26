@@ -11,7 +11,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 cfg = {}
 jobs, jobs_lock = {}, threading.Lock()
 CONTAINERS = {"onec-server", "onec-postgres", "onec-client"}
-NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+NAME_RE = re.compile(r"^(?!\.{1,2}$)[A-Za-z0-9_.-]{1,64}$")
 UUID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
 MEM_RE = re.compile(r"^(0|[0-9]{1,6}[bkmg]?)$")
 
@@ -659,7 +659,7 @@ def prune_regular_backups(base_name, maximum):
     directory = os.path.join(backup_base_dir(base_name), "dt")
     if not os.path.isdir(directory):
         return
-    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\\.dt$")
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\.dt$")
     files = []
     for entry in os.scandir(directory):
         if entry.is_file(follow_symlinks=False) and pattern.fullmatch(entry.name):
@@ -675,8 +675,8 @@ def prune_regular_backups(base_name, maximum):
 
 def move_to_monthly(base_name):
     """Переносит созданный месячный .dt в отдельный каталог, не участвующий в ротации."""
-    directory = os.path.join(data_dir("backups"), "dt")
-    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\\.dt$")
+    directory = os.path.join(backup_base_dir(base_name), "dt")
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\.dt$")
     candidates = []
     if os.path.isdir(directory):
         for entry in os.scandir(directory):
