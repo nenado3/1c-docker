@@ -788,8 +788,9 @@ async function loadFiles() {
   if (r.error) return;
   $('dirBackups').textContent = r.backups.dir;
   $('fBackups').innerHTML = fileRows(r.backups, 'backups');
-  $('dirLic').textContent = r.licenses.dir;
-  $('fLic').innerHTML = r.licenses.files.length ? r.licenses.files.map(f => '<tr><td class="mono">' + esc(f.name) + '</td><td>' + fmtSize(f.size) + '</td><td>' + fmtDate(f.mtime) + '</td></tr>').join('') : '<tr><td colspan="3" class="mut">Файлов лицензий нет</td></tr>';
+  // Раздел списка файлов лицензий удалён вместе с клиентской вкладкой.
+  // Не обращаемся к отсутствующим элементам DOM: загрузка файлов не должна
+  // прерывать инициализацию остальных элементов веб-панели.
 }
 
 async function loadMemory() {
@@ -1193,7 +1194,8 @@ function uploadPgDump(file, db) {
     xhr.send(file);
   });
 };
-$('openServerLicenseDialog').onclick = () => {
+const openServerLicenseButton = $('openServerLicenseDialog');
+if (openServerLicenseButton) openServerLicenseButton.onclick = () => {
   $('serverLicenseStatus').textContent = '';
   $('serverLicenseFile').value = '';
   $('dlgServerLicense').showModal();
