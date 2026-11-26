@@ -55,7 +55,7 @@ RSSH -t "$SERVER_SSH" "$REMOTE_CMD" || die "выгрузка на сервере
 
 echo "== Поиск файла"
 REMOTE_FILE=$(RSSH "$SERVER_SSH" "ls -t $REMOTE_BACKUP_DIR/${QIB}_*.${EXT} 2>/dev/null | head -n1")
-[ -n "$REMOTE_FILE" ] || die "на сервере не найден файл backups/${IB}_*.${EXT}"
+[ -n "$REMOTE_FILE" ] || die "на сервере не найден файл в backups/${IB}/$([ "$MODE" = dt ] && echo dt || echo pg)"
 NAME=$(basename "$REMOTE_FILE")
 RQ=$(printf '%q' "$REMOTE_FILE")
 
