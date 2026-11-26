@@ -22,7 +22,7 @@ if [[ "$CLEAN" == "yes" ]]; then
     echo "Включена очистка существующих объектов базы '$DB'."
 fi
 LOG_DIR="$BACKUP_DIR/$DB/logs"
-mkdir -p "$BACKUP_DIR/$DB/pg" "$LOG_DIR"
+mkdir -p "$BACKUP_DIR/$DB"/{dt,cf,pg,logs}
 LOG="$LOG_DIR/pg_restore_$(date +%Y%m%d_%H%M%S).log"
 echo "Восстанавливаю PostgreSQL dump в базу '$DB'..." | tee -a "$LOG"
 if $DOCKER compose exec -T postgres bash -c 'DB="$1"; shift; runuser -u postgres -- /usr/local/pgbin/pg_restore "$@" -d "$DB"' _ "$DB" "${ARGS[@]}" < "$FILE" 2>&1 | tee -a "$LOG"; then
