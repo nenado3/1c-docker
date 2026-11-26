@@ -901,7 +901,7 @@ def load_update_schedule():
             update_schedule.update(data)
             if not isinstance(update_schedule.get("weekday"), int) or not 0 <= update_schedule["weekday"] <= 6:
                 update_schedule["weekday"] = 6
-            if not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", str(update_schedule.get("weekly_time", ""))):
+            if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", str(update_schedule.get("weekly_time", ""))):
                 update_schedule["weekly_time"] = "03:00"
             if update_schedule.get("enabled") and not update_schedule.get("next_run"):
                 update_schedule["next_run"] = next_weekly_update(update_schedule["weekday"], update_schedule["weekly_time"])
@@ -933,7 +933,7 @@ def save_update_schedule_request(body):
     try: weekday = int(weekday)
     except (TypeError, ValueError): raise ValueError("Некорректный день недели")
     if weekday < 0 or weekday > 6: raise ValueError("Некорректный день недели")
-    if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\\d|2[0-3]):[0-5]\\d", clock_time):
+    if not isinstance(clock_time, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", clock_time):
         raise ValueError("Укажите время в формате ЧЧ:ММ")
     if not isinstance(password, str) or len(password) > 1024 or len(username) > 256:
         raise ValueError("Слишком длинные учётные данные")
