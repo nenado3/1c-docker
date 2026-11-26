@@ -446,7 +446,7 @@ def do_action(body):
     if a == "postgres_create_admin":
         username = need(body, "username", NAME_RE)
         password = body.get("password", "")
-        if not isinstance(password, str) or len(password) < 12 or len(password) > 128 or "\\x00" in password:
+        if not isinstance(password, str) or len(password) < 12 or len(password) > 128 or "\x00" in password:
             raise ValueError("пароль должен содержать от 12 до 128 символов")
         # Имена ролей проверяются регулярным выражением и заключаются в кавычки;
         # пароль экранируется как SQL-литерал, чтобы исключить инъекцию.
