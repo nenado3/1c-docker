@@ -1331,23 +1331,25 @@ $('updateKick').onclick = async () => {
 };
 $('updateUpload').onclick = async () => {
   const ib = $('updateBase').value, file = $('updateFile').files[0], remoteFile = updateYandexFile;
+  const filename = file ? file.name : (remoteFile && remoteFile.filename);
   if (!ib) { $('updateStatus').textContent = 'Выберите базу.'; return; }
-  if (!file || !/\.cf$/i.test(file.name)) { $('updateStatus').textContent = 'Выберите файл конфигурации .cf.'; return; }
+  if (!filename || !/\.cf$/i.test(filename)) { $('updateStatus').textContent = 'Выберите файл .cf или скачайте его с Яндекс Диска.'; return; }
   await refreshUpdateAvailability();
   if ($('updateUpload').disabled) { $('updateStatus').textContent = 'Проверьте файл и выбранную базу: при активных сеансах обновление запрещено.'; return; }
   if (file && (file.size <= 0 || file.size > 8 * 1024 * 1024 * 1024)) { $('updateStatus').textContent = 'Размер файла должен быть от 1 байта до 8 ГБ.'; return; }
   $('updateUpload').disabled = true;
-  $('updateStatus').textContent = file ? ('Загружаю конфигурацию ' + file.name + '…') : ('Запускаю обновление из файла ' + filename + '…');
+  $('updateStatus').textContent = file ? ('Загружаю конфигурацию ' + filename + '…') : ('Запускаю обновление из файла ' + filename + '…');
   try {
-    const result = await uploadFileWithProgress(file, 'update');
+    const result = file ? await uploadFileWithProgress(file, 'update') : remoteFile;
     await runAction({action:'import_file', ib, filename:result.filename, new_base:false,
                      user:$('updateUser').value, pwd:$('updatePwd').value});
     $('updateFile').value = '';
+    updateYandexFile = null;
+    $('updateYandexUrl').value = '';
     $('updateStatus').textContent = 'Обновление передано на выполнение.';
   } catch (e) { $('updateStatus').textContent = 'Ошибка: ' + e.message; }
   finally { await refreshUpdateAvailability(); $('updateProgress').style.display = 'none'; }
 };
-
 setupConsoleResize();
 init();
 </script>
