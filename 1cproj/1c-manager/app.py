@@ -190,11 +190,15 @@ def backup_base_dir(base_name, kind=None):
     if not NAME_RE.fullmatch(name):
         raise ValueError("недопустимое имя информационной базы")
     root = os.path.join(data_dir("backups"), name)
+    # Каждая ИБ всегда получает полный набор каталогов, даже если пока
+    # выполняется только одна операция (например, загрузка .cf).
+    os.makedirs(root, exist_ok=True)
+    for folder in ("dt", "cf", "pg", "logs"):
+        os.makedirs(os.path.join(root, folder), exist_ok=True)
     if kind:
         if kind not in ("dt", "cf", "pg", "logs"):
             raise ValueError("недопустимый тип каталога резервной копии")
         root = os.path.join(root, kind)
-    os.makedirs(root, exist_ok=True)
     return root
 
 
@@ -898,6 +902,8 @@ def api_get(path, q):
             name = item.get("name") or item.get("Name")
             if name and NAME_RE.fullmatch(name):
                 names.append(name)
+                # Создаём структуру каталогов для каждой уже существующей ИБ.
+                backup_base_dir(name)
         return {"items": sorted(set(names), key=str.lower)}
     if path == "/api/browse_dirs":
         requested = q.get("path", [os.path.expanduser("~")])[0]
@@ -1013,6 +1019,18 @@ def api_get(path, q):
             return {"error": (r.stderr or r.stdout).strip(), "items": []}
         return {"items": [dict(zip(("name", "size"), l.split("|"))) for l in r.stdout.splitlines() if "|" in l]}
     if path == "/api/files":
+        # При открытии раздела «Выгрузки» создаём папки для всех зарегистрированных
+        # баз, чтобы структура была видна даже до первой резервной копии.
+        if cfg.get("docker"):
+            try:
+                result = dk("exec", "onec-server", "bash", "-lc", RAC["infobases"])
+                if result.returncode == 0:
+                    for item in parse_rac(result.stdout):
+                        name = item.get("name") or item.get("Name")
+                        if name and NAME_RE.fullmatch(name):
+                            backup_base_dir(name)
+            except Exception as exc:
+                print("Не удалось подготовить каталоги резервных копий: %s" % exc, file=sys.stderr)
         return {"backups": list_files("backups"), "export": list_files("export"), "licenses": list_files("licenses")}
     if path == "/api/job":
         j = jobs.get(q.get("id", [""])[0])
