@@ -127,6 +127,12 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 @media(max-width:560px){#dlgImport{min-width:0}#dlgImport h3{padding:18px 18px 14px;font-size:18px}#dlgImport .import-body{padding:16px 18px 20px}#dlgImport .import-grid{grid-template-columns:1fr}#dlgImport .import-actions{flex-direction:column-reverse}#dlgImport .import-actions button{width:100%}}
 
 
+/* Переключатель способов выбора файла обновления */
+#dlgUpdate .update-source-tabs{display:flex;gap:6px;margin:0 0 12px;padding:4px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
+#dlgUpdate .update-source-tab{flex:1;min-height:36px;padding:7px 12px;border-radius:6px}
+#dlgUpdate .update-source-tab.active{background:var(--acc);color:var(--accfg);border-color:var(--acc)}
+#dlgUpdate .update-source-panel[hidden]{display:none}
+#dlgUpdate .update-source-panel{padding:2px 0}
 /* Простое и компактное оформление окна обновления базы */
 #dlgUpdate{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 30px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.2)}
 #dlgUpdate::backdrop{background:rgba(0,0,0,.45)}
@@ -430,14 +436,21 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
     </div>
     <div class="import-group">
       <div class="import-group-title"><span class="import-step">3</span> Файл обновления</div>
-      <label>Выберите файл с компьютера</label>
-      <input id="updateFile" type="file" accept=".cf,application/octet-stream">
-      <div class="import-hint" style="margin:10px 0 7px">Или скачайте файл с Яндекс Диска</div>
-      <div class="import-grid">
-        <div><label for="updateYandexUrl">Публичная ссылка на файл .cf</label><input id="updateYandexUrl" type="url" placeholder="https://disk.yandex.ru/d/…"></div>
-        <div style="display:flex;align-items:end"><button class="b sec" id="updateYandexDownload" type="button">Скачать с Яндекс Диска</button></div>
+      <div class="update-source-tabs" role="tablist" aria-label="Способ получения файла">
+        <button class="b update-source-tab active" id="updateTabComputer" type="button" role="tab" aria-selected="true" aria-controls="updatePanelComputer">С компьютера</button>
+        <button class="b sec update-source-tab" id="updateTabYandex" type="button" role="tab" aria-selected="false" aria-controls="updatePanelYandex">Яндекс Диск</button>
       </div>
-      <p class="import-hint">Поддерживаются публичные ссылки. Файл будет сохранён в каталоге резервных копий .cf и подготовлен к обновлению. При наличии активных сеансов загрузка обновления будет заблокирована.</p>
+      <div id="updatePanelComputer" class="update-source-panel" role="tabpanel" aria-labelledby="updateTabComputer">
+        <label>Файл конфигурации .cf</label>
+        <input id="updateFile" type="file" accept=".cf,application/octet-stream">
+      </div>
+      <div id="updatePanelYandex" class="update-source-panel" role="tabpanel" aria-labelledby="updateTabYandex" hidden>
+        <label for="updateYandexUrl">Публичная ссылка на файл .cf</label>
+        <input id="updateYandexUrl" type="url" placeholder="https://disk.yandex.ru/d/…">
+        <button class="b sec" id="updateYandexDownload" type="button" style="margin-top:9px">Скачать с Яндекс Диска</button>
+        <p class="import-hint">Вставьте публичную ссылку. Файл будет скачан в каталог .cf и подготовлен к обновлению.</p>
+      </div>
+      <p class="import-hint">При наличии активных сеансов загрузка обновления будет заблокирована.</p>
       <div class="import-grid">
         <div><label>Пользователь 1С</label><input id="updateUser" placeholder="Пользователь 1С"></div>
         <div><label>Пароль 1С</label><input id="updatePwd" type="password" placeholder="Пароль 1С" autocomplete="new-password"></div>
@@ -1259,6 +1272,19 @@ $('uploadImport').onclick = async () => {
 };
 
 
+function setUpdateSource(source) {
+  const computer = source === 'computer';
+  $('updatePanelComputer').hidden = !computer;
+  $('updatePanelYandex').hidden = computer;
+  $('updateTabComputer').classList.toggle('active', computer);
+  $('updateTabYandex').classList.toggle('active', !computer);
+  $('updateTabComputer').classList.toggle('sec', !computer);
+  $('updateTabYandex').classList.toggle('sec', computer);
+  $('updateTabComputer').setAttribute('aria-selected', String(computer));
+  $('updateTabYandex').setAttribute('aria-selected', String(!computer));
+}
+$('updateTabComputer').onclick = () => setUpdateSource('computer');
+$('updateTabYandex').onclick = () => setUpdateSource('yandex');
 let updateYandexFile = null;
 $('updateFile').onchange = () => {
   updateYandexFile = null;
