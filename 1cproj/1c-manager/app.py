@@ -4,13 +4,14 @@
 import argparse, json, os, re, secrets, shutil, subprocess, sys, threading, time, webbrowser
 from datetime import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs, quote
+from urllib.parse import urlparse, parse_qs, quote, urlencode
+from urllib.request import Request, urlopen
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 cfg = {}
 jobs, jobs_lock = {}, threading.Lock()
-CONTAINERS = {"onec-server", "onec-postgres", "onec-client"}
-NAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+CONTAINERS = {"onec-server", "onec-postgres"}
+NAME_RE = re.compile(r"^(?!\.{1,2}$)[A-Za-z0-9_.-]{1,64}$")
 UUID_RE = re.compile(r"^[0-9a-fA-F-]{36}$")
 MEM_RE = re.compile(r"^(0|[0-9]{1,6}[bkmg]?)$")
 
@@ -106,12 +107,6 @@ ENV_SETTINGS = {
         "BACKUP_DIR": "Каталог резервных копий", "SERVER_MEMORY_LIMIT": "Лимит памяти сервера",
         "POSTGRES_MEMORY_LIMIT": "Лимит памяти PostgreSQL"
     },
-    "client": {
-        "ONEC_VERSION": "Версия платформы 1С", "ONEC_RUN_COMPONENTS": "Компоненты установщика",
-        "CLIENT_UID": "UID пользователя клиента", "SERVER_IP": "IP-адрес сервера 1С",
-        "NETHASP_ADDRS": "Адреса NetHASP", "EXPORT_DIR": "Каталог выгрузок",
-        "CLIENT_MEMORY_LIMIT": "Лимит памяти клиентского контейнера"
-    }
 }
 ENV_SECRET_KEYS = {"POSTGRES_PASSWORD"}
 
@@ -119,7 +114,7 @@ ENV_SECRET_KEYS = {"POSTGRES_PASSWORD"}
 def settings_snapshot():
     result = {}
     for section, keys in ENV_SETTINGS.items():
-        directory = cfg["server_dir"] if section == "server" else cfg["client_dir"]
+        directory = cfg["server_dir"]
         values = read_env(directory)
         result[section] = {key: {"label": label, "value": "" if key in ENV_SECRET_KEYS else values.get(key, ""),
                                 "configured": bool(values.get(key, "")) if key in ENV_SECRET_KEYS else None,
@@ -135,7 +130,7 @@ def save_settings(body):
         values = body.get(section, {})
         if not isinstance(values, dict):
             raise ValueError("неверный формат настроек: " + section)
-        directory = cfg["server_dir"] if section == "server" else cfg["client_dir"]
+        directory = cfg["server_dir"]
         if not os.path.isdir(directory):
             raise ValueError("каталог проекта не найден: " + directory)
         path = os.path.join(directory, ".env")
@@ -157,10 +152,8 @@ def save_settings(body):
                 raise ValueError("недопустимое значение параметра " + key)
             if any(ch in value for ch in ('"', "'", "\\", "#", "$")):
                 raise ValueError("параметр %s содержит символы, несовместимые с форматом .env: кавычки, #, $ и обратная косая черта не поддерживаются" % key)
-            if key in ("SERVER_MEMORY_LIMIT", "POSTGRES_MEMORY_LIMIT", "CLIENT_MEMORY_LIMIT") and not MEM_RE.match(value.lower()):
+            if key in ("SERVER_MEMORY_LIMIT", "POSTGRES_MEMORY_LIMIT") and not MEM_RE.match(value.lower()):
                 raise ValueError("%s: укажите 0 или значение, например 8g или 512m" % key)
-            if key == "CLIENT_UID" and value and not value.isdigit():
-                raise ValueError("CLIENT_UID должен быть числом")
             if key == "ONEC_VERSION" and value and not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+", value):
                 raise ValueError("ONEC_VERSION должен иметь формат 8.5.1.1522")
             write_env_value(path, key, value)
@@ -175,16 +168,32 @@ def data_dir(kind):
         # Должен совпадать с BACKUP_DIR в docker-compose.yml и common.sh:
         # этот каталог используется и веб-загрузкой, и контейнером onec-server.
         base, key, default = cfg["server_dir"], "BACKUP_DIR", "./backups"
-    elif kind == "export":
-        base, key, default = cfg["client_dir"], "EXPORT_DIR", "./export"
     else:
         base, key, default = cfg["server_dir"], None, "./licenses"
     val = read_env(base).get(key, default) if key else default
     return os.path.normpath(os.path.join(base, os.path.expanduser(val)))
 
 
+def backup_base_dir(base_name, kind=None):
+    """Каталог конкретной информационной базы и его подкаталоги."""
+    name = str(base_name or "").strip()
+    if not NAME_RE.fullmatch(name):
+        raise ValueError("недопустимое имя информационной базы")
+    root = os.path.join(data_dir("backups"), name)
+    # Каждая ИБ всегда получает полный набор каталогов, даже если пока
+    # выполняется только одна операция (например, загрузка .cf).
+    os.makedirs(root, exist_ok=True)
+    for folder in ("dt", "cf", "pg", "logs"):
+        os.makedirs(os.path.join(root, folder), exist_ok=True)
+    if kind:
+        if kind not in ("dt", "cf", "pg", "logs"):
+            raise ValueError("недопустимый тип каталога резервной копии")
+        root = os.path.join(root, kind)
+    return root
+
+
 def walk_files(d, rel=""):
-    """Обход каталога со вложенными папками (для веб-обзора backup/export)."""
+    """Обход каталога со вложенными папками (для веб-обзора резервных копий)."""
     out = []
     try:
         entries = sorted(os.scandir(d), key=lambda e: (not e.is_dir(follow_symlinks=False), e.name.lower()))
@@ -251,7 +260,7 @@ def run_job(title, argv, cwd=None):
 
 
 def project(name):
-    d = cfg["server_dir"] if name == "server" else cfg["client_dir"]
+    d = cfg["server_dir"]
     if not os.path.isdir(d):
         raise ValueError("папка проекта не найдена: %s" % d)
     return d
@@ -290,20 +299,15 @@ def do_action(body):
         return run_job("%s %s" % (op, name), cfg["docker"] + [op, name])
     if a == "compose_op":
         proj, op = need(body, "project"), need(body, "op")
-        if proj not in ("server", "client") or op not in ("up", "stop", "restart"):
+        if proj != "server" or op not in ("up", "stop", "restart"):
             raise ValueError("недопустимое действие")
         d = project(proj)
-        # клиент и запуск сервера идут через скрипты проектов: common.sh переводит имя хоста SERVER_IP в IP,
-        # генерирует nethasp.ini и создаёт каталоги (прямой docker compose всё это пропускает)
-        if proj == "client":
-            sub = {"up": "up", "stop": "stop", "restart": "recreate"}[op]
-            return script_job("Клиентский контейнер: %s" % op, "client", "client.sh", sub)
         if op == "up":
             return script_job("Запуск сервера (postgres + 1С)", "server", "start.sh")
         return run_job("Сервер: %s" % op, cfg["docker"] + ["compose", op], cwd=d)
     if a == "build":
         proj = need(body, "project")
-        if proj not in ("server", "client"):
+        if proj != "server":
             raise ValueError("недопустимый проект")
         args = []
         if proj == "server":
@@ -318,7 +322,6 @@ def do_action(body):
             limits = (
                 ("memory", "SERVER_MEMORY_LIMIT", project("server")),
                 ("postgres_memory", "POSTGRES_MEMORY_LIMIT", project("server")),
-                ("client_memory", "CLIENT_MEMORY_LIMIT", project("client")),
             )
             for field, env_key, directory in limits:
                 value = str(body.get(field, "")).strip().lower()
@@ -329,8 +332,8 @@ def do_action(body):
         return script_job("Сборка образов (%s)" % proj, proj, "build.sh", *args)
     if a == "update_image":
         proj = need(body, "project")
-        if proj not in ("server", "client"):
-            raise ValueError("недопустимый проект")
+        if proj != "server":
+            raise ValueError("доступна только серверная часть")
         return script_job("Обновление Docker-образа (%s)" % proj, proj, "update-image.sh")
     if a == "recreate_server":
         d = project("server")
@@ -360,7 +363,7 @@ def do_action(body):
             raise ValueError("для отдельного пользователя PostgreSQL укажите и логин, и пароль; иначе оставьте оба поля пустыми для использования .env")
         if len(db_pwd) > 200:
             raise ValueError("слишком длинный пароль PostgreSQL")
-        uploaded_file = os.path.join(data_dir("backups"), "dt", filename)
+        uploaded_file = os.path.join(backup_base_dir(ib, "dt"), filename)
         if not os.path.isfile(uploaded_file) or os.path.getsize(uploaded_file) <= 0:
             raise ValueError("Загруженный .dt не найден или пуст: %s" % uploaded_file)
         return script_job("Запуск сервера и создание базы %s из .dt" % ib, "server",
@@ -395,19 +398,72 @@ def do_action(body):
             raise ValueError("слишком длинный пароль PostgreSQL")
         # Передаём import.sh тот же абсолютный путь, куда API загрузки реально сохранил файл.
         # Это исключает расхождение BACKUP_DIR/cwd между веб-панелью и shell-скриптом.
-        uploaded_file = os.path.join(data_dir("backups"), kind, filename)
+        uploaded_file = os.path.join(backup_base_dir(ib, kind), filename)
         if not os.path.isfile(uploaded_file):
             raise ValueError("Загрузка не найдена на диске: %s. Проверьте ответ загрузки и каталог BACKUP_DIR." % uploaded_file)
         if os.path.getsize(uploaded_file) <= 0:
             raise ValueError("Загруженный файл пустой: %s" % uploaded_file)
         if new_base and kind != "dt":
             raise ValueError("создание новой базы поддерживается только из файла .dt")
+        if kind == "cf":
+            # Защита на стороне сервера: не начинаем обновление конфигурации,
+            # пока в выбранной информационной базе остаются пользовательские сеансы.
+            clusters = parse_rac(rac_call("cluster", "list"))
+            cluster = next((item.get("cluster") for item in clusters if item.get("cluster")), None)
+            if not cluster:
+                raise ValueError("кластер 1С не найден")
+            bases = parse_rac(rac_call("infobase", "summary", "list", "--cluster=" + cluster))
+            base_info = next((item for item in bases if (item.get("name") or item.get("Name")) == ib), None)
+            base_id = (base_info or {}).get("infobase")
+            if not base_id:
+                raise ValueError("не удалось определить идентификатор выбранной информационной базы")
+            sessions = parse_rac(rac_call("session", "list", "--cluster=" + cluster))
+            active = [item for item in sessions if item.get("infobase") == base_id]
+            if active:
+                raise ValueError("обновление заблокировано: в базе %s остаётся активных сеансов: %d" % (ib, len(active)))
         # Девятый аргумент включает строгий режим: только новая ИБ и новая БД PostgreSQL.
         args = [ib, filename, kind, user, pwd, db_user, db_pwd, uploaded_file, "new" if new_base else "", db_name if new_base else ""]
         title = "Создание базы %s из .dt" % ib if new_base else "Импорт .%s в базу %s" % (kind, ib)
         return script_job(title, "server", "import.sh", *args)
     if a == "backup_pg":
         return script_job("Дамп PostgreSQL %s" % need(body, "db", NAME_RE), "server", "backup.sh", "--pg", need(body, "db", NAME_RE))
+    if a == "postgres_create_admin":
+        username = need(body, "username", NAME_RE)
+        password = body.get("password", "")
+        if not isinstance(password, str) or len(password) < 12 or len(password) > 128 or "\x00" in password:
+            raise ValueError("пароль должен содержать от 12 до 128 символов")
+        # Имена ролей проверяются регулярным выражением и заключаются в кавычки;
+        # пароль экранируется как SQL-литерал, чтобы исключить инъекцию.
+        role_ident = '"' + username.replace('"', '""') + '"'
+        password_literal = "'" + password.replace("'", "''") + "'"
+        sql = "CREATE ROLE " + role_ident + " WITH LOGIN SUPERUSER PASSWORD " + password_literal
+        return run_job("Создание администратора PostgreSQL %s" % username,
+                       cfg["docker"] + ["exec", "onec-postgres", "runuser", "-u", "postgres", "--",
+                                        "/usr/local/pgbin/psql", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+                                        "-c", sql])
+    if a == "postgres_update_role":
+        username = need(body, "username", NAME_RE)
+        if username == "postgres" or username.startswith("pg_"):
+            raise ValueError("системные роли PostgreSQL изменять через веб-панель нельзя")
+        flags = ("login", "superuser", "createdb", "createrole", "inherit", "replication", "bypassrls")
+        values = {}
+        for flag in flags:
+            value = body.get(flag)
+            if not isinstance(value, bool):
+                raise ValueError("некорректное значение права: %s" % flag)
+            values[flag] = value
+        role_ident = '"' + username.replace('"', '""') + '"'
+        clauses = []
+        for flag, sql_name in (("login", "LOGIN"), ("superuser", "SUPERUSER"),
+                               ("createdb", "CREATEDB"), ("createrole", "CREATEROLE"),
+                               ("inherit", "INHERIT"), ("replication", "REPLICATION"),
+                               ("bypassrls", "BYPASSRLS")):
+            clauses.append((" " if values[flag] else " NO") + sql_name)
+        sql = "ALTER ROLE " + role_ident + " WITH" + "".join(clauses)
+        return run_job("Изменение прав PostgreSQL: %s" % username,
+                       cfg["docker"] + ["exec", "onec-postgres", "runuser", "-u", "postgres", "--",
+                                        "/usr/local/pgbin/psql", "-d", "postgres", "-v", "ON_ERROR_STOP=1",
+                                        "-c", sql])
     if a == "postgres_drop_db":
         db = need(body, "db", NAME_RE)
         if db.lower() in ("postgres", "template0", "template1"):
@@ -423,16 +479,12 @@ def do_action(body):
     if a == "restore_pg_dump":
         db = need(body, "db", NAME_RE)
         filename = need(body, "filename", re.compile(r"^[A-Za-z0-9_.-]{1,180}\.dump$", re.I), 190)
-        uploaded_file = os.path.join(data_dir("backups"), "pg", filename)
+        uploaded_file = os.path.join(backup_base_dir(db, "pg"), filename)
         if not os.path.isfile(uploaded_file) or os.path.getsize(uploaded_file) <= 0:
             raise ValueError("Загруженный .dump не найден или пуст")
         clean = "yes" if body.get("clean") else "no"
         title = "Восстановление PostgreSQL dump в %s%s" % (db, " с очисткой объектов" if clean == "yes" else "")
         return script_job(title, "server", "restore-pg.sh", db, uploaded_file, clean)
-    if a == "client_start":
-        return script_job("Запуск клиента 1С", "client", "client.sh")
-    if a == "license_install":
-        return script_job("Перенос лицензий", "client", "license.sh", "install")
     if a == "apache_op":
         op = need(body, "op")
         if op not in ("start", "stop", "restart", "status"):
@@ -454,6 +506,10 @@ def do_action(body):
         db = str(body.get("db_name") or n).strip()
         if not NAME_RE.match(db):
             raise ValueError("недопустимое имя базы PostgreSQL")
+        # Подготавливаем каталоги базы заранее; выгрузки и журналы будут попадать сюда.
+        for kind in ("dt", "cf", "logs"):
+            backup_base_dir(n, kind)
+        backup_base_dir(db, "pg")
         return rac_job("Создание базы %s" % n, "create", n, db, need(body, "db_user", NAME_RE), need(body, "db_pwd"))
     if a == "infobase_drop":
         i = need(body, "id", UUID_RE)
@@ -464,6 +520,62 @@ def do_action(body):
     if a == "session_kill":
         return rac_job("Завершение сеанса", "kill", need(body, "id", UUID_RE))
     raise ValueError("неизвестное действие")
+
+
+def migrate_legacy_backups():
+    """Переносит старые файлы ИБ_дата.dt/.cf в backups/ИБ/тип."""
+    root = data_dir("backups")
+    for kind in ("dt", "cf"):
+        legacy = os.path.join(root, kind)
+        if not os.path.isdir(legacy):
+            continue
+        try:
+            entries = list(os.scandir(legacy))
+        except OSError:
+            continue
+        for entry in entries:
+            if not entry.is_file(follow_symlinks=False):
+                continue
+            match = re.fullmatch(r"([A-Za-z0-9_.-]{1,64})_\d{8}_\d{6}\." + kind, entry.name, re.I)
+            if not match:
+                continue
+            target = os.path.join(backup_base_dir(match.group(1), kind), entry.name)
+            if not os.path.exists(target):
+                try:
+                    shutil.move(entry.path, target)
+                except OSError as exc:
+                    print("Не удалось перенести старую копию %s: %s" % (entry.path, exc), file=sys.stderr)
+        old_monthly = os.path.join(legacy, "monthly")
+        if os.path.isdir(old_monthly):
+            for entry in os.scandir(old_monthly):
+                match = re.fullmatch(r"([A-Za-z0-9_.-]{1,64})_\d{8}_\d{6}\." + kind, entry.name, re.I)
+                if not entry.is_file(follow_symlinks=False) or not match:
+                    continue
+                target_dir = os.path.join(backup_base_dir(match.group(1), kind), "monthly")
+                os.makedirs(target_dir, exist_ok=True)
+                target = os.path.join(target_dir, entry.name)
+                if not os.path.exists(target):
+                    try:
+                        shutil.move(entry.path, target)
+                    except OSError as exc:
+                        print("Не удалось перенести месячную копию %s: %s" % (entry.path, exc), file=sys.stderr)
+    # Старые дампы PostgreSQL лежали в корне backups или backups/pg.
+    for legacy_pg in (root, os.path.join(root, "pg")):
+        if not os.path.isdir(legacy_pg):
+            continue
+        for entry in os.scandir(legacy_pg):
+            if not entry.is_file(follow_symlinks=False):
+                continue
+            match = re.fullmatch(r"([A-Za-z0-9_.-]{1,63})_\d{8}_\d{6}\.dump", entry.name, re.I)
+            if not match:
+                continue
+            target_dir = backup_base_dir(match.group(1), "pg")
+            target = os.path.join(target_dir, entry.name)
+            if not os.path.exists(target):
+                try:
+                    shutil.move(entry.path, target)
+                except OSError as exc:
+                    print("Не удалось перенести старый дамп %s: %s" % (entry.path, exc), file=sys.stderr)
 
 
 # ---------------- автоматические резервные копии ----------------
@@ -600,10 +712,10 @@ def save_backup_schedule_request(body):
 
 def prune_regular_backups(base_name, maximum):
     """Ограничивает число обычных .dt для базы; monthly/ не затрагивает."""
-    directory = os.path.join(data_dir("backups"), "dt")
+    directory = os.path.join(backup_base_dir(base_name), "dt")
     if not os.path.isdir(directory):
         return
-    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\\.dt$")
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\.dt$")
     files = []
     for entry in os.scandir(directory):
         if entry.is_file(follow_symlinks=False) and pattern.fullmatch(entry.name):
@@ -619,8 +731,8 @@ def prune_regular_backups(base_name, maximum):
 
 def move_to_monthly(base_name):
     """Переносит созданный месячный .dt в отдельный каталог, не участвующий в ротации."""
-    directory = os.path.join(data_dir("backups"), "dt")
-    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\\.dt$")
+    directory = os.path.join(backup_base_dir(base_name), "dt")
+    pattern = re.compile(r"^" + re.escape(base_name) + r"_\d{8}_\d{6}\.dt$")
     candidates = []
     if os.path.isdir(directory):
         for entry in os.scandir(directory):
@@ -807,6 +919,8 @@ def api_get(path, q):
             name = item.get("name") or item.get("Name")
             if name and NAME_RE.fullmatch(name):
                 names.append(name)
+                # Создаём структуру каталогов для каждой уже существующей ИБ.
+                backup_base_dir(name)
         return {"items": sorted(set(names), key=str.lower)}
     if path == "/api/browse_dirs":
         requested = q.get("path", [os.path.expanduser("~")])[0]
@@ -832,8 +946,7 @@ def api_get(path, q):
         return {"path": current, "parent": parent, "dirs": dirs}
     if path == "/api/status":
         return {"docker": bool(cfg["docker"]), "docker_cmd": " ".join(cfg["docker"] or []),
-                "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"]),
-                "client_dir": cfg["client_dir"], "client_ok": os.path.isdir(cfg["client_dir"])}
+                "server_dir": cfg["server_dir"], "server_ok": os.path.isdir(cfg["server_dir"])}
     if path == "/api/apache_status":
         r = dk("exec", "onec-server", "bash", "-lc",
                "ps -eo comm=,stat= | awk '$1 == \"apache2\" || $1 == \"httpd\" { if ($2 !~ /^Z/) found=1 } END { exit !found }' && echo running || echo stopped")
@@ -878,8 +991,6 @@ def api_get(path, q):
         env = read_env(cfg["server_dir"])
         limit = (env.get("SERVER_MEMORY_LIMIT") or "0").strip()
         postgres_limit = (env.get("POSTGRES_MEMORY_LIMIT") or "0").strip()
-        client_env = read_env(cfg["client_dir"])
-        client_limit = (client_env.get("CLIENT_MEMORY_LIMIT") or "0").strip()
         usage, percent = "", ""
         try:
             r = dk("stats", "--no-stream", "--format", "{{.MemUsage}}|{{.MemPerc}}", "onec-server")
@@ -887,7 +998,7 @@ def api_get(path, q):
                 usage, percent = r.stdout.strip().split("|", 1)
         except Exception:
             pass
-        return {"limit": limit, "postgres_limit": postgres_limit, "client_limit": client_limit,
+        return {"limit": limit, "postgres_limit": postgres_limit,
                 "usage": usage, "percent": percent}
     if path == "/api/dist":
         target = q.get("target", [""])[0]
@@ -920,9 +1031,47 @@ def api_get(path, q):
                "SELECT datname, pg_size_pretty(pg_database_size(datname)) FROM pg_database WHERE NOT datistemplate ORDER BY 1")
         if r.returncode != 0:
             return {"error": (r.stderr or r.stdout).strip(), "items": []}
-        return {"items": [dict(zip(("name", "size"), l.split("|"))) for l in r.stdout.splitlines() if "|" in l]}
+        items = [dict(zip(("name", "size"), l.split("|", 1))) for l in r.stdout.splitlines() if "|" in l]
+        roles_sql = """
+            SELECT r.rolname,
+                   r.rolsuper::text,
+                   r.rolcreatedb::text,
+                   r.rolcreaterole::text,
+                   r.rolcanlogin::text,
+                   r.rolinherit::text,
+                   r.rolreplication::text,
+                   r.rolbypassrls::text,
+                   COALESCE((SELECT string_agg(pg_get_userbyid(m.roleid), ', ' ORDER BY pg_get_userbyid(m.roleid))
+                             FROM pg_auth_members m WHERE m.member = r.oid), '')
+            FROM pg_roles r
+            ORDER BY r.rolname
+        """
+        rr = dk("exec", "onec-postgres", "runuser", "-u", "postgres", "--",
+                "/usr/local/pgbin/psql", "-d", "postgres", "-At", "-F", "|", "-c", roles_sql)
+        if rr.returncode != 0:
+            return {"items": items, "roles": [], "roles_error": (rr.stderr or rr.stdout).strip()}
+        roles = []
+        for line in rr.stdout.splitlines():
+            cols = line.split("|", 8)
+            if len(cols) != 9:
+                continue
+            roles.append(dict(zip(("name", "superuser", "createdb", "createrole", "login",
+                                   "inherit", "replication", "bypassrls", "memberships"), cols)))
+        return {"items": items, "roles": roles}
     if path == "/api/files":
-        return {"backups": list_files("backups"), "export": list_files("export"), "licenses": list_files("licenses")}
+        # При открытии раздела «Выгрузки» создаём папки для всех зарегистрированных
+        # баз, чтобы структура была видна даже до первой резервной копии.
+        if cfg.get("docker"):
+            try:
+                result = dk("exec", "onec-server", "bash", "-lc", RAC["infobases"])
+                if result.returncode == 0:
+                    for item in parse_rac(result.stdout):
+                        name = item.get("name") or item.get("Name")
+                        if name and NAME_RE.fullmatch(name):
+                            backup_base_dir(name)
+            except Exception as exc:
+                print("Не удалось подготовить каталоги резервных копий: %s" % exc, file=sys.stderr)
+        return {"backups": list_files("backups"), "export": [], "licenses": list_files("licenses")}
     if path == "/api/job":
         j = jobs.get(q.get("id", [""])[0])
         if not j:
@@ -967,15 +1116,15 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, html, "text/html; charset=utf-8")
             if u.path == "/download":
                 kind, name = q.get("dir", [""])[0], q.get("name", [""])[0]
-                # name может быть с вложенными папками (backup/export просматриваются на веб целиком);
+                # name может быть с вложенными папками (backup просматриваются на веб целиком);
                 # защита от выхода за пределы каталога — normpath + проверка префикса
-                if kind not in ("backups", "export") or not name or name.startswith(".") or "\x00" in name:
+                if kind != "backups" or not name or name.startswith(".") or "\x00" in name:
                     return self._send(400, {"error": "недопустимый запрос"})
                 base = os.path.realpath(data_dir(kind))
                 p = os.path.normpath(os.path.join(base, name))
                 if not (p == base or p.startswith(base + os.sep)):
                     return self._send(400, {"error": "недопустимый путь"})
-                # Не разрешаем обход каталога через символьные ссылки внутри backup/export.
+                # Не разрешаем обход каталога через символьные ссылки внутри backup.
                 p = os.path.realpath(p)
                 if not (p == base or p.startswith(base + os.sep)):
                     return self._send(400, {"error": "недопустимый путь"})
@@ -1007,6 +1156,73 @@ class H(BaseHTTPRequestHandler):
             return self._send(403, {"error": "доступ запрещён"})
         try:
             n = int(self.headers.get("Content-Length") or 0)
+            if u.path == "/api/yandex_cf":
+                if n <= 0 or n > 8192:
+                    return self._send(400, {"error": "передайте ссылку на публичный файл Яндекс Диска"})
+                try:
+                    payload = json.loads(self.rfile.read(n).decode("utf-8"))
+                except Exception:
+                    return self._send(400, {"error": "не удалось прочитать ссылку"})
+                ib = str(payload.get("ib", "")).strip()
+                if not NAME_RE.fullmatch(ib):
+                    return self._send(400, {"error": "сначала выберите информационную базу"})
+                public_url = str(payload.get("url", "")).strip()
+                parsed = urlparse(public_url)
+                allowed_hosts = {"disk.yandex.ru", "yadi.sk", "disk.yandex.com",
+                                 "disk.yandex.kz", "disk.yandex.com.tr"}
+                if (parsed.scheme != "https" or (parsed.hostname or "").lower() not in allowed_hosts
+                        or not parsed.path.startswith(("/d/", "/i/")) or parsed.username or parsed.password):
+                    return self._send(400, {"error": "укажите публичную HTTPS-ссылку Яндекс Диска (например, https://disk.yandex.ru/d/…)"})
+                api_base = "https://cloud-api.yandex.net/v1/disk/public/resources"
+                query = urlencode({"public_key": public_url})
+                request = Request(api_base + "?" + query, headers={"User-Agent": "1C-Docker-Manager/1.0"})
+                with urlopen(request, timeout=30) as response:
+                    metadata = json.loads(response.read(1024 * 1024).decode("utf-8"))
+                original_name = str(metadata.get("name", ""))
+                if not original_name.lower().endswith(".cf"):
+                    return self._send(400, {"error": "по ссылке найден файл «%s», нужен файл .cf" % (original_name or "без имени")})
+                size = int(metadata.get("size") or 0)
+                max_size = 8 * 1024 * 1024 * 1024
+                if size <= 0 or size > max_size:
+                    return self._send(413, {"error": "размер файла по ссылке должен быть от 1 байта до 8 ГБ"})
+                request = Request(api_base + "/download?" + query,
+                                  headers={"User-Agent": "1C-Docker-Manager/1.0"})
+                with urlopen(request, timeout=30) as response:
+                    download_info = json.loads(response.read(1024 * 1024).decode("utf-8"))
+                href = str(download_info.get("href", ""))
+                href_info = urlparse(href)
+                if href_info.scheme != "https" or not href_info.hostname:
+                    return self._send(502, {"error": "Яндекс Диск вернул некорректную ссылку скачивания"})
+                safe_stem = re.sub(r"[^A-Za-z0-9_.-]+", "_", os.path.splitext(os.path.basename(original_name))[0]).strip("._-")
+                safe_name = ((safe_stem[:150] or "yandex_config") + ".cf")
+                dest_dir = backup_base_dir(ib, "cf")
+                os.makedirs(dest_dir, exist_ok=True)
+                dest = os.path.join(dest_dir, safe_name)
+                part = os.path.join(dest_dir, ".yandex-" + secrets.token_hex(8) + ".part")
+                downloaded = 0
+                try:
+                    with urlopen(Request(href, headers={"User-Agent": "1C-Docker-Manager/1.0"}), timeout=60) as response:
+                        with open(part, "xb") as output:
+                            while True:
+                                chunk = response.read(1024 * 1024)
+                                if not chunk:
+                                    break
+                                downloaded += len(chunk)
+                                if downloaded > max_size or downloaded > size:
+                                    raise ValueError("размер скачанного файла превышает размер, указанный Яндекс Диском")
+                                output.write(chunk)
+                            output.flush()
+                            os.fsync(output.fileno())
+                    if downloaded != size:
+                        raise ValueError("файл скачан не полностью: получено %s из %s байт" % (downloaded, size))
+                    os.replace(part, dest)
+                    os.chmod(dest, 0o666)
+                except Exception:
+                    try: os.unlink(part)
+                    except OSError: pass
+                    raise
+                return self._send(200, {"filename": safe_name, "size": downloaded,
+                                        "kind": "cf", "path": dest, "source": "yandex"})
             if u.path == "/api/upload":
                 if n <= 0:
                     return self._send(400, {"error": "загружаемый файл пуст"})
@@ -1016,11 +1232,13 @@ class H(BaseHTTPRequestHandler):
                         or filename.startswith(".")):
                     return self._send(400, {"error": "разрешены только файлы .dt и .cf (имя до 180 символов)"})
                 ext = filename.rsplit(".", 1)[1].lower()
-                # .dt и .cf хранятся раздельно. Сначала пишем во временный файл,
+                ib = parse_qs(u.query).get("ib", [""])[0]
+                if not NAME_RE.fullmatch(ib):
+                    return self._send(400, {"error": "не указана корректная информационная база"})
+                # .dt и .cf хранятся отдельно для каждой информационной базы.
                 # затем атомарно заменяем целевой: оборванная загрузка не уничтожит старую копию.
                 safe_name = filename
-                dest_dir = os.path.join(data_dir("backups"), ext)
-                os.makedirs(dest_dir, exist_ok=True)
+                dest_dir = backup_base_dir(ib, ext)
                 dest = os.path.join(dest_dir, safe_name)
                 part = os.path.join(dest_dir, ".upload-" + secrets.token_hex(8) + ".part")
                 remaining = n
@@ -1039,7 +1257,7 @@ class H(BaseHTTPRequestHandler):
                     try: os.unlink(part)
                     except OSError: pass
                     raise
-                return self._send(200, {"filename": safe_name, "size": n, "kind": ext, "path": dest, "backup_dir": data_dir("backups")})
+                return self._send(200, {"filename": safe_name, "size": n, "kind": ext, "path": dest, "backup_dir": dest_dir, "ib": ib})
             if u.path == "/api/upload_license":
                 if n <= 0 or n > 50 * 1024 * 1024:
                     return self._send(413, {"error": "размер файла лицензии должен быть от 1 байта до 50 МБ"})
@@ -1073,8 +1291,10 @@ class H(BaseHTTPRequestHandler):
                 filename = os.path.basename(parse_qs(u.query).get("name", [""])[0]).strip()
                 if not re.fullmatch(r"[A-Za-z0-9_.-]{1,176}\.dump", filename, re.I) or filename.startswith("."):
                     return self._send(400, {"error": "разрешены только файлы .dump"})
-                dest_dir = os.path.join(data_dir("backups"), "pg")
-                os.makedirs(dest_dir, exist_ok=True)
+                db = parse_qs(u.query).get("db", [""])[0]
+                if not NAME_RE.fullmatch(db):
+                    return self._send(400, {"error": "сначала выберите целевую базу PostgreSQL"})
+                dest_dir = backup_base_dir(db, "pg")
                 dest = os.path.join(dest_dir, filename)
                 part = os.path.join(dest_dir, ".upload-" + secrets.token_hex(8) + ".part")
                 remaining = n
@@ -1133,7 +1353,7 @@ class H(BaseHTTPRequestHandler):
                 return self._send(200, save_backup_schedule_request(body))
             if u.path != "/api/action":
                 return self._send(404, {"error": "не найдено"})
-            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
+            if not cfg["docker"] and body.get("action") in ("container_op", "compose_op", "infobase_create", "infobase_drop", "session_kill", "import_file", "start_server_with_dt", "restore_pg_dump", "postgres_create_admin", "postgres_update_role", "postgres_drop_db", "backup_pg", "set_memory", "recreate_server", "license_server_activate", "apache_op", "web_publish", "web_delete"):
                 return self._send(400, {"error": "Docker недоступен для этого пользователя"})
             return self._send(200, {"job": do_action(body)})
         except ValueError as e:
@@ -1145,14 +1365,14 @@ class H(BaseHTTPRequestHandler):
 def main():
     ap = argparse.ArgumentParser(description="Менеджер контейнеров 1С")
     ap.add_argument("--server-dir", default=os.path.join(HERE, "..", "1c-server"))
-    ap.add_argument("--client-dir", default=os.path.join(HERE, "..", "1c-client"))
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--token", default=None, help="фиксированный токен (по умолчанию случайный)")
     ap.add_argument("--no-browser", action="store_true")
     a = ap.parse_args()
-    cfg.update(server_dir=os.path.abspath(a.server_dir), client_dir=os.path.abspath(a.client_dir),
+    cfg.update(server_dir=os.path.abspath(a.server_dir),
                token=a.token or secrets.token_urlsafe(16), docker=detect_docker())
     load_backup_schedule()
+    migrate_legacy_backups()
     threading.Thread(target=automatic_backup_loop, daemon=True, name="automatic-backups").start()
     try:
         srv = ThreadingHTTPServer(("127.0.0.1", a.port), H)

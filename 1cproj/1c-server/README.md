@@ -16,7 +16,7 @@ chmod +x *.sh
 ```
 
 Сервер публикует порты 1540, 1541, 1560-1591 и создаёт сеть onec-net,
-к которой подключается проект 1c-client. Запускайте сервер раньше клиента.
+к которой подключаются серверные процессы 1С и PostgreSQL.
 Порт 1545 (RAS) публикуется только на 127.0.0.1: кластер работает с -seclev 0,
 и в сеть его выставлять нельзя.
 
@@ -69,20 +69,14 @@ Docker volume apache-config.
 поэтому DB_PASS вручную задавать не нужно. После первой инициализации тома pg-data
 смена POSTGRES_PASSWORD не меняет пароль в базе.
 
-## Подключение клиентов
+## Сетевой доступ к серверу
 
-- Клиент 1С на другой машине подключается по IP. Для тонкого/толстого клиента откройте:
-      sudo firewall-cmd --permanent --add-port=1540-1541/tcp --add-port=1560-1591/tcp
-- Для веб-клиента откройте HTTP и HTTPS:
-      sudo firewall-cmd --permanent --add-port=80/tcp --add-port=443/tcp
-- Примените правила:
-      sudo firewall-cmd --reload
+Для веб-публикаций откройте HTTP и HTTPS:
 
-      sudo firewall-cmd --permanent --add-port=1540-1541/tcp --add-port=1560-1591/tcp
-      sudo firewall-cmd --reload
+    sudo firewall-cmd --permanent --add-port=80/tcp --add-port=443/tcp
+    sudo firewall-cmd --reload
 
-- Файлы .lic, полученные клиентом, кладите в ./licenses (или ./license.sh add файл.lic)
-  и перезапускайте сервер: sudo docker restart onec-server.
+Лицензии сервера размещайте в ./licenses и перезапускайте onec-server при необходимости.
 
 ## Архитектура: amd64 и arm64
 
@@ -96,7 +90,7 @@ Docker volume apache-config.
 Если для версии нет .deb, положите в server/dist установщик setup-full-<версия>-x86_64.run.
 По умолчанию ставятся компоненты server,server_admin,client_full,ru (список меняется
 переменной ONEC_RUN_COMPONENTS в .env). client_full нужен для выгрузки .dt в контейнере.
-Версия платформы на сервере и клиенте должна совпадать.
+
 
 ## Сетевой ключ HASP (NetHASP)
 
@@ -116,7 +110,7 @@ Docker volume apache-config.
 виртуальный дисплей xvfb) — графическая сессия не нужна. Перед выгрузкой завершите
 сеансы пользователей. Каталог задаётся BACKUP_DIR в .env.
 
-Забрать выгрузку на другой компьютер: ./export-db.sh --pull или --remote в папке 1c-client.
+
 
 ## Импорт
 
@@ -180,8 +174,7 @@ SERVER_BASE_IMAGE и POSTGRES_BASE_IMAGE в .env. Для postgres берите �
     libc6 >= 2.35, libicu70               -> ubuntu:22.04
 
 Сборка сама сверяет требуемую пакетами версию libc6 с образом и останавливается
-с понятным сообщением, если база не та. Списки apt-пакетов в Dockerfile сервера
-и клиента рассчитаны на 24.04 и 22.04 соответственно.
+с понятным сообщением, если база не та. Список apt-пакетов в Dockerfile сервера рассчитан на поддерживаемые базовые образы.
 
 ## Установка платформы (install-platform.sh)
 

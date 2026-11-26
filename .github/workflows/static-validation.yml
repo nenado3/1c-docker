@@ -3,6 +3,8 @@ name: Static validation
 on:
   push:
     branches:
+      - main
+      - fixes
       - "audit/**"
   pull_request:
     branches:
@@ -35,7 +37,6 @@ jobs:
           files = [
               Path("1cproj/1c-server/server/Dockerfile"),
               Path("1cproj/1c-server/postgres/Dockerfile"),
-              Path("1cproj/1c-client/Dockerfile"),
           ]
           failed = False
           for dockerfile in files:
@@ -66,5 +67,3 @@ jobs:
       - name: Validate server Compose configuration
         run: docker compose -f 1cproj/1c-server/docker-compose.yml config --quiet
 
-      - name: Validate client Compose configuration
-        run: docker compose -f 1cproj/1c-client/docker-compose.yml config --quiet

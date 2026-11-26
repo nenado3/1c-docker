@@ -19,4 +19,4 @@ die() { echo "ОШИБКА: $*" >&2; exit 1; }
 
 # Каталоги, монтируемые в контейнер (создаём заранее, иначе Docker создаст их от root)
 BACKUP_DIR="${BACKUP_DIR:-./backups}"
-mkdir -p licenses "$BACKUP_DIR" "$BACKUP_DIR/dt" "$BACKUP_DIR/cf" && chmod 1777 licenses && chmod 777 "$BACKUP_DIR" "$BACKUP_DIR/dt" "$BACKUP_DIR/cf" 2>/dev/null || true
+mkdir -p licenses "$BACKUP_DIR" && chmod 1777 licenses && chmod 777 "$BACKUP_DIR" 2>/dev/null || true
