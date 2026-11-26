@@ -127,31 +127,30 @@ dialog::backdrop{background:rgba(0,0,0,.45)}
 @media(max-width:560px){#dlgImport{min-width:0}#dlgImport h3{padding:18px 18px 14px;font-size:18px}#dlgImport .import-body{padding:16px 18px 20px}#dlgImport .import-grid{grid-template-columns:1fr}#dlgImport .import-actions{flex-direction:column-reverse}#dlgImport .import-actions button{width:100%}}
 
 
-/* Обновление базы — отдельный современный мастер */
-#dlgUpdate{width:min(760px,calc(100vw - 28px));max-width:760px;max-height:calc(100vh - 30px);overflow:auto;padding:0;border:1px solid color-mix(in srgb,var(--acc) 20%,var(--line));border-radius:20px;box-shadow:0 28px 90px rgba(15,23,42,.30)}
-#dlgUpdate::backdrop{background:rgba(8,15,30,.58);backdrop-filter:blur(3px)}
-#dlgUpdate>h3{position:relative;overflow:hidden;margin:0;padding:25px 28px 22px;border:0;border-bottom:1px solid var(--line);background:linear-gradient(118deg,color-mix(in srgb,var(--acc) 17%,var(--bg)),var(--card) 78%);font-size:23px;font-weight:760;letter-spacing:-.035em}
-#dlgUpdate>h3:after{content:"↻";position:absolute;right:28px;top:0;color:var(--acc);font-size:88px;font-weight:800;line-height:1.2;opacity:.09;pointer-events:none}
-#dlgUpdate .import-body{padding:21px 27px 25px}
-#dlgUpdate .import-intro{max-width:650px;margin:0 0 19px;color:var(--mut);font-size:14px;line-height:1.6}
-#dlgUpdate .import-intro:after{content:"01  БАЗА     ━━━━━     02  СЕАНСЫ     ━━━━━     03  КОНФИГУРАЦИЯ";display:block;margin-top:15px;padding:10px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card);color:var(--acc);font-size:10px;font-weight:800;letter-spacing:.075em}
-#dlgUpdate .import-group{position:relative;padding:17px 18px 18px;margin:0 0 13px;border:1px solid var(--line);border-radius:14px;background:var(--bg);box-shadow:0 3px 12px rgba(15,23,42,.035);transition:border-color .16s,box-shadow .16s}
-#dlgUpdate .import-group:focus-within{border-color:color-mix(in srgb,var(--acc) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 9%,transparent)}
-#dlgUpdate .import-group-title{gap:11px;margin:0 0 13px;font-size:14px;font-weight:750;letter-spacing:-.01em}
-#dlgUpdate .import-step{width:30px;height:30px;border-radius:10px;background:color-mix(in srgb,var(--acc) 13%,var(--bg));color:var(--acc);font-size:13px;box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--acc) 20%,transparent)}
-#dlgUpdate label{margin:10px 0 6px;color:var(--mut);font-size:12px;font-weight:650}
-#dlgUpdate select,#dlgUpdate input:not([type=file]){width:100%;min-width:0;min-height:43px;padding:9px 12px;border:1px solid var(--line);border-radius:9px;background:var(--card);transition:border-color .15s,box-shadow .15s}
-#dlgUpdate select:focus,#dlgUpdate input:not([type=file]):focus{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px color-mix(in srgb,var(--acc) 13%,transparent)}
-#dlgUpdate #updateKick{min-height:40px;padding:8px 14px;border-radius:9px;font-weight:650}
-#dlgUpdate #updateUsers{padding:11px 13px;margin-top:11px;border:1px solid var(--line);border-radius:9px;background:var(--card);font-size:12px;line-height:1.5}
-#dlgUpdate input[type=file]{display:block;width:100%;min-width:0;min-height:112px;padding:24px 16px;border:1.5px dashed color-mix(in srgb,var(--acc) 55%,var(--line));border-radius:12px;background:color-mix(in srgb,var(--acc) 4%,var(--card));color:var(--mut);cursor:pointer}
-#dlgUpdate input[type=file]:hover{border-color:var(--acc);background:color-mix(in srgb,var(--acc) 8%,var(--card))}
-#dlgUpdate .import-hint{margin:9px 0 0;color:var(--mut);font-size:11px;line-height:1.55}
-#dlgUpdate .import-grid{gap:0 16px;margin-top:10px}
+/* Простое и компактное оформление окна обновления базы */
+#dlgUpdate{width:min(680px,calc(100vw - 28px));max-width:680px;max-height:calc(100vh - 30px);overflow:auto;padding:0;border:1px solid var(--line);border-radius:12px;box-shadow:0 16px 48px rgba(0,0,0,.2)}
+#dlgUpdate::backdrop{background:rgba(0,0,0,.45)}
+#dlgUpdate>h3{margin:0;padding:18px 22px;border-bottom:1px solid var(--line);background:var(--card);font-size:19px;font-weight:650}
+#dlgUpdate .import-body{padding:18px 22px 20px}
+#dlgUpdate .import-intro{margin:0 0 16px;color:var(--mut);font-size:14px;line-height:1.5}
+#dlgUpdate .import-group{padding:14px 15px;margin:0 0 12px;border:1px solid var(--line);border-radius:9px;background:var(--bg)}
+#dlgUpdate .import-group-title{gap:9px;margin:0 0 10px;font-size:14px;font-weight:650}
+#dlgUpdate .import-step{width:25px;height:25px;border-radius:50%;background:var(--acc);color:var(--accfg);font-size:12px}
+#dlgUpdate label{margin:8px 0 5px;color:var(--mut);font-size:12px;font-weight:550}
+#dlgUpdate select,#dlgUpdate input:not([type=file]){display:block;width:100%;min-width:0;min-height:39px;padding:7px 10px;border:1px solid var(--line);border-radius:7px;background:var(--bg)}
+#dlgUpdate #updateKick{min-height:36px;padding:6px 11px;border-radius:7px}
+#dlgUpdate #updateUsers{padding:9px 11px;margin-top:9px;border:1px solid var(--line);border-radius:7px;background:var(--card);font-size:12px;line-height:1.45}
+#dlgUpdate input[type=file]{display:block;width:100%;min-width:0;padding:12px;border:1px dashed var(--line);border-radius:7px;background:var(--bg);color:var(--fg)}
+#dlgUpdate .import-hint{margin:8px 0 0;color:var(--mut);font-size:12px;line-height:1.45}
+#dlgUpdate .import-grid{gap:0 14px;margin-top:8px}
 #dlgUpdate .import-grid>div{min-width:0}
-#dlgUpdate #updateStatus{padding:0 3px;margin:10px 0;font-size:12px;line-height:1.5;overflow-wrap:anywhere}
-#dlgUpdate .upload-progress{max-width:none;margin:12px 0}
+#dlgUpdate #updateStatus{margin:9px 0;font-size:12px;line-height:1.45;overflow-wrap:anywhere}
+#dlgUpdate .upload-progress{max-width:none;margin:10px 0}
 #dlgUpdate .upload-progress-track{height:9px}
+#dlgUpdate .import-actions{display:flex;justify-content:flex-end;gap:8px;margin:15px 0 0;padding-top:13px;border-top:1px solid var(--line)}
+#dlgUpdate .import-actions button{min-height:38px;padding:7px 14px;border-radius:7px}
+@media(max-width:560px){#dlgUpdate{min-width:0}#dlgUpdate>h3{padding:16px 17px;font-size:18px}#dlgUpdate .import-body{padding:15px 16px 17px}#dlgUpdate .import-grid{grid-template-columns:1fr}#dlgUpdate .import-actions{flex-direction:column-reverse}#dlgUpdate .import-actions button{width:100%}}
+.upload-progress-track{height:9px}
 #dlgUpdate .import-actions{position:sticky;bottom:-1px;z-index:2;justify-content:space-between;gap:10px;margin:18px -27px -25px;padding:14px 27px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--bg) 94%,transparent);backdrop-filter:blur(12px)}
 #dlgUpdate .import-actions button{min-height:42px;padding:9px 18px;border-radius:10px;font-weight:650}
 #dlgUpdate #updateUpload{min-width:190px;box-shadow:0 4px 12px color-mix(in srgb,var(--acc) 20%,transparent)}
