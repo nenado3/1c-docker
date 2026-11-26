@@ -346,6 +346,30 @@ dialog::backdrop{background:rgba(12,22,40,.48);backdrop-filter:blur(3px)}
 }
 
 
+
+/* Нормальный размер нативных переключателей: не применять к ним размеры текстовых полей */
+input[type="checkbox"],input[type="radio"]{
+  appearance:auto;
+  -webkit-appearance:auto;
+  display:inline-block;
+  box-sizing:border-box;
+  width:16px;
+  height:16px;
+  min-width:16px;
+  min-height:16px;
+  max-width:16px;
+  padding:0;
+  margin:0 7px 0 0;
+  border:initial;
+  border-radius:3px;
+  background:initial;
+  box-shadow:none;
+  vertical-align:middle;
+  accent-color:var(--acc);
+}
+#dlgImport .import-check{display:flex;align-items:center;gap:9px}
+#dlgImport .import-check input[type="checkbox"]{flex:0 0 16px;margin:0}
+
 /* Нумерация шагов обновления в точности как в форме создания базы */
 #dlgUpdate .import-group-title{display:flex;align-items:center;gap:9px}
 #dlgUpdate .import-step{display:inline-grid;place-items:center;flex:0 0 24px;width:24px;height:24px;min-width:24px;padding:0;border-radius:8px;background:var(--acc);color:var(--accfg);font-size:12px;line-height:1;font-weight:750;text-align:center;opacity:1;visibility:visible}
